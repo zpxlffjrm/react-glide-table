@@ -4,13 +4,9 @@ export {
   DataTable,
   Table,
   type TableCompoundComponent,
-} from "@/components/ui/Table"
+} from "@/compound/index"
 export type {
-  ColumnDef,
-  DataTableProps,
   DataTableSlots,
-  RowSelectionMode,
-  RowSelectionState,
   TableColumnProps,
   TableProps,
-} from "@/components/ui/Table"
+} from "@/compound/index"
