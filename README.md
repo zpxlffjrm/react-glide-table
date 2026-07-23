@@ -84,7 +84,7 @@ Wire `rowContextValue` into your own row/cell components for edit, selection, ex
 ## Notable constraints
 
 - **Row span + virtualization**: when `enableRowSpan` is on, virtualization is forced off (HTML `<table>` + `rowspan` cannot safely share a virtual window).
-- **No shipped CSS / opinionated components**: bring your own DOM. The repo’s `src/components/ui` folder is a local playground reference only and is not part of the published package.
+- **No shipped CSS / opinionated components**: bring your own DOM. The published package does not export the reference UI components under `src/components/ui` (but some feature helpers are re-exported and shipped).
 
 ## Local playground
 
