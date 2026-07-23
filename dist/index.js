@@ -4,7 +4,8 @@ import {
   getCoreRowModel,
   useReactTable
 } from "@tanstack/react-table";
-import { useCallback as useCallback3, useMemo as useMemo2, useState as useState3 } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback as useCallback3, useEffect as useEffect5, useMemo as useMemo2, useRef as useRef4, useState as useState3 } from "react";
 
 // src/components/ui/table/components/DataTable/DataTableRow.tsx
 import { flexRender } from "@tanstack/react-table";
@@ -19,6 +20,8 @@ var CELL_ALIGN_CLASS = {
 var ROW_HOVER_CLASS = "row-hoverable";
 var ROW_HOVERED_BG_CLASS = "row-hovered";
 var CELL_SELECTION_FILL_CLASS = "cell-selection-fill";
+var DATA_TABLE_ROW_HEIGHT = 44;
+var DATA_TABLE_VIRTUAL_OVERSCAN = 8;
 
 // src/components/ui/table/DataTableContext.tsx
 import { createContext, use } from "react";
@@ -468,7 +471,9 @@ function cn(...inputs) {
 import { jsx as jsx3, jsxs as jsxs2 } from "react/jsx-runtime";
 function resolveExpandCellIndex(cells, toggleField) {
   if (!toggleField) return 0;
-  const matchedIndex = cells.findIndex((cell) => cell.column.id === toggleField);
+  const matchedIndex = cells.findIndex(
+    (cell) => cell.column.id === toggleField
+  );
   if (matchedIndex >= 0) return matchedIndex;
   const noColumnIndex = cells.findIndex(
     (cell) => cell.column.id === "no" || cell.column.id === "treeNo"
@@ -480,7 +485,9 @@ function resolveExpandCellIndex(cells, toggleField) {
 }
 function DataTableRow({
   row,
-  onToggleSelect
+  onToggleSelect,
+  virtualIndex,
+  measureElement
 }) {
   const { rowSpan, selection, cellSelection, cellEdit, expand } = useDataTableRowContext();
   const {
@@ -500,8 +507,21 @@ function DataTableRow({
     onCellMouseEnter,
     onFillHandleMouseDown
   } = cellSelection;
-  const { editingCell, draftValue, onDraftValueChange, onStartEdit, onCommitEdit, onCancelEdit } = cellEdit;
-  const { enableExpand, toggleField, expandedRows, preventExpand, onToggleExpand } = expand;
+  const {
+    editingCell,
+    draftValue,
+    onDraftValueChange,
+    onStartEdit,
+    onCommitEdit,
+    onCancelEdit
+  } = cellEdit;
+  const {
+    enableExpand,
+    toggleField,
+    expandedRows,
+    preventExpand,
+    onToggleExpand
+  } = expand;
   const rowIndex = row.index;
   const rowData = row.original;
   const isRowHovered = hoveredRowIndex === rowIndex;
@@ -525,6 +545,8 @@ function DataTableRow({
   return /* @__PURE__ */ jsx3(
     "tr",
     {
+      ref: measureElement,
+      "data-index": virtualIndex,
       className: cn(
         "DataTableRowJSX",
         !enableRowSpan && ROW_HOVER_CLASS,
@@ -579,12 +601,21 @@ function DataTableRow({
                 return;
               }
               event.preventDefault();
-              onCellMouseDown(resolveCellRowIndex(event.clientY, event.currentTarget), cellIndex);
+              onCellMouseDown(
+                resolveCellRowIndex(event.clientY, event.currentTarget),
+                cellIndex
+              );
             },
-            onMouseEnter: (event) => onCellMouseEnter(resolveCellRowIndex(event.clientY, event.currentTarget), cellIndex),
+            onMouseEnter: (event) => onCellMouseEnter(
+              resolveCellRowIndex(event.clientY, event.currentTarget),
+              cellIndex
+            ),
             onMouseMove: (event) => {
               if (!dragState.isSelecting && !dragState.isFillDragging) return;
-              onCellMouseEnter(resolveCellRowIndex(event.clientY, event.currentTarget), cellIndex);
+              onCellMouseEnter(
+                resolveCellRowIndex(event.clientY, event.currentTarget),
+                cellIndex
+              );
             },
             onDoubleClick: (event) => {
               if (!editable) return;
@@ -983,7 +1014,7 @@ function collectRowSpanColumns(columns) {
 }
 
 // src/components/ui/table/components/DataTable/DataTable.tsx
-import { jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
 function DataTable({
   data,
   columns,
@@ -1011,13 +1042,25 @@ function DataTable({
   flattenField,
   expandedRows: controlledExpandedRows,
   onExpandedRowsChange,
-  preventExpand = false
+  preventExpand = false,
+  enableVirtualization = true,
+  estimateRowHeight = DATA_TABLE_ROW_HEIGHT,
+  virtualOverscan = DATA_TABLE_VIRTUAL_OVERSCAN
 }) {
   const enableExpand = Boolean(toggleField);
   const [internalRowSelection, setInternalRowSelection] = useState3({});
   const [internalExpandedRows, setInternalExpandedRows] = useState3(() => /* @__PURE__ */ new Set());
   const [hoveredRowIndex, setHoveredRowIndex] = useState3(null);
   const [hoveredGroupKey, setHoveredGroupKey] = useState3(null);
+  const scrollRef = useRef4(null);
+  const shouldVirtualize = enableVirtualization && !enableRowSpan;
+  useEffect5(() => {
+    if (enableVirtualization && enableRowSpan) {
+      console.warn(
+        "[DataTable] enableRowSpan\uC774 \uCF1C\uC838 \uC788\uC73C\uBA74 \uC140 \uBCD1\uD569 \uC720\uC9C0\uB97C \uC704\uD574 \uAC00\uC0C1\uD654\uB97C \uBE44\uD65C\uC131\uD654\uD569\uB2C8\uB2E4."
+      );
+    }
+  }, [enableVirtualization, enableRowSpan]);
   const rowSelection = resolveRowSelection(
     rowSelectionMode,
     controlledRowSelection,
@@ -1078,6 +1121,17 @@ function DataTable({
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedCount = selectedRows.length;
   const rows = table.getRowModel().rows;
+  const columnCount = table.getAllLeafColumns().length || 1;
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? rows.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => estimateRowHeight,
+    overscan: virtualOverscan
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+  const paddingBottom = virtualRows.length > 0 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0;
   const selectedGroupKeys = useMemo2(() => {
     if (!enableRowSpan || !primaryRowSpanKey) return /* @__PURE__ */ new Set();
     const keys = /* @__PURE__ */ new Set();
@@ -1226,7 +1280,7 @@ function DataTable({
         toolbar
       }
     ),
-    /* @__PURE__ */ jsx5("div", { className: "data-table-scroll", children: /* @__PURE__ */ jsxs4(
+    /* @__PURE__ */ jsx5("div", { ref: scrollRef, className: "data-table-scroll", children: /* @__PURE__ */ jsxs4(
       "table",
       {
         className: "data-table",
@@ -1249,14 +1303,38 @@ function DataTable({
               header.id
             );
           }) }, headerGroup.id)) }),
-          /* @__PURE__ */ jsx5(DataTableContextProvider, { value: rowContextValue, children: /* @__PURE__ */ jsx5("tbody", { onMouseLeave: clearHover, className: "data-table-body", children: rows.length === 0 ? /* @__PURE__ */ jsx5("tr", { children: /* @__PURE__ */ jsx5(
-            "td",
-            {
-              colSpan: table.getAllLeafColumns().length || 1,
-              className: "data-table-empty-cell",
-              children: emptyText
-            }
-          ) }) : rows.map((row) => /* @__PURE__ */ jsx5(
+          /* @__PURE__ */ jsx5(DataTableContextProvider, { value: rowContextValue, children: /* @__PURE__ */ jsx5("tbody", { onMouseLeave: clearHover, className: "data-table-body", children: rows.length === 0 ? /* @__PURE__ */ jsx5("tr", { children: /* @__PURE__ */ jsx5("td", { colSpan: columnCount, className: "data-table-empty-cell", children: emptyText }) }) : shouldVirtualize ? /* @__PURE__ */ jsxs4(Fragment2, { children: [
+            paddingTop > 0 && /* @__PURE__ */ jsx5("tr", { "aria-hidden": true, className: "data-table-virtual-spacer", children: /* @__PURE__ */ jsx5(
+              "td",
+              {
+                colSpan: columnCount,
+                style: { height: paddingTop },
+                className: "data-table-virtual-spacer-cell"
+              }
+            ) }),
+            virtualRows.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              if (!row) return null;
+              return /* @__PURE__ */ jsx5(
+                DataTableRow,
+                {
+                  row,
+                  virtualIndex: virtualRow.index,
+                  measureElement: rowVirtualizer.measureElement,
+                  onToggleSelect: () => handleToggleSelect(row)
+                },
+                row.id
+              );
+            }),
+            paddingBottom > 0 && /* @__PURE__ */ jsx5("tr", { "aria-hidden": true, className: "data-table-virtual-spacer", children: /* @__PURE__ */ jsx5(
+              "td",
+              {
+                colSpan: columnCount,
+                style: { height: paddingBottom },
+                className: "data-table-virtual-spacer-cell"
+              }
+            ) })
+          ] }) : rows.map((row) => /* @__PURE__ */ jsx5(
             DataTableRow,
             {
               row,

@@ -61,6 +61,16 @@ type DataTableProps<T extends Record<string, unknown>> = {
     onExpandedRowsChange?: (next: Set<string>) => void;
     /** true면 토글 비활성(자식 항상 표시) */
     preventExpand?: boolean;
+    /**
+     * 행 가상화 활성화. 기본 true.
+     * enableRowSpan이 true면 셀 병합 유지를 위해 가상화를 강제 비활성화합니다.
+     * (HTML table + spacer 방식 유지, absolute/translateY 미사용)
+     */
+    enableVirtualization?: boolean;
+    /** 가상화 행 예상 높이(px). 기본 44. 실측은 measureElement로 보정 */
+    estimateRowHeight?: number;
+    /** 가상화 overscan 행 수. 기본 8 */
+    virtualOverscan?: number;
 };
 type TableColumnProps<T extends Record<string, unknown>, K extends string = keyof T & string> = {
     /** 컬럼 id. 데이터 필드명이거나 virtual 컬럼용 임의 문자열 */
@@ -83,7 +93,7 @@ type TableProps<T extends Record<string, unknown>> = Omit<DataTableProps<T>, "co
     children: ReactNode;
 };
 
-declare function DataTable<T extends Record<string, unknown>>({ data, columns, rowSelectionMode, rowSelection: controlledRowSelection, onRowSelectionChange, totalCount, filteredCount, summary, toolbar, selectionLabel, isPending, emptyText, enableRowSpan, getRowId, onRowClick, getRowClassName, getRowCanSelect, selectOnRowClick, onDataChange, className, preserveRowSelection, toggleField, childField, flattenField, expandedRows: controlledExpandedRows, onExpandedRowsChange, preventExpand, }: DataTableProps<T>): react.JSX.Element;
+declare function DataTable<T extends Record<string, unknown>>({ data, columns, rowSelectionMode, rowSelection: controlledRowSelection, onRowSelectionChange, totalCount, filteredCount, summary, toolbar, selectionLabel, isPending, emptyText, enableRowSpan, getRowId, onRowClick, getRowClassName, getRowCanSelect, selectOnRowClick, onDataChange, className, preserveRowSelection, toggleField, childField, flattenField, expandedRows: controlledExpandedRows, onExpandedRowsChange, preventExpand, enableVirtualization, estimateRowHeight, virtualOverscan, }: DataTableProps<T>): react.JSX.Element;
 
 /** 본문 슬롯 마커. 실제 tbody는 DataTable이 렌더합니다. */
 declare function TableBody(): null;

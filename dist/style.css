@@ -96,6 +96,11 @@
   color: var(--color-neutral-text-muted);
 }
 
+.DataTableJSX .data-table-virtual-spacer-cell {
+  padding: 0;
+  border: 0;
+}
+
 .DataTableJSX .cell-align-left {
   text-align: left;
 }
@@ -110,7 +115,7 @@
 
 
 .DataTableRowJSX {
-  height: 44px;
+  min-height: 44px;
   background-color: var(--color-neutral-bg-surface);
   transition: background-color 0.15s ease;
 }
