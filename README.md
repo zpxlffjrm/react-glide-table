@@ -45,23 +45,21 @@ These Glide features are **not** included: Canvas custom cell drawing, frozen/pi
 
 ## Requirements
 
-| Package | Version |
-| --- | --- |
-| `react` | `^18` or `^19` |
-| `react-dom` | `^18` or `^19` |
-| `@tanstack/react-table` | `^8` |
-| `@tanstack/react-virtual` | `^3` |
+| Package | Version | Notes |
+| --- | --- | --- |
+| `react` | `^18` or `^19` | Peer dependency — provided by your app |
+| `react-dom` | `^18` or `^19` | Peer dependency — provided by your app |
 
-These are **peer dependencies** — install them in your app.
+`@tanstack/react-table` and `@tanstack/react-virtual` are installed automatically with this package.
 
 ## Installation
 
 ```bash
-npm install react-glide-table @tanstack/react-table @tanstack/react-virtual
+npm install react-glide-table
 # or
-pnpm add react-glide-table @tanstack/react-table @tanstack/react-virtual
+pnpm add react-glide-table
 # or
-yarn add react-glide-table @tanstack/react-table @tanstack/react-virtual
+yarn add react-glide-table
 ```
 
 Import styles once at your app entry (or layout):
