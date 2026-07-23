@@ -10,6 +10,12 @@ export {
   DEFAULT_TREE_QTY_FIELD,
 } from "@/core/treeDefaults"
 export { useGlideTable, type UseGlideTableOptions, type UseGlideTableResult } from "@/core/useGlideTable"
+export type {
+  ColumnDef,
+  DataTableProps,
+  RowSelectionMode,
+  RowSelectionState,
+} from "@/components/ui/table/types"
 
 export {
   applyCellEdit,

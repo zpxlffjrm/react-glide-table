@@ -16,10 +16,18 @@ pnpm add react-glide-table
 
 Peer dependencies: `react` and `react-dom` (`^18` or `^19`).
 
+The package is marked `"sideEffects": false` for tree-shaking. Prefer subpath imports when you only need one surface:
+
+| Import | Contents |
+| --- | --- |
+| `react-glide-table` | Full barrel (compound + core) |
+| `react-glide-table/compound` | `createTable` / `Table` / `DataTable` + related types |
+| `react-glide-table/core` | `useGlideTable` + feature hooks/helpers (no compound UI) |
+
 ## Quick start (compound)
 
 ```tsx
-import { createTable } from "react-glide-table"
+import { createTable } from "react-glide-table/compound"
 import { useState } from "react"
 
 type Product = { id: string; name: string; qty: number }
@@ -66,8 +74,8 @@ Row-level UI → `slots.Row`. Cell content → `Column.render`. Header/Cell are 
 
 ```tsx
 import { flexRender } from "@tanstack/react-table"
-import { useGlideTable } from "react-glide-table"
-import type { ColumnDef } from "react-glide-table"
+import { useGlideTable } from "react-glide-table/core"
+import type { ColumnDef } from "react-glide-table/core"
 
 type Product = { id: string; name: string; qty: number }
 
@@ -121,17 +129,17 @@ Wire `rowContextValue` into your own row/cell components for edit, selection, ex
 
 ## Public API
 
-| Export | Role |
-| --- | --- |
-| `createTable` / `Table` | Compound column DSL (`Header` / `Column` / `Body` / `Pagination`) |
-| `DataTable` | Unstyled default renderer (semantic HTML + slots/props) |
-| `useGlideTable` | Headless engine escape hatch |
-| `useCellEdit` / `useCellSelection` / `useConvertTreeData` | Feature hooks |
-| `applyCellEdit`, `applyFillData`, `buildColumnRowSpanMap`, … | Pure helpers |
-| `DEFAULT_DATA_TABLE_LABELS` / `resolveDataTableLabels` | Optional English UI copy helpers |
-| Tree field defaults | `id` / `parentId` / `children` / `qty` |
+| Export | Path | Role |
+| --- | --- | --- |
+| `createTable` / `Table` | `/compound` | Compound column DSL (`Header` / `Column` / `Body` / `Pagination`) |
+| `DataTable` | `/compound` | Unstyled default renderer (semantic HTML + slots/props) |
+| `useGlideTable` | `/core` | Headless engine escape hatch |
+| `useCellEdit` / `useCellSelection` / `useConvertTreeData` | `/core` | Feature hooks |
+| `applyCellEdit`, `applyFillData`, `buildColumnRowSpanMap`, … | `/core` | Pure helpers |
+| `DEFAULT_DATA_TABLE_LABELS` / `resolveDataTableLabels` | `/core` | Optional English UI copy helpers |
+| Tree field defaults | `/core` | `id` / `parentId` / `children` / `qty` |
 
-Related types: `TableProps`, `TableColumnProps`, `DataTableProps`, `DataTableSlots`, `TableCompoundComponent`, `ColumnDef`, …
+Root `react-glide-table` re-exports both surfaces. Related types: `TableProps`, `TableColumnProps`, `DataTableProps`, `DataTableSlots`, `TableCompoundComponent`, `ColumnDef`, …
 
 ## Notable constraints
 
