@@ -4,59 +4,70 @@ import {
   getCoreRowModel,
   useReactTable,
   type RowSelectionState,
-} from "@tanstack/react-table"
-import { useVirtualizer, type VirtualItem, type Virtualizer } from "@tanstack/react-virtual"
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
+} from "@tanstack/react-table";
+import {
+  useVirtualizer,
+  type VirtualItem,
+  type Virtualizer,
+} from "@tanstack/react-virtual";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import {
   DATA_TABLE_ROW_HEIGHT,
   DATA_TABLE_VIRTUAL_OVERSCAN,
-} from "@/components/ui/table/constants"
-import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext"
-import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit"
-import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection"
+} from "@/components/ui/table/constants";
+import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
+import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
+import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import {
   toggleExpandedRowId,
   useConvertTreeData,
-} from "@/components/ui/table/features/row-expand/row-expand"
+} from "@/components/ui/table/features/row-expand/row-expand";
 import {
   applySelectionUpdater,
   resolveRowSelection,
-} from "@/components/ui/table/features/row-selection/rowSelection"
+} from "@/components/ui/table/features/row-selection/rowSelection";
 import {
   buildColumnRowSpanMap,
   collectRowSpanColumns,
-} from "@/components/ui/table/features/row-span/rowSpan"
-import type { DataTableProps } from "@/components/ui/table/types"
-import type { DataTableLabels } from "@/core/labels"
-import { resolveDataTableLabels } from "@/core/labels"
+} from "@/components/ui/table/features/row-span/rowSpan";
+import type { DataTableProps } from "@/components/ui/table/types";
+import type { DataTableLabels } from "@/core/labels";
+import { resolveDataTableLabels } from "@/core/labels";
 
 export type UseGlideTableOptions<T extends Record<string, unknown>> = Omit<
   DataTableProps<T>,
   "className" | "slots" | "summary" | "toolbar" | "isPending"
->
+>;
 
 export type UseGlideTableResult<T extends Record<string, unknown>> = {
-  table: Table<T>
-  tableData: T[]
-  rows: Row<T>[]
-  columnCount: number
-  selectedCount: number
-  labels: DataTableLabels
-  emptyText: string
-  loadingText: string
-  selectionLabel: DataTableLabels["selection"]
-  enableCellSelection: boolean
-  shouldVirtualize: boolean
-  scrollRef: RefObject<HTMLDivElement | null>
-  rowVirtualizer: Virtualizer<HTMLDivElement, Element>
-  virtualRows: VirtualItem[]
-  paddingTop: number
-  paddingBottom: number
-  rowContextValue: DataTableRowContextValue
-  handleToggleSelect: (row: Row<T>) => void
-  clearHover: () => void
-}
+  table: Table<T>;
+  tableData: T[];
+  rows: Row<T>[];
+  columnCount: number;
+  selectedCount: number;
+  labels: DataTableLabels;
+  emptyText: string;
+  loadingText: string;
+  selectionLabel: DataTableLabels["selection"];
+  enableCellSelection: boolean;
+  shouldVirtualize: boolean;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  rowVirtualizer: Virtualizer<HTMLDivElement, Element>;
+  virtualRows: VirtualItem[];
+  paddingTop: number;
+  paddingBottom: number;
+  rowContextValue: DataTableRowContextValue;
+  handleToggleSelect: (row: Row<T>) => void;
+  clearHover: () => void;
+};
 
 export function useGlideTable<T extends Record<string, unknown>>(
   options: UseGlideTableOptions<T>,
@@ -92,56 +103,59 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enableVirtualization = true,
     estimateRowHeight = DATA_TABLE_ROW_HEIGHT,
     virtualOverscan = DATA_TABLE_VIRTUAL_OVERSCAN,
-  } = options
+  } = options;
 
   const labels = useMemo(() => {
-    const resolved = resolveDataTableLabels(labelsProp)
+    const resolved = resolveDataTableLabels(labelsProp);
 
     return {
       ...resolved,
       empty: labelsProp?.empty ?? emptyText ?? resolved.empty,
       loading: labelsProp?.loading ?? loadingText ?? resolved.loading,
       selection: labelsProp?.selection ?? selectionLabel ?? resolved.selection,
-    }
-  }, [labelsProp, emptyText, loadingText, selectionLabel])
+    };
+  }, [labelsProp, emptyText, loadingText, selectionLabel]);
 
-  const enableExpand = Boolean(toggleField)
-  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
-  const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(() => new Set())
-  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null)
-  const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const enableExpand = Boolean(toggleField);
+  const [internalRowSelection, setInternalRowSelection] =
+    useState<RowSelectionState>({});
+  const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+  const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const shouldVirtualize = enableVirtualization && !enableRowSpan
+  const shouldVirtualize = enableVirtualization && !enableRowSpan;
 
   useEffect(() => {
     if (enableVirtualization && enableRowSpan) {
       console.warn(
         "[DataTable] enableRowSpan is on; virtualization is disabled to preserve cell merges.",
-      )
+      );
     }
-  }, [enableVirtualization, enableRowSpan])
+  }, [enableVirtualization, enableRowSpan]);
 
   const rowSelection = resolveRowSelection(
     rowSelectionMode,
     controlledRowSelection,
     internalRowSelection,
-  )
+  );
 
-  const expandedRows = controlledExpandedRows ?? internalExpandedRows
+  const expandedRows = controlledExpandedRows ?? internalExpandedRows;
 
   const handleExpandedRowsChange = useCallback(
     (next: Set<string>) => {
       if (onExpandedRowsChange) {
-        onExpandedRowsChange(next)
+        onExpandedRowsChange(next);
 
-        return
+        return;
       }
 
-      setInternalExpandedRows(next)
+      setInternalExpandedRows(next);
     },
     [onExpandedRowsChange],
-  )
+  );
 
   const tableData = useConvertTreeData({
     data,
@@ -153,7 +167,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     expandedRows,
     onExpandedRowsChange: enableExpand ? handleExpandedRowsChange : undefined,
     preventExpand,
-  })
+  });
 
   const table = useReactTable({
     data: tableData,
@@ -172,63 +186,65 @@ export function useGlideTable<T extends Record<string, unknown>>(
       if (onRowSelectionChange) {
         onRowSelectionChange((previous) =>
           applySelectionUpdater(rowSelectionMode, updater, previous),
-        )
+        );
 
-        return
+        return;
       }
 
       setInternalRowSelection((previous) =>
         applySelectionUpdater(rowSelectionMode, updater, previous),
-      )
+      );
     },
     getCoreRowModel: getCoreRowModel(),
     getRowId: getRowId
       ? (originalRow, index) => getRowId(originalRow as T, index)
       : (_originalRow, index) => String(index),
-  })
+  });
 
   const rowSpanColumnKeys = useMemo(() => {
-    if (!enableRowSpan) return []
+    if (!enableRowSpan) return [];
 
-    return collectRowSpanColumns(columns)
-  }, [enableRowSpan, columns])
+    return collectRowSpanColumns(columns);
+  }, [enableRowSpan, columns]);
 
-  const primaryRowSpanKey = rowSpanColumnKeys[0]?.rowSpanKey
+  const primaryRowSpanKey = rowSpanColumnKeys[0]?.rowSpanKey;
 
   const columnRowSpanMap = useMemo(
     () => buildColumnRowSpanMap(tableData, rowSpanColumnKeys),
     [tableData, rowSpanColumnKeys],
-  )
+  );
 
-  const selectedRows = table.getSelectedRowModel().rows
-  const selectedCount = selectedRows.length
-  const rows = table.getRowModel().rows
-  const columnCount = table.getAllLeafColumns().length || 1
+  const selectedRows = table.getSelectedRowModel().rows;
+  const selectedCount = selectedRows.length;
+  const rows = table.getRowModel().rows;
+  const columnCount = table.getAllLeafColumns().length || 1;
 
   const rowVirtualizer = useVirtualizer({
     count: shouldVirtualize ? rows.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => estimateRowHeight,
     overscan: virtualOverscan,
-  })
+  });
 
-  const virtualRows = rowVirtualizer.getVirtualItems()
-  const totalSize = rowVirtualizer.getTotalSize()
-  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
-    virtualRows.length > 0 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0
+    virtualRows.length > 0
+      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+      : 0;
 
   const selectedGroupKeys = useMemo(() => {
-    if (!enableRowSpan || !primaryRowSpanKey) return new Set<string>()
+    if (!enableRowSpan || !primaryRowSpanKey) return new Set<string>();
 
-    const keys = new Set<string>()
+    const keys = new Set<string>();
     for (const selectedRow of selectedRows) {
-      const value = selectedRow.original[primaryRowSpanKey]
-      if (value !== null && value !== undefined) keys.add(String(value))
+      const value = selectedRow.original[primaryRowSpanKey];
+      if (value !== null && value !== undefined) keys.add(String(value));
     }
 
-    return keys
-  }, [enableRowSpan, primaryRowSpanKey, selectedRows])
+    return keys;
+  }, [enableRowSpan, primaryRowSpanKey, selectedRows]);
 
   const {
     dragState,
@@ -242,69 +258,77 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enabled: enableCellSelection,
     onDataChange,
     onBatchChange,
-  })
+  });
 
-  const { editingCell, draftValue, setDraftValue, startEdit, commitEdit, cancelEdit } = useCellEdit(
-    { data: tableData, rows, onDataChange, onCellChange },
-  )
+  const {
+    editingCell,
+    draftValue,
+    setDraftValue,
+    startEdit,
+    commitEdit,
+    cancelEdit,
+  } = useCellEdit({ data: tableData, rows, onDataChange, onCellChange });
 
   const handleCellMouseDownWithCommit = useCallback(
     (rowIndex: number, colIndex: number) => {
       const isSameEditingCell =
-        editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex
+        editingCell?.rowIndex === rowIndex &&
+        editingCell?.colIndex === colIndex;
 
       if (editingCell && !isSameEditingCell && !commitEdit()) {
-        return
+        return;
       }
 
-      handleCellMouseDown(rowIndex, colIndex)
+      handleCellMouseDown(rowIndex, colIndex);
     },
     [commitEdit, editingCell, handleCellMouseDown],
-  )
+  );
 
   const clearHover = useCallback(() => {
-    setHoveredRowIndex(null)
-    setHoveredGroupKey(null)
-  }, [])
+    setHoveredRowIndex(null);
+    setHoveredGroupKey(null);
+  }, []);
 
   const handleRowHover = useCallback(
     (rowIndex: number, rowData: T) => {
-      setHoveredRowIndex(rowIndex)
+      setHoveredRowIndex(rowIndex);
       if (!primaryRowSpanKey) {
-        setHoveredGroupKey(null)
+        setHoveredGroupKey(null);
 
-        return
+        return;
       }
 
-      const groupValue = rowData[primaryRowSpanKey]
+      const groupValue = rowData[primaryRowSpanKey];
       setHoveredGroupKey(
-        groupValue === null || groupValue === undefined ? null : String(groupValue),
-      )
+        groupValue === null || groupValue === undefined
+          ? null
+          : String(groupValue),
+      );
     },
     [primaryRowSpanKey],
-  )
+  );
 
   const handleToggleSelect = useCallback(
     (row: Row<T>) => {
-      if (!row.getCanSelect()) return
+      if (!row.getCanSelect()) return;
 
       if (preserveRowSelection && row.getIsSelected()) {
-        return
+        return;
       }
 
-      row.toggleSelected()
+      row.toggleSelected();
     },
     [preserveRowSelection],
-  )
+  );
 
   const handleToggleExpand = useCallback(
     (rowKey: string) => {
-      if (preventExpand) return
+      if (preventExpand) return;
 
-      handleExpandedRowsChange(toggleExpandedRowId(rowKey, expandedRows))
+      handleExpandedRowsChange(toggleExpandedRowId(rowKey, expandedRows));
     },
     [preventExpand, handleExpandedRowsChange, expandedRows],
-  )
+  );
 
   const rowContextValue = useMemo((): DataTableRowContextValue => {
     return {
@@ -315,12 +339,14 @@ export function useGlideTable<T extends Record<string, unknown>>(
         hoveredRowIndex,
         hoveredGroupKey,
         selectedGroupKeys,
-        onRowHover: handleRowHover as DataTableRowContextValue["rowSpan"]["onRowHover"],
+        onRowHover:
+          handleRowHover as DataTableRowContextValue["rowSpan"]["onRowHover"],
       },
       selection: {
         rowSelectionMode,
         selectOnRowClick,
-        onRowClick: onRowClick as DataTableRowContextValue["selection"]["onRowClick"],
+        onRowClick:
+          onRowClick as DataTableRowContextValue["selection"]["onRowClick"],
         getRowClassName:
           getRowClassName as DataTableRowContextValue["selection"]["getRowClassName"],
       },
@@ -349,7 +375,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
         expandRowLabel: labels.expandRow,
         collapseRowLabel: labels.collapseRow,
       },
-    }
+    };
   }, [
     enableRowSpan,
     primaryRowSpanKey,
@@ -381,7 +407,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleToggleExpand,
     labels.expandRow,
     labels.collapseRow,
-  ])
+  ]);
 
   return {
     table,
@@ -403,5 +429,5 @@ export function useGlideTable<T extends Record<string, unknown>>(
     rowContextValue,
     handleToggleSelect,
     clearHover,
-  }
+  };
 }
