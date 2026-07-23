@@ -1,5 +1,5 @@
 .DataTableRowJSX {
-  height: 44px;
+  min-height: 44px;
   background-color: var(--color-neutral-bg-surface);
   transition: background-color 0.15s ease;
 }

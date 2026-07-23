@@ -71,6 +71,11 @@
   color: var(--color-neutral-text-muted);
 }
 
+.DataTableJSX .data-table-virtual-spacer-cell {
+  padding: 0;
+  border: 0;
+}
+
 .DataTableJSX .cell-align-left {
   text-align: left;
 }

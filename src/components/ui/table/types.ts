@@ -64,6 +64,17 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   onExpandedRowsChange?: (next: Set<string>) => void
   /** true면 토글 비활성(자식 항상 표시) */
   preventExpand?: boolean
+
+  /**
+   * 행 가상화 활성화. 기본 true.
+   * enableRowSpan이 true면 셀 병합 유지를 위해 가상화를 강제 비활성화합니다.
+   * (HTML table + spacer 방식 유지, absolute/translateY 미사용)
+   */
+  enableVirtualization?: boolean
+  /** 가상화 행 예상 높이(px). 기본 44. 실측은 measureElement로 보정 */
+  estimateRowHeight?: number
+  /** 가상화 overscan 행 수. 기본 8 */
+  virtualOverscan?: number
 }
 
 export type TableColumnProps<
