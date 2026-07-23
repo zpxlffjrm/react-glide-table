@@ -44,7 +44,13 @@ import { resolveDataTableLabels } from "@/core/labels";
 
 export type UseGlideTableOptions<T extends Record<string, unknown>> = Omit<
   DataTableProps<T>,
-  "className" | "slots" | "summary" | "toolbar" | "isPending"
+  | "className"
+  | "slots"
+  | "summary"
+  | "toolbar"
+  | "isPending"
+  | "totalCount"
+  | "filteredCount"
 >;
 
 export type UseGlideTableResult<T extends Record<string, unknown>> = {
