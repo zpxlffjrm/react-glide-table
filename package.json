@@ -1,6 +1,14 @@
 {
   "name": "react-glide-table",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zpxlffjrm/react-glide-table.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zpxlffjrm/react-glide-table/issues"
+  },
+  "homepage": "https://github.com/zpxlffjrm/react-glide-table#readme",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
