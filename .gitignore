@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# logs / coverage
+*.log
+coverage/
+.turbo/

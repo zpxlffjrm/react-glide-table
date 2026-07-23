@@ -5,11 +5,16 @@ import {
   useReactTable,
   type RowSelectionState,
 } from "@tanstack/react-table"
-import { useCallback, useMemo, useState } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow"
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
-import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants"
+import {
+  CELL_ALIGN_CLASS,
+  DATA_TABLE_ROW_HEIGHT,
+  DATA_TABLE_VIRTUAL_OVERSCAN,
+} from "@/components/ui/table/constants"
 import {
   DataTableContextProvider,
   type DataTableRowContextValue,
@@ -60,12 +65,26 @@ function DataTable<T extends Record<string, unknown>>({
   expandedRows: controlledExpandedRows,
   onExpandedRowsChange,
   preventExpand = false,
+  enableVirtualization = true,
+  estimateRowHeight = DATA_TABLE_ROW_HEIGHT,
+  virtualOverscan = DATA_TABLE_VIRTUAL_OVERSCAN,
 }: DataTableProps<T>) {
   const enableExpand = Boolean(toggleField)
   const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
   const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(() => new Set())
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null)
   const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const shouldVirtualize = enableVirtualization && !enableRowSpan
+
+  useEffect(() => {
+    if (enableVirtualization && enableRowSpan) {
+      console.warn(
+        "[DataTable] enableRowSpan이 켜져 있으면 셀 병합 유지를 위해 가상화를 비활성화합니다.",
+      )
+    }
+  }, [enableVirtualization, enableRowSpan])
 
   const rowSelection = resolveRowSelection(
     rowSelectionMode,
@@ -147,6 +166,20 @@ function DataTable<T extends Record<string, unknown>>({
   const selectedRows = table.getSelectedRowModel().rows
   const selectedCount = selectedRows.length
   const rows = table.getRowModel().rows
+  const columnCount = table.getAllLeafColumns().length || 1
+
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? rows.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => estimateRowHeight,
+    overscan: virtualOverscan,
+  })
+
+  const virtualRows = rowVirtualizer.getVirtualItems()
+  const totalSize = rowVirtualizer.getTotalSize()
+  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0
+  const paddingBottom =
+    virtualRows.length > 0 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0
 
   const selectedGroupKeys = useMemo(() => {
     if (!enableRowSpan || !primaryRowSpanKey) return new Set<string>()
@@ -320,7 +353,7 @@ function DataTable<T extends Record<string, unknown>>({
         toolbar={toolbar}
       />
 
-      <div className="data-table-scroll">
+      <div ref={scrollRef} className="data-table-scroll">
         <table
           className="data-table"
           onDragStart={(event) => event.preventDefault()}>
@@ -353,12 +386,45 @@ function DataTable<T extends Record<string, unknown>>({
             <tbody onMouseLeave={clearHover} className="data-table-body">
               {rows.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={table.getAllLeafColumns().length || 1}
-                    className="data-table-empty-cell">
+                  <td colSpan={columnCount} className="data-table-empty-cell">
                     {emptyText}
                   </td>
                 </tr>
+              ) : shouldVirtualize ? (
+                <>
+                  {paddingTop > 0 && (
+                    <tr aria-hidden className="data-table-virtual-spacer">
+                      <td
+                        colSpan={columnCount}
+                        style={{ height: paddingTop }}
+                        className="data-table-virtual-spacer-cell"
+                      />
+                    </tr>
+                  )}
+                  {virtualRows.map((virtualRow) => {
+                    const row = rows[virtualRow.index]
+                    if (!row) return null
+
+                    return (
+                      <DataTableRow
+                        key={row.id}
+                        row={row}
+                        virtualIndex={virtualRow.index}
+                        measureElement={rowVirtualizer.measureElement}
+                        onToggleSelect={() => handleToggleSelect(row)}
+                      />
+                    )
+                  })}
+                  {paddingBottom > 0 && (
+                    <tr aria-hidden className="data-table-virtual-spacer">
+                      <td
+                        colSpan={columnCount}
+                        style={{ height: paddingBottom }}
+                        className="data-table-virtual-spacer-cell"
+                      />
+                    </tr>
+                  )}
+                </>
               ) : (
                 rows.map((row) => (
                   <DataTableRow
