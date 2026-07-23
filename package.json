@@ -1,6 +1,6 @@
 {
   "name": "react-glide-table",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zpxlffjrm/react-glide-table.git"
@@ -10,6 +10,10 @@
   },
   "homepage": "https://github.com/zpxlffjrm/react-glide-table#readme",
   "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,36 +22,38 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./style.css": "./dist/style.css"
+    }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup && node scripts/build-css.mjs",
+    "dev": "vite --config playground/vite.config.ts",
+    "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc"
   },
   "peerDependencies": {
-    "@tanstack/react-table": "^8.0.0",
-    "@tanstack/react-virtual": "^3.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
   },
-  "devDependencies": {
+  "dependencies": {
     "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.14.7",
+    "@tanstack/react-virtual": "^3.14.7"
+  },
+  "devDependencies": {
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
+    "vite": "^8.1.5",
     "vitest": "^4.1.10"
   }
 }

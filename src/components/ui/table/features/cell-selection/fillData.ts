@@ -14,13 +14,30 @@ function getColumnAccessorKey(columnDef: ColumnDef<unknown, unknown>): string | 
   return columnDef.id
 }
 
-export function applyFillData<T extends Record<string, unknown>>(
-  data: T[],
+export type CellChange = {
+  rowId: string
+  columnId: string
+  value: unknown
+}
+
+function collectFillTargets<T extends Record<string, unknown>>(
   rows: Row<T>[],
   sourceBounds: CellSelectionBounds,
   fillBounds: CellSelectionBounds,
-): T[] {
-  const newData = data.map((row) => ({ ...row }))
+): Array<{
+  rowIndex: number
+  accessorKey: string
+  columnId: string
+  value: unknown
+  rowId: string
+}> {
+  const targets: Array<{
+    rowIndex: number
+    accessorKey: string
+    columnId: string
+    value: unknown
+    rowId: string
+  }> = []
   const sourceHeight = sourceBounds.endRow - sourceBounds.startRow + 1
   const sourceWidth = sourceBounds.endCol - sourceBounds.startCol + 1
 
@@ -35,17 +52,52 @@ export function applyFillData<T extends Record<string, unknown>>(
       const sourceColIndex =
         sourceBounds.startCol + (((offsetCol % sourceWidth) + sourceWidth) % sourceWidth)
 
-      const targetCell = rows[rowIndex]?.getVisibleCells()[colIndex]
+      const targetRow = rows[rowIndex]
+      const targetCell = targetRow?.getVisibleCells()[colIndex]
       const sourceCell = rows[sourceRowIndex]?.getVisibleCells()[sourceColIndex]
-      if (!targetCell || !sourceCell) continue
+      if (!targetRow || !targetCell || !sourceCell) continue
 
       const accessorKey = getColumnAccessorKey(
         targetCell.column.columnDef as ColumnDef<unknown, unknown>,
       )
       if (!accessorKey) continue
 
-      ;(newData[rowIndex] as Record<string, unknown>)[accessorKey] = sourceCell.getValue()
+      targets.push({
+        rowIndex,
+        accessorKey,
+        columnId: targetCell.column.id,
+        value: sourceCell.getValue(),
+        rowId: targetRow.id,
+      })
     }
+  }
+
+  return targets
+}
+
+export function collectFillChanges<T extends Record<string, unknown>>(
+  rows: Row<T>[],
+  sourceBounds: CellSelectionBounds,
+  fillBounds: CellSelectionBounds,
+): CellChange[] {
+  return collectFillTargets(rows, sourceBounds, fillBounds).map(
+    ({ rowId, columnId, value }) => ({ rowId, columnId, value }),
+  )
+}
+
+export function applyFillData<T extends Record<string, unknown>>(
+  data: T[],
+  rows: Row<T>[],
+  sourceBounds: CellSelectionBounds,
+  fillBounds: CellSelectionBounds,
+): T[] {
+  const newData = data.map((row) => ({ ...row }))
+  const targets = collectFillTargets(rows, sourceBounds, fillBounds)
+
+  for (const target of targets) {
+    if (!newData[target.rowIndex]) continue
+
+    ;(newData[target.rowIndex] as Record<string, unknown>)[target.accessorKey] = target.value
   }
 
   return newData

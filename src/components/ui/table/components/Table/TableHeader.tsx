@@ -6,7 +6,7 @@ type TableHeaderProps = {
   children: ReactNode
 }
 
-/** 컬럼 선언 슬롯. DOM을 렌더하지 않습니다. */
+/** Column declaration slot. Does not render DOM. */
 function TableHeader(props: TableHeaderProps) {
   void props
 

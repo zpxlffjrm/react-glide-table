@@ -31,7 +31,7 @@ function TablePagination({
         className="pagination-button"
         disabled={!canGoPrev}
         onClick={() => onChange(safePage - 1)}
-        aria-label="이전 페이지">
+        aria-label="Previous page">
         <ChevronLeft className="pagination-button-icon" />
       </button>
       <span className="pagination-label">
@@ -42,7 +42,7 @@ function TablePagination({
         className="pagination-button"
         disabled={!canGoNext}
         onClick={() => onChange(safePage + 1)}
-        aria-label="다음 페이지">
+        aria-label="Next page">
         <ChevronRight className="pagination-button-icon" />
       </button>
     </div>
