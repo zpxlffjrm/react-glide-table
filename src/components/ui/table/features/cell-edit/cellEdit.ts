@@ -59,7 +59,7 @@ export function getCellEditDraftValue(value: unknown): string {
   return String(value)
 }
 
-/** 성공 시 갱신된 데이터, 파싱 실패·편집 불가 시 null */
+/** Returns updated data on success; null if parsing fails or the cell is not editable */
 export function applyCellEdit<T extends Record<string, unknown>>(
   data: T[],
   rows: Row<T>[],

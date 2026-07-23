@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table"
 
 export type RowSpanInfo = {
-  /** 0이면 렌더 생략(상위 행에 병합됨) */
+  /** 0 means skip render (merged into a parent row) */
   rowSpan: number
   isFirstInGroup: boolean
 }
@@ -11,7 +11,7 @@ function getRowFieldValue<T extends Record<string, unknown>>(row: T, key: string
 }
 
 /**
- * 연속된 동일 rowSpanKey 값을 기준으로 세로 병합 정보를 계산합니다.
+ * Computes vertical merge info from consecutive identical rowSpanKey values.
  */
 export function computeRowSpans<T extends Record<string, unknown>>(
   data: T[],
@@ -48,7 +48,34 @@ export function computeRowSpans<T extends Record<string, unknown>>(
 export type ColumnRowSpanMap = Map<string, RowSpanInfo[]>
 
 /**
- * rowSpan meta가 있는 컬럼별 병합 정보를 한 번에 계산합니다.
+ * Returns the start row and rowSpan of the merged cell covering a given row.
+ * Rows with rowSpan === 0 walk up to the merge origin.
+ */
+export function resolveRowSpanAt(
+  rowSpans: RowSpanInfo[] | undefined,
+  rowIndex: number,
+): { startRow: number; rowSpan: number } {
+  if (!rowSpans?.[rowIndex]) {
+    return { startRow: rowIndex, rowSpan: 1 };
+  }
+
+  const current = rowSpans[rowIndex];
+  if (current.rowSpan > 0) {
+    return { startRow: rowIndex, rowSpan: current.rowSpan };
+  }
+
+  for (let row = rowIndex - 1; row >= 0; row--) {
+    const info = rowSpans[row];
+    if (info && info.rowSpan > 0) {
+      return { startRow: row, rowSpan: info.rowSpan };
+    }
+  }
+
+  return { startRow: rowIndex, rowSpan: 1 };
+}
+
+/**
+ * Computes merge info for every column that has rowSpan meta.
  */
 export function buildColumnRowSpanMap<T extends Record<string, unknown>>(
   data: T[],

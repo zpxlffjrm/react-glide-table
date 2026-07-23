@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef } from "react"
 
+import {
+  DEFAULT_TREE_CHILDREN_FIELD,
+  DEFAULT_TREE_ID_FIELD,
+  DEFAULT_TREE_PARENT_ID_FIELD,
+  DEFAULT_TREE_QTY_FIELD,
+} from "@/core/treeDefaults"
+
 export type TreeRow<T extends Record<string, unknown> = Record<string, unknown>> = T & {
   level: number
   children: TreeRow<T>[]
@@ -11,11 +18,16 @@ export type TreeRow<T extends Record<string, unknown> = Record<string, unknown>>
 
 export type UseConvertTreeDataParams<T extends Record<string, unknown>> = {
   data: T[] | null
-  /** false면 변환 없이 원본 반환 (일반 DataTable) */
+  /** When false, returns data unchanged (plain DataTable) */
   enabled?: boolean
+  /** Row id / expand key field (idField). Defaults to `id` */
   toggleField?: string
+  /** Child → parent reference field (parentIdField). Defaults to `parentId` */
   childField?: string
+  /** Nested children array field (childrenField). Defaults to `children` */
   flattenField?: string
+  /** Parent quantity field (qtyField). Used for parentCount. Defaults to `qty` */
+  qtyField?: string
   preventExpand?: boolean
   startIndex?: number
   expandedRows?: Set<string>
@@ -45,15 +57,16 @@ export function toggleExpandedRowId(rowId: string, previous: Set<string>): Set<s
 }
 
 /**
- * flat/중첩 데이터를 트리로 구성한 뒤, expandedRows 기준으로 보이는 행만 flat 반환.
- * enabled=false면 data를 그대로 반환한다.
+ * Builds a tree from flat/nested data, then returns only rows visible under expandedRows.
+ * When enabled=false, returns data as-is.
  */
 export const useConvertTreeData = <T extends Record<string, unknown>>({
   data,
   enabled = true,
-  toggleField = "materialCode",
-  childField = "assemblyCode",
-  flattenField = "assemblyMaterials",
+  toggleField = DEFAULT_TREE_ID_FIELD,
+  childField = DEFAULT_TREE_PARENT_ID_FIELD,
+  flattenField = DEFAULT_TREE_CHILDREN_FIELD,
+  qtyField = DEFAULT_TREE_QTY_FIELD,
   preventExpand = false,
   startIndex = 1,
   expandedRows,
@@ -214,7 +227,7 @@ export const useConvertTreeData = <T extends Record<string, unknown>>({
         const parentItem = flattenedData.find(
           (parent) => getFieldValue(parent, toggleField) === getFieldValue(item, childField),
         )
-        const parentAmount = parentItem ? Number(getFieldValue(parentItem, "amount") ?? 1) : 1
+        const parentAmount = parentItem ? Number(getFieldValue(parentItem, qtyField) ?? 1) : 1
         item.parentCount = parentAmount || 1
       } else {
         item.parentCount = 1
@@ -222,7 +235,16 @@ export const useConvertTreeData = <T extends Record<string, unknown>>({
     })
 
     return flattenedData
-  }, [enabled, processedData, startIndex, toggleField, childField, preventExpand, expandedRows])
+  }, [
+    enabled,
+    processedData,
+    startIndex,
+    toggleField,
+    childField,
+    qtyField,
+    preventExpand,
+    expandedRows,
+  ])
 
   const sortedData = useMemo(() => {
     if (!enabled) {
