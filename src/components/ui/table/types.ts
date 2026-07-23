@@ -77,6 +77,10 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   onBatchChange?: (
     changes: Array<{ rowId: string; columnId: string; value: unknown }>,
   ) => void
+  /**
+   * Root className hook (combined with `DataTableJSX`).
+   * The package ships no CSS — style these hooks yourself or leave unstyled.
+   */
   className?: string
 
   /** Expand key field. Enables tree conversion / expand UI when set. Default `id` */
@@ -105,8 +109,8 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   virtualOverscan?: number
 
   /**
-   * Optional UI part replacements for the reference DataTable renderer.
-   * Works with the playground `createTable` / `Table.Column` API.
+   * Optional UI part replacements for the unstyled DataTable renderer.
+   * Use with `createTable` / `Table.Column`, or pass columns directly to `DataTable`.
    */
   slots?: DataTableSlots<T>
 }
@@ -128,8 +132,15 @@ export type DataTableRowSlotProps<T extends Record<string, unknown>> = {
   measureElement?: (node: Element | null) => void
 }
 
+/**
+ * Slot replacements for the default DataTable shell (semantic HTML + behavior only).
+ * Row-level custom UI → `Row`; cell content → `Table.Column` / column `render`.
+ * Header/Cell are not split into separate slots in this contract.
+ */
 export type DataTableSlots<T extends Record<string, unknown>> = {
+  /** Top summary / actions region */
   Toolbar?: ComponentType<DataTableToolbarSlotProps>
+  /** Full row replacement (cells, selection, edit UI) */
   Row?: ComponentType<DataTableRowSlotProps<T>>
   /** Replace the pending state view */
   Pending?: ComponentType<{ loadingText: string; className?: string }>
