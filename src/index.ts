@@ -1,4 +1,10 @@
 export * from "@/core/index"
+export {
+  createTable,
+  DataTable,
+  Table,
+  type TableCompoundComponent,
+} from "@/components/ui/Table"
 export type {
   ColumnDef,
   DataTableProps,
@@ -7,4 +13,4 @@ export type {
   RowSelectionState,
   TableColumnProps,
   TableProps,
-} from "@/components/ui/table/types"
+} from "@/components/ui/Table"
