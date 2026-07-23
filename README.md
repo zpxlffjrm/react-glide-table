@@ -29,13 +29,12 @@ const columns: ColumnDef<Product, unknown>[] = [
 ]
 
 export function ProductTable({ data }: { data: Product[] }) {
-  const { table, rows, scrollRef, shouldVirtualize, rowContextValue } =
-    useGlideTable({
-      data,
-      columns,
-      getRowId: (row) => row.id,
-      rowSelectionMode: "multi",
-    })
+  const { table, rows, scrollRef } = useGlideTable({
+    data,
+    columns,
+    getRowId: (row) => row.id,
+    rowSelectionMode: "multi",
+  })
 
   return (
     <div ref={scrollRef}>

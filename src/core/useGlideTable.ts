@@ -137,7 +137,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
   useEffect(() => {
     if (enableVirtualization && enableRowSpan) {
       console.warn(
-        "[DataTable] enableRowSpan is on; virtualization is disabled to preserve cell merges.",
+        "[useGlideTable] enableRowSpan is on; virtualization is disabled to preserve cell merges.",
       );
     }
   }, [enableVirtualization, enableRowSpan]);
