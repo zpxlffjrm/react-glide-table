@@ -33,6 +33,18 @@
   font-weight: 400;
 }
 
+/* Left vertical edge for merged cells. Adjacent merges each draw only their left edge to keep it 1px. */
+.DataTableRowJSX .data-table-cell.is-merged {
+  box-shadow: inset 1px 0 0 var(--color-neutral-border-default);
+}
+
+/* Add a right vertical edge only when the next column is not merged. */
+.DataTableRowJSX .data-table-cell.is-merged.is-merged-edge-right {
+  box-shadow:
+    inset 1px 0 0 var(--color-neutral-border-default),
+    inset -1px 0 0 var(--color-neutral-border-default);
+}
+
 .DataTableRowJSX .data-table-cell.is-group-selected {
   background-color: var(--color-brand-primary);
   color: #ffffff;
@@ -49,6 +61,26 @@
 .DataTableRowJSX .data-table-cell.cell-selection-fill {
   background-color: var(--color-brand-surface);
   color: #000000;
+}
+
+/*
+ * Draw the selection border on ::after, not the cell body.
+ * bottom: -1px covers the border-bottom so the vertical edge does not look
+ * 1px broken at merged-cell boundaries.
+ * background-image is for partial vertical borders on merged-cell step segments.
+ */
+.DataTableRowJSX .data-table-cell.cell-selection-edges::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  bottom: -1px;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: var(--selection-edge-shadows, none);
+  background-image: var(--selection-edge-gradients, none);
+  background-size: var(--selection-edge-sizes, auto);
+  background-position: var(--selection-edge-positions, 0 0);
+  background-repeat: no-repeat;
 }
 
 .DataTableRowJSX .data-table-cell.is-editable {

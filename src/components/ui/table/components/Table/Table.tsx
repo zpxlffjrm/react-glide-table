@@ -82,7 +82,7 @@ function TableRoot<T extends Record<string, unknown>>({
   }, [data, sort, paginationProps, page, pageSize])
 
   if (columns.length === 0) {
-    console.warn("[Table] Table.Header 안에 Table.Column을 하나 이상 선언해 주세요.")
+    console.warn("[Table] Declare at least one Table.Column inside Table.Header.")
   }
 
   return (
