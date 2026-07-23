@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   applyCellEdit,
   getCellEditDraftValue,
+  getColumnEditType,
   isColumnEditable,
+  parseCellEditValue,
   type EditingCell,
 } from "@/components/ui/table/features/cell-edit/cellEdit"
 
@@ -12,12 +14,14 @@ type UseCellEditOptions<T extends Record<string, unknown>> = {
   data: T[]
   rows: Row<T>[]
   onDataChange?: (data: T[]) => void
+  onCellChange?: (rowId: string, columnId: string, value: unknown) => void
 }
 
 export function useCellEdit<T extends Record<string, unknown>>({
   data,
   rows,
   onDataChange,
+  onCellChange,
 }: UseCellEditOptions<T>) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
   const [draftValue, setDraftValue] = useState("")
@@ -42,22 +46,47 @@ export function useCellEdit<T extends Record<string, unknown>>({
       const current = editingCellRef.current
       if (!current) return true
 
-      if (!onDataChange) {
+      if (!onCellChange && !onDataChange) {
+        cancelEdit()
+
+        return true
+      }
+
+      const row = rows[current.rowIndex]
+      const cell = row?.getVisibleCells()[current.colIndex]
+      if (!row || !cell) {
         cancelEdit()
 
         return true
       }
 
       const value = raw ?? draftValueRef.current
+
+      if (!isColumnEditable(cell.column.columnDef)) {
+        cancelEdit()
+
+        return true
+      }
+
+      const parsed = parseCellEditValue(value, getColumnEditType(cell.column.columnDef))
+      if (!parsed.ok) return false
+
+      if (onCellChange) {
+        onCellChange(row.id, cell.column.id, parsed.value)
+        cancelEdit()
+
+        return true
+      }
+
       const next = applyCellEdit(data, rows, current.rowIndex, current.colIndex, value)
       if (!next) return false
 
-      onDataChange(next)
+      onDataChange?.(next)
       cancelEdit()
 
       return true
     },
-    [cancelEdit, data, onDataChange, rows],
+    [cancelEdit, data, onCellChange, onDataChange, rows],
   )
 
   const startEdit = useCallback(

@@ -4,5 +4,11 @@ export {
   Table,
   type TableCompoundComponent,
 } from "@/components/ui/table/components/Table/Table"
-export type { DataTableProps, TableColumnProps, TableProps } from "@/components/ui/table/types"
+export type {
+  DataTableLabels,
+  DataTableProps,
+  DataTableSlots,
+  TableColumnProps,
+  TableProps,
+} from "@/components/ui/table/types"
 export type { ColumnDef, RowSelectionState, RowSelectionMode } from "@/components/ui/table/types"

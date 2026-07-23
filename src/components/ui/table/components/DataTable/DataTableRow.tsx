@@ -1,5 +1,5 @@
 import { flexRender, type Row } from "@tanstack/react-table";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 import {
   CELL_ALIGN_CLASS,
@@ -13,21 +13,26 @@ import {
   isColumnEditable,
 } from "@/components/ui/table/features/cell-edit/cellEdit";
 import {
+  CELL_SELECTION_EDGES_CLASS,
   getCellSelectionEdgeStyle,
   getRowIndexInMergedCell,
+  hasCellSelectionEdges,
   isCellInSelection,
 } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
-import type { RowSpanInfo } from "@/components/ui/table/features/row-span/rowSpan";
+import {
+  resolveRowSpanAt,
+  type RowSpanInfo,
+} from "@/components/ui/table/features/row-span/rowSpan";
 import { ChevronDown, ChevronUp } from "@/components/ui/table/components/icons";
 import { cn } from "@/lib/cn";
 
 export type DataTableRowProps<T extends Record<string, unknown>> = {
   row: Row<T>;
   onToggleSelect: () => void;
-  /** 가상화 아이템 인덱스. measureElement 추적용 */
+  /** Virtual item index, used for measureElement tracking */
   virtualIndex?: number;
-  /** 동적 행 높이 측정 콜백 (useVirtualizer.measureElement) */
+  /** Callback to measure dynamic row height (useVirtualizer.measureElement) */
   measureElement?: (node: Element | null) => void;
 };
 
@@ -75,6 +80,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
     selection;
 
   const {
+    enableCellSelection,
     activeSelectionBounds,
     dragState,
     onCellMouseDown,
@@ -97,6 +103,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
     expandedRows,
     preventExpand,
     onToggleExpand,
+    expandRowLabel,
+    collapseRowLabel,
   } = expand;
 
   const rowIndex = row.index;
@@ -117,6 +125,30 @@ export function DataTableRow<T extends Record<string, unknown>>({
     enableRowSpan && rowGroupKey !== null && selectedGroupKeys.has(rowGroupKey);
 
   const visibleCells = row.getVisibleCells();
+  const columnIdsByIndex = visibleCells.map((cell) => cell.column.id);
+  const isVisuallySelectedAt = activeSelectionBounds
+    ? (targetRow: number, targetCol: number) => {
+        if (
+          targetCol < activeSelectionBounds.startCol ||
+          targetCol > activeSelectionBounds.endCol
+        ) {
+          return false;
+        }
+
+        const columnId = columnIdsByIndex[targetCol];
+        const { startRow, rowSpan: span } = resolveRowSpanAt(
+          columnId ? columnRowSpanMap.get(columnId) : undefined,
+          targetRow,
+        );
+
+        return isCellInSelection(
+          startRow,
+          targetCol,
+          activeSelectionBounds,
+          span,
+        );
+      }
+    : undefined;
   const expandCellIndex = enableExpand
     ? resolveExpandCellIndex(visibleCells, toggleField)
     : -1;
@@ -189,6 +221,15 @@ export function DataTableRow<T extends Record<string, unknown>>({
           ? isGroupSelected
           : isRowSelected;
         const cellRowSpan = rowSpanInfo?.rowSpan ?? 1;
+        const isMerged = cellRowSpan > 1;
+        /** Draw the right edge only when the next column is not merged, so vertical lines do not stack with adjacent merged cells. */
+        const showMergedRightEdge =
+          isMerged &&
+          (cellIndex === visibleCells.length - 1 ||
+            resolveRowSpanAt(
+              columnRowSpanMap.get(columnIdsByIndex[cellIndex + 1]),
+              rowIndex,
+            ).rowSpan <= 1);
         const isCellDragSelected = isCellInSelection(
           rowIndex,
           cellIndex,
@@ -203,6 +244,14 @@ export function DataTableRow<T extends Record<string, unknown>>({
           activeSelectionBounds.endRow >= rowIndex &&
           activeSelectionBounds.endRow <= rowIndex + cellRowSpan - 1 &&
           cellIndex === activeSelectionBounds.endCol;
+
+        const selectionEdgeStyle = getCellSelectionEdgeStyle(
+          rowIndex,
+          cellIndex,
+          activeSelectionBounds,
+          cellRowSpan,
+          isVisuallySelectedAt,
+        );
 
         const resolveCellRowIndex = (clientY: number, element: HTMLElement) =>
           getRowIndexInMergedCell(clientY, element, rowIndex, cellRowSpan);
@@ -222,19 +271,24 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 return;
               }
 
+              if (!enableCellSelection) return;
+
               event.preventDefault();
               onCellMouseDown(
                 resolveCellRowIndex(event.clientY, event.currentTarget),
                 cellIndex,
               );
             }}
-            onMouseEnter={(event) =>
+            onMouseEnter={(event) => {
+              if (!enableCellSelection) return;
+
               onCellMouseEnter(
                 resolveCellRowIndex(event.clientY, event.currentTarget),
                 cellIndex,
-              )
-            }
+              );
+            }}
             onMouseMove={(event) => {
+              if (!enableCellSelection) return;
               if (!dragState.isSelecting && !dragState.isFillDragging) return;
 
               onCellMouseEnter(
@@ -249,22 +303,21 @@ export function DataTableRow<T extends Record<string, unknown>>({
               event.stopPropagation();
               onStartEdit(rowIndex, cellIndex);
             }}
-            style={getCellSelectionEdgeStyle(
-              rowIndex,
-              cellIndex,
-              activeSelectionBounds,
-              cellRowSpan,
-            )}
+            style={selectionEdgeStyle as CSSProperties | undefined}
             className={cn(
               "data-table-cell",
               CELL_ALIGN_CLASS[align],
               cellClassName,
+              isMerged && cellIndex > 0 && "is-merged",
+              showMergedRightEdge && "is-merged-edge-right",
               enableRowSpan && showCellSelected && "is-group-selected",
               enableRowSpan &&
                 showCellHover &&
                 !showCellSelected &&
                 "is-group-hovered",
               isCellDragSelected && CELL_SELECTION_FILL_CLASS,
+              hasCellSelectionEdges(selectionEdgeStyle) &&
+                CELL_SELECTION_EDGES_CLASS,
               editable && "is-editable",
             )}
           >
@@ -305,7 +358,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 {canExpand && expandKey && (
                   <button
                     type="button"
-                    aria-label={isExpanded ? "행 접기" : "행 펼치기"}
+                    aria-label={isExpanded ? collapseRowLabel : expandRowLabel}
                     className="expand-toggle-button"
                     onClick={(event) => {
                       event.stopPropagation();

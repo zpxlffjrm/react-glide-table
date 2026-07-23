@@ -3,6 +3,7 @@ node_modules/
 
 # build
 dist/
+playground/dist/
 
 # OS / editor
 .DS_Store
@@ -16,3 +17,7 @@ Thumbs.db
 *.log
 coverage/
 .turbo/
+
+# Bot review / discussion helpers
+discussion.md
+orchastration.py

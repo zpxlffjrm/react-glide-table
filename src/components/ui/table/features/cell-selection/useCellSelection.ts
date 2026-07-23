@@ -9,66 +9,98 @@ import {
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 import {
   applyFillData,
+  collectFillChanges,
   hasFillExtension,
 } from "@/components/ui/table/features/cell-selection/fillData"
 
 type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   data: T[]
   rows: Row<T>[]
+  enabled?: boolean
   onDataChange?: (data: T[]) => void
+  onBatchChange?: (
+    changes: Array<{ rowId: string; columnId: string; value: unknown }>,
+  ) => void
 }
 
 export function useCellSelection<T extends Record<string, unknown>>({
   data,
   rows,
+  enabled = true,
   onDataChange,
+  onBatchChange,
 }: UseCellSelectionOptions<T>) {
   const [dragState, setDragState] = useState<DragState>(INITIAL_DRAG_STATE)
 
   const cellSelectionBounds = getCellSelectionBounds(dragState.start, dragState.end)
-  const activeSelectionBounds = getActiveSelectionBounds(dragState, cellSelectionBounds)
+  const activeSelectionBounds = enabled
+    ? getActiveSelectionBounds(dragState, cellSelectionBounds)
+    : null
 
-  const handleCellMouseDown = useCallback((rowIndex: number, colIndex: number) => {
-    setDragState({
-      isSelecting: true,
-      isFillDragging: false,
-      start: { row: rowIndex, col: colIndex },
-      end: { row: rowIndex, col: colIndex },
-      fillAnchor: null,
-      fillEnd: null,
-    })
-  }, [])
+  const handleCellMouseDown = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (!enabled) return
 
-  const handleCellMouseEnter = useCallback((rowIndex: number, colIndex: number) => {
-    setDragState((prev) => {
-      if (prev.isSelecting) {
-        return { ...prev, end: { row: rowIndex, col: colIndex } }
-      }
+      setDragState({
+        isSelecting: true,
+        isFillDragging: false,
+        start: { row: rowIndex, col: colIndex },
+        end: { row: rowIndex, col: colIndex },
+        fillAnchor: null,
+        fillEnd: null,
+      })
+    },
+    [enabled],
+  )
 
-      if (prev.isFillDragging) {
-        return { ...prev, fillEnd: { row: rowIndex, col: colIndex } }
-      }
+  const handleCellMouseEnter = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (!enabled) return
 
-      return prev
-    })
-  }, [])
+      setDragState((prev) => {
+        if (prev.isSelecting) {
+          return { ...prev, end: { row: rowIndex, col: colIndex } }
+        }
 
-  const handleFillHandleMouseDown = useCallback((rowIndex: number, colIndex: number) => {
-    setDragState((prev) => {
-      const bounds = getCellSelectionBounds(prev.start, prev.end)
-      if (!bounds) return prev
+        if (prev.isFillDragging) {
+          return { ...prev, fillEnd: { row: rowIndex, col: colIndex } }
+        }
 
-      return {
-        ...prev,
-        isSelecting: false,
-        isFillDragging: true,
-        fillAnchor: { row: bounds.startRow, col: bounds.startCol },
-        fillEnd: { row: rowIndex, col: colIndex },
-      }
-    })
-  }, [])
+        return prev
+      })
+    },
+    [enabled],
+  )
+
+  const handleFillHandleMouseDown = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (!enabled) return
+
+      setDragState((prev) => {
+        const bounds = getCellSelectionBounds(prev.start, prev.end)
+        if (!bounds) return prev
+
+        return {
+          ...prev,
+          isSelecting: false,
+          isFillDragging: true,
+          fillAnchor: { row: bounds.startRow, col: bounds.startCol },
+          fillEnd: { row: rowIndex, col: colIndex },
+        }
+      })
+    },
+    [enabled],
+  )
 
   useEffect(() => {
+    if (!enabled) {
+      setDragState(INITIAL_DRAG_STATE)
+    }
+  }, [enabled])
+
+  useEffect(() => {
+    if (!enabled) return
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "c" && activeSelectionBounds) {
         const { startRow, endRow, startCol, endCol } = activeSelectionBounds
@@ -92,9 +124,11 @@ export function useCellSelection<T extends Record<string, unknown>>({
     window.addEventListener("keydown", handleKeyDown)
 
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [activeSelectionBounds, rows])
+  }, [activeSelectionBounds, enabled, rows])
 
   useEffect(() => {
+    if (!enabled) return
+
     const handleMouseUp = () => {
       setDragState((prev) => {
         if (prev.isFillDragging && prev.fillAnchor && prev.fillEnd) {
@@ -102,8 +136,15 @@ export function useCellSelection<T extends Record<string, unknown>>({
           const newBounds = getCellSelectionBounds(prev.fillAnchor, prev.fillEnd)
 
           if (newBounds) {
-            if (hasFillExtension(sourceBounds, newBounds) && sourceBounds && onDataChange) {
-              onDataChange(applyFillData(data, rows, sourceBounds, newBounds))
+            if (hasFillExtension(sourceBounds, newBounds) && sourceBounds) {
+              if (onBatchChange) {
+                const changes = collectFillChanges(rows, sourceBounds, newBounds)
+                if (changes.length > 0) {
+                  onBatchChange(changes)
+                }
+              } else if (onDataChange) {
+                onDataChange(applyFillData(data, rows, sourceBounds, newBounds))
+              }
             }
 
             return {
@@ -132,10 +173,10 @@ export function useCellSelection<T extends Record<string, unknown>>({
     window.addEventListener("mouseup", handleMouseUp)
 
     return () => window.removeEventListener("mouseup", handleMouseUp)
-  }, [data, onDataChange, rows])
+  }, [data, enabled, onBatchChange, onDataChange, rows])
 
   return {
-    dragState,
+    dragState: enabled ? dragState : INITIAL_DRAG_STATE,
     activeSelectionBounds,
     handleCellMouseDown,
     handleCellMouseEnter,

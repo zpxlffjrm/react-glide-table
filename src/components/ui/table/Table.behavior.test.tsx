@@ -32,24 +32,24 @@ const TREE_ROWS: TreeRow[] = [
   {
     id: "root-1",
     materialCode: "ASM-1000",
-    materialName: "메인 어셈블리",
+    materialName: "Main assembly",
     assemblyMaterials: [
       {
         id: "child-1",
         materialCode: "PRT-1100",
-        materialName: "상부 커버",
+        materialName: "Upper cover",
       },
       {
         id: "child-2",
         materialCode: "PRT-1200",
-        materialName: "하부 베이스",
+        materialName: "Lower base",
       },
     ],
   },
   {
     id: "root-2",
     materialCode: "ASM-2000",
-    materialName: "서브 어셈블리",
+    materialName: "Sub assembly",
   },
 ]
 
@@ -71,13 +71,18 @@ function renderSimpleTable(
   const { data = SIMPLE_ROWS, ...rest } = props
 
   return render(
-    <SimpleTable data={data} getRowId={(row) => row.id} {...rest}>
+    <SimpleTable
+      data={data}
+      getRowId={(row) => row.id}
+      enableVirtualization={false}
+      {...rest}
+    >
       <SimpleTable.Header>
         <SimpleTable.Column field="name" sortable>
-          이름
+          Name
         </SimpleTable.Column>
         <SimpleTable.Column field="amount" sortable>
-          수량
+          Qty
         </SimpleTable.Column>
       </SimpleTable.Header>
     </SimpleTable>,
@@ -99,9 +104,15 @@ function PaginatedTableHarness({
   }))
 
   return (
-    <SimpleTable data={data} filteredCount={25} totalCount={25} getRowId={(row) => row.id}>
+    <SimpleTable
+      data={data}
+      filteredCount={25}
+      totalCount={25}
+      getRowId={(row) => row.id}
+      enableVirtualization={false}
+    >
       <SimpleTable.Header>
-        <SimpleTable.Column field="name">이름</SimpleTable.Column>
+        <SimpleTable.Column field="name">Name</SimpleTable.Column>
       </SimpleTable.Header>
       <SimpleTable.Pagination page={page} pageSize={pageSize} totalCount={25} onChange={setPage} />
     </SimpleTable>
@@ -120,10 +131,12 @@ function ExpandTableHarness() {
       flattenField="assemblyMaterials"
       expandedRows={expandedRows}
       onExpandedRowsChange={setExpandedRows}
-      getRowId={(row) => row.id}>
+      getRowId={(row) => row.id}
+      enableVirtualization={false}
+    >
       <Table.Header>
-        <Table.Column field="materialCode">부품 Code</Table.Column>
-        <Table.Column field="materialName">부품명</Table.Column>
+        <Table.Column field="materialCode">Part code</Table.Column>
+        <Table.Column field="materialName">Part name</Table.Column>
       </Table.Header>
     </Table>
   )
@@ -133,44 +146,49 @@ function EditableTableHarness() {
   const [data, setData] = useState<SimpleRow[]>([{ id: "1", name: "Alpha", amount: 10 }])
 
   return (
-    <SimpleTable data={data} onDataChange={setData} getRowId={(row) => row.id}>
+    <SimpleTable
+      data={data}
+      onDataChange={setData}
+      getRowId={(row) => row.id}
+      enableVirtualization={false}
+    >
       <SimpleTable.Header>
         <SimpleTable.Column field="name" editable editType="text">
-          이름
+          Name
         </SimpleTable.Column>
       </SimpleTable.Header>
     </SimpleTable>
   )
 }
 
-describe("Table / createTable 동작", () => {
-  it("데이터 행을 렌더한다", () => {
+describe("Table / createTable behavior", () => {
+  it("renders data rows", () => {
     const { container } = renderSimpleTable()
 
     expect(getBodyRowTexts(container, 0)).toEqual(["Charlie", "Alpha", "Bravo"])
   })
 
-  it("정렬 헤더 클릭 시 행 순서가 바뀐다", async () => {
+  it("changes row order when a sortable header is clicked", async () => {
     const user = userEvent.setup()
     const { container } = renderSimpleTable()
 
-    await user.click(screen.getByRole("button", { name: /이름/ }))
+    await user.click(screen.getByRole("button", { name: /Name/ }))
     expect(getBodyRowTexts(container, 0)).toEqual(["Alpha", "Bravo", "Charlie"])
 
-    await user.click(screen.getByRole("button", { name: /이름/ }))
+    await user.click(screen.getByRole("button", { name: /Name/ }))
     expect(getBodyRowTexts(container, 0)).toEqual(["Charlie", "Bravo", "Alpha"])
 
-    await user.click(screen.getByRole("button", { name: /이름/ }))
+    await user.click(screen.getByRole("button", { name: /Name/ }))
     expect(getBodyRowTexts(container, 0)).toEqual(["Charlie", "Alpha", "Bravo"])
   })
 
-  it("데이터가 없으면 emptyText를 표시한다", () => {
-    renderSimpleTable({ data: [], emptyText: "표시할 데이터 없음" })
+  it("shows emptyText when there is no data", () => {
+    renderSimpleTable({ data: [], emptyText: "No data to display" })
 
-    expect(screen.getByText("표시할 데이터 없음")).toBeInTheDocument()
+    expect(screen.getByText("No data to display")).toBeInTheDocument()
   })
 
-  it("행 클릭 시 다중 선택 상태가 반영된다", async () => {
+  it("reflects multi-select state when a row is clicked", async () => {
     const user = userEvent.setup()
 
     renderSimpleTable({ rowSelectionMode: "multi" })
@@ -180,10 +198,10 @@ describe("Table / createTable 동작", () => {
 
     await user.click(firstBodyRow)
 
-    expect(screen.getByText("✓ 1개 선택됨")).toBeInTheDocument()
+    expect(screen.getByText("✓ 1 selected")).toBeInTheDocument()
   })
 
-  it("getRowCanSelect=false인 행은 선택되지 않는다", async () => {
+  it("does not select a row when getRowCanSelect returns false", async () => {
     const user = userEvent.setup()
 
     renderSimpleTable({
@@ -195,10 +213,10 @@ describe("Table / createTable 동작", () => {
 
     await user.click(rows[1])
 
-    expect(screen.queryByText(/선택됨/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
   })
 
-  it("페이지네이션 시 툴바에 전체 filteredCount를 표시하고 현재 페이지 행만 렌더한다", () => {
+  it("shows full filteredCount in the toolbar and only renders the current page rows", () => {
     const { container } = render(<PaginatedTableHarness />)
 
     expect(screen.getByText("25")).toBeInTheDocument()
@@ -208,11 +226,11 @@ describe("Table / createTable 동작", () => {
     expect(getBodyRowTexts(container, 0)[9]).toBe("Item-10")
   })
 
-  it("페이지네이션 버튼으로 다음 페이지를 볼 수 있다", async () => {
+  it("navigates to the next page via the pagination button", async () => {
     const user = userEvent.setup()
     const { container } = render(<PaginatedTableHarness />)
 
-    await user.click(screen.getByRole("button", { name: "다음 페이지" }))
+    await user.click(screen.getByRole("button", { name: "Next page" }))
 
     expect(screen.getByText("2 / 3")).toBeInTheDocument()
     expect(getBodyRowTexts(container, 0)[0]).toBe("Item-11")
@@ -220,22 +238,22 @@ describe("Table / createTable 동작", () => {
   })
 })
 
-describe("Table row-expand 동작", () => {
-  it("최초 로드 후 루트 행이 자동 펼쳐지고 자식 행이 보인다", async () => {
+describe("Table row-expand behavior", () => {
+  it("auto-expands root rows after load and shows child rows", async () => {
     render(<ExpandTableHarness />)
 
     expect(await screen.findByText("PRT-1100")).toBeInTheDocument()
     expect(screen.getByText("PRT-1200")).toBeInTheDocument()
   })
 
-  it("행 접기 버튼 클릭 시 자식 행이 숨겨진다", async () => {
+  it("hides child rows when the collapse button is clicked", async () => {
     const user = userEvent.setup()
 
     render(<ExpandTableHarness />)
 
     expect(await screen.findByText("PRT-1100")).toBeInTheDocument()
 
-    const collapseButtons = screen.getAllByRole("button", { name: "행 접기" })
+    const collapseButtons = screen.getAllByRole("button", { name: "Collapse row" })
 
     await user.click(collapseButtons[0])
 
@@ -244,25 +262,25 @@ describe("Table row-expand 동작", () => {
     expect(screen.getByText("ASM-2000")).toBeInTheDocument()
   })
 
-  it("접은 뒤 행 펼치기 버튼으로 자식 행을 다시 볼 수 있다", async () => {
+  it("shows child rows again after collapse via the expand button", async () => {
     const user = userEvent.setup()
 
     render(<ExpandTableHarness />)
 
     expect(await screen.findByText("PRT-1100")).toBeInTheDocument()
 
-    await user.click(screen.getAllByRole("button", { name: "행 접기" })[0])
+    await user.click(screen.getAllByRole("button", { name: "Collapse row" })[0])
     expect(screen.queryByText("PRT-1100")).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "행 펼치기" }))
+    await user.click(screen.getByRole("button", { name: "Expand row" }))
 
     expect(screen.getByText("PRT-1100")).toBeInTheDocument()
     expect(screen.getByText("PRT-1200")).toBeInTheDocument()
   })
 })
 
-describe("Table 셀 편집 동작", () => {
-  it("editable 컬럼 더블클릭 후 Enter로 값을 수정한다", async () => {
+describe("Table cell-edit behavior", () => {
+  it("updates a value after double-clicking an editable column and pressing Enter", async () => {
     const user = userEvent.setup()
 
     render(<EditableTableHarness />)
@@ -282,22 +300,29 @@ describe("Table 셀 편집 동작", () => {
   })
 })
 
-describe("DataTable 직접 사용 동작", () => {
-  it("ColumnDef 배열로 데이터를 렌더한다", () => {
+describe("DataTable direct usage behavior", () => {
+  it("renders data from a ColumnDef array", () => {
     const columns: ColumnDef<SimpleRow, unknown>[] = [
       {
         id: "name",
         accessorKey: "name",
-        header: "이름",
+        header: "Name",
       },
       {
         id: "amount",
         accessorKey: "amount",
-        header: "수량",
+        header: "Qty",
       },
     ]
 
-    render(<DataTable data={SIMPLE_ROWS} columns={columns} getRowId={(row) => row.id} />)
+    render(
+      <DataTable
+        data={SIMPLE_ROWS}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      />,
+    )
 
     const table = screen.getByRole("table")
 
@@ -306,12 +331,12 @@ describe("DataTable 직접 사용 동작", () => {
     expect(within(table).getByText("Bravo")).toBeInTheDocument()
   })
 
-  it("filteredCount와 totalCount를 툴바에 표시한다", () => {
+  it("shows filteredCount and totalCount in the toolbar", () => {
     const columns: ColumnDef<SimpleRow, unknown>[] = [
       {
         id: "name",
         accessorKey: "name",
-        header: "이름",
+        header: "Name",
       },
     ]
 
@@ -322,6 +347,7 @@ describe("DataTable 직접 사용 동작", () => {
         filteredCount={2}
         totalCount={3}
         getRowId={(row) => row.id}
+        enableVirtualization={false}
       />,
     )
 

@@ -27,6 +27,7 @@ export type DataTableRowContextValue = {
     getRowClassName?: (row: RowData, index: number) => string | undefined
   }
   cellSelection: {
+    enableCellSelection: boolean
     activeSelectionBounds: CellSelectionBounds | null
     dragState: DragState
     onCellMouseDown: (rowIndex: number, colIndex: number) => void
@@ -47,6 +48,8 @@ export type DataTableRowContextValue = {
     expandedRows?: Set<string>
     preventExpand: boolean
     onToggleExpand?: (rowKey: string) => void
+    expandRowLabel: string
+    collapseRowLabel: string
   }
 }
 
