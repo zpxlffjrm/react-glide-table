@@ -38,6 +38,12 @@ function DefaultEmpty({
   )
 }
 
+/**
+ * Unstyled DataTable shell: semantic HTML + interaction behavior.
+ * Class hooks (`DataTableJSX`, `data-table`, …) are opt-in — no CSS is shipped.
+ * Customize via `className`, column `className` / `headerClassName`, `labels`,
+ * `summary` / `toolbar`, `Column.render`, and `slots`.
+ */
 function DataTable<T extends Record<string, unknown>>({
   isPending = false,
   summary,

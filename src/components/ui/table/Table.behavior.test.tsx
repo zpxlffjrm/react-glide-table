@@ -4,8 +4,8 @@ import type { ComponentProps } from "react"
 import { useState } from "react"
 import { describe, expect, it } from "vitest"
 
-import { createTable, DataTable, Table } from "@/components/ui/Table"
-import type { ColumnDef } from "@/components/ui/Table"
+import { createTable, DataTable, Table } from "@/index"
+import type { ColumnDef } from "@/index"
 
 type SimpleRow = {
   id: string
