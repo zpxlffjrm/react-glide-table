@@ -1,0 +1,142 @@
+.DataTableRowJSX {
+  height: 44px;
+  background-color: var(--color-neutral-bg-surface);
+  transition: background-color 0.15s ease;
+}
+
+.DataTableRowJSX.row-hoverable:hover {
+  background-color: var(--color-neutral-border-default);
+}
+
+.DataTableRowJSX.row-hovered {
+  background-color: var(--color-neutral-border-default);
+}
+
+.DataTableRowJSX.is-selected {
+  background-color: var(--color-brand-primary);
+  color: #ffffff;
+}
+
+.DataTableRowJSX.is-selected * {
+  color: #ffffff;
+}
+
+.DataTableRowJSX.is-expandable {
+  cursor: pointer;
+}
+
+.DataTableRowJSX .data-table-cell {
+  position: relative;
+  border-bottom: 1px solid var(--color-neutral-border-default);
+  padding: 0 var(--spacing-md);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.DataTableRowJSX .data-table-cell.is-group-selected {
+  background-color: var(--color-brand-primary);
+  color: #ffffff;
+}
+
+.DataTableRowJSX .data-table-cell.is-group-selected * {
+  color: #ffffff;
+}
+
+.DataTableRowJSX .data-table-cell.is-group-hovered {
+  background-color: var(--color-neutral-border-default);
+}
+
+.DataTableRowJSX .data-table-cell.cell-selection-fill {
+  background-color: var(--color-brand-surface);
+  color: #000000;
+}
+
+.DataTableRowJSX .data-table-cell.is-editable {
+  cursor: text;
+}
+
+.DataTableRowJSX .cell-align-left {
+  text-align: left;
+}
+
+.DataTableRowJSX .cell-align-center {
+  text-align: center;
+}
+
+.DataTableRowJSX .cell-align-right {
+  text-align: right;
+}
+
+.DataTableRowJSX .cell-edit-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--spacing-xs);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-neutral-bg-surface);
+  font-size: 14px;
+  color: var(--color-neutral-text-default);
+  outline: none;
+  user-select: text;
+}
+
+.DataTableRowJSX .expand-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}
+
+.DataTableRowJSX .expand-cell-content {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.DataTableRowJSX .expand-cell-indent {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.DataTableRowJSX .expand-cell-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.DataTableRowJSX .expand-toggle-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-neutral-text-muted);
+  cursor: pointer;
+}
+
+.DataTableRowJSX .expand-toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.DataTableRowJSX .fill-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-brand-primary);
+  cursor: crosshair;
+}

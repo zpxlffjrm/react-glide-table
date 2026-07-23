@@ -1,0 +1,23 @@
+:root {
+  --color-neutral-border-default: #e5e7eb;
+  --color-neutral-bg-surface: #ffffff;
+  --color-neutral-bg-app: #f9fafb;
+  --color-neutral-text-primary: #111827;
+  --color-neutral-text-secondary: #4b5563;
+  --color-neutral-text-muted: #6b7280;
+  --color-neutral-text-placeholder: #9ca3af;
+  --color-neutral-text-default: #1f2937;
+  --color-brand-primary: #2563eb;
+  --color-brand-accent: #2563eb;
+  --color-brand-surface: #eff6ff;
+  --spacing-xs: 4px;
+  --spacing-sm: 6px;
+  --spacing-md: 8px;
+  --spacing-lg: 12px;
+  --spacing-xl: 16px;
+  --spacing-3xl: 24px;
+  --spacing-5xl: 32px;
+  --spacing-7xl: 48px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+}

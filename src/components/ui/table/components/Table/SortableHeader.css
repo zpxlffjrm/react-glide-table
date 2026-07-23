@@ -1,0 +1,24 @@
+.SortableHeaderJSX {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.SortableHeaderJSX.is-active {
+  color: var(--color-neutral-text-primary);
+}
+
+.SortableHeaderJSX.is-inactive {
+  color: var(--color-neutral-text-muted);
+}
+
+.SortableHeaderJSX .sortable-header-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}

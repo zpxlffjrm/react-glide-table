@@ -1,0 +1,7 @@
+@import "./tokens.css";
+@import "../components/ui/table/components/DataTable/DataTable.css";
+@import "../components/ui/table/components/DataTable/DataTableRow.css";
+@import "../components/ui/table/components/DataTable/DataTableToolbar.css";
+@import "../components/ui/table/components/Table/Table.css";
+@import "../components/ui/table/components/Table/TablePagination.css";
+@import "../components/ui/table/components/Table/SortableHeader.css";
