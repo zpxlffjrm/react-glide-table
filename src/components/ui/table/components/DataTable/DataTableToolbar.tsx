@@ -28,7 +28,10 @@ function DataTableToolbar({
 
   const selectionContent = selectionLabel?.(selectedCount) ?? null
   const hasSelectionContent =
-    selectionContent !== null && selectionContent !== false && selectionContent !== undefined
+    selectionContent !== null &&
+    selectionContent !== false &&
+    selectionContent !== undefined &&
+    typeof selectionContent !== "boolean"
 
   if (!hasLeftContent && !hasToolbar && !hasSelectionContent) return null
 
