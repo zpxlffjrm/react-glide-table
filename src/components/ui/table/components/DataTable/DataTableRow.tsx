@@ -259,6 +259,9 @@ export function DataTableRow<T extends Record<string, unknown>>({
           cellIndex === activeSelectionBounds.endCol;
 
         const spanRowHeights =
+          enableCellSelection &&
+          activeSelectionBounds &&
+          isCellDragSelected &&
           cellRowSpan > 1
             ? measureMergedSpanRowHeights(rowIndex, cellRowSpan)
             : undefined;
@@ -286,7 +289,11 @@ export function DataTableRow<T extends Record<string, unknown>>({
             }
             data-merged={isMerged && cellIndex > 0 ? "" : undefined}
             data-merged-edge-right={showMergedRightEdge ? "" : undefined}
-            data-merged-row-first={cellIndex === 0 ? "" : undefined}
+            data-merged-row-first={
+              isMerged && cellIndex === 0 && showMergedRightEdge
+                ? ""
+                : undefined
+            }
             data-group-selected={
               enableRowSpan && showCellSelected ? "" : undefined
             }
@@ -344,7 +351,10 @@ export function DataTableRow<T extends Record<string, unknown>>({
               CELL_ALIGN_CLASS[align],
               cellClassName,
               isMerged && "is-merged",
-              cellIndex === 0 && "is-merged-row-first",
+              isMerged &&
+                cellIndex === 0 &&
+                showMergedRightEdge &&
+                "is-merged-row-first",
               showMergedRightEdge && "is-merged-edge-right",
               enableRowSpan && showCellSelected && "is-group-selected",
               enableRowSpan &&

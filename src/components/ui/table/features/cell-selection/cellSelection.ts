@@ -57,7 +57,9 @@ export function measureMergedSpanRowHeights(
 
   const tbody =
     cellElement?.closest("tbody") ??
-    document.querySelector("tbody.data-table-body");
+    (typeof document !== "undefined"
+      ? document.querySelector("tbody.data-table-body")
+      : null);
   if (!tbody) return undefined;
 
   const rows = tbody.querySelectorAll(":scope > tr");
@@ -335,7 +337,7 @@ function buildPartialEdgeGradient(
   const endPct = (edge.offsetRatio + edge.lengthRatio) * 100;
   const startPx = edge.offsetPx ?? 0;
   const endPx = (edge.offsetPx ?? 0) + (edge.lengthPx ?? 0);
-  const overlapPx = 2;
+  const overlapPx = SELECTION_EDGE_WIDTH_PX;
   const isTopProtrusion =
     (usePx ? startPx === 0 : edge.offsetRatio === 0) && edge.lengthRatio < 1;
   const isBottomProtrusion = usePx ? startPx > 0 : edge.offsetRatio > 0;
