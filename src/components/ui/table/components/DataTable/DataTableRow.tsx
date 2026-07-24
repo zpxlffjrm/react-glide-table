@@ -63,7 +63,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
   virtualIndex,
   measureElement,
 }: DataTableRowProps<T>) {
-  const { rowSpan, selection, cellSelection, cellEdit, expand } =
+  const { classNames, rowSpan, selection, cellSelection, cellEdit, expand } =
     useDataTableRowContext();
 
   const {
@@ -176,12 +176,17 @@ export function DataTableRow<T extends Record<string, unknown>>({
     <tr
       ref={measureElement}
       data-index={virtualIndex}
+      data-selected={isRowSelected ? "" : undefined}
+      data-hovered={isRowHovered || isGroupHovered ? "" : undefined}
+      data-expandable={enableExpand && canExpand ? "" : undefined}
+      data-expanded={isExpanded ? "" : undefined}
       className={cn(
         "DataTableRowJSX",
         !enableRowSpan && ROW_HOVER_CLASS,
         enableRowSpan && isRowHovered && !isRowSelected && ROW_HOVERED_BG_CLASS,
         isRowSelected && "is-selected",
         enableExpand && canExpand && "is-expandable",
+        classNames?.row,
         getRowClassName?.(rowData, rowIndex),
       )}
       onMouseEnter={() => onRowHover(rowIndex, rowData)}
@@ -256,6 +261,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
         const resolveCellRowIndex = (clientY: number, element: HTMLElement) =>
           getRowIndexInMergedCell(clientY, element, rowIndex, cellRowSpan);
 
+        const hasSelectionEdges = hasCellSelectionEdges(selectionEdgeStyle);
+
         return (
           <td
             key={cell.id}
@@ -264,6 +271,20 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 ? rowSpanInfo.rowSpan
                 : undefined
             }
+            data-merged={isMerged && cellIndex > 0 ? "" : undefined}
+            data-merged-edge-right={showMergedRightEdge ? "" : undefined}
+            data-group-selected={
+              enableRowSpan && showCellSelected ? "" : undefined
+            }
+            data-group-hovered={
+              enableRowSpan && showCellHover && !showCellSelected
+                ? ""
+                : undefined
+            }
+            data-selection-fill={isCellDragSelected ? "" : undefined}
+            data-selection-edges={hasSelectionEdges ? "" : undefined}
+            data-editable={editable ? "" : undefined}
+            data-editing={isEditing ? "" : undefined}
             onMouseDown={(event) => {
               if (isEditing) {
                 event.stopPropagation();
@@ -316,9 +337,9 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 !showCellSelected &&
                 "is-group-hovered",
               isCellDragSelected && CELL_SELECTION_FILL_CLASS,
-              hasCellSelectionEdges(selectionEdgeStyle) &&
-                CELL_SELECTION_EDGES_CLASS,
+              hasSelectionEdges && CELL_SELECTION_EDGES_CLASS,
               editable && "is-editable",
+              classNames?.cell,
             )}
           >
             {isEditing ? (
@@ -326,7 +347,11 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 ref={editInputRef}
                 type={editType === "number" ? "number" : "text"}
                 defaultValue={draftValue}
-                className={cn("cell-edit-input", CELL_ALIGN_CLASS[align])}
+                className={cn(
+                  "cell-edit-input",
+                  CELL_ALIGN_CLASS[align],
+                  classNames?.cellEditInput,
+                )}
                 onChange={(event) => onDraftValueChange(event.target.value)}
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={(event) => event.stopPropagation()}
@@ -346,12 +371,29 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 }}
               />
             ) : isExpandCell && enableExpand ? (
-              <div className="expand-cell">
-                <div className="expand-cell-content">
-                  {rowLevel > 0 && (
-                    <span className="expand-cell-indent">·</span>
+              <div className={cn("expand-cell", classNames?.expandCell)}>
+                <div
+                  className={cn(
+                    "expand-cell-content",
+                    classNames?.expandCellContent,
                   )}
-                  <div className="expand-cell-value">
+                >
+                  {rowLevel > 0 && (
+                    <span
+                      className={cn(
+                        "expand-cell-indent",
+                        classNames?.expandCellIndent,
+                      )}
+                    >
+                      ·
+                    </span>
+                  )}
+                  <div
+                    className={cn(
+                      "expand-cell-value",
+                      classNames?.expandCellValue,
+                    )}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </div>
                 </div>
@@ -359,7 +401,10 @@ export function DataTableRow<T extends Record<string, unknown>>({
                   <button
                     type="button"
                     aria-label={isExpanded ? collapseRowLabel : expandRowLabel}
-                    className="expand-toggle-button"
+                    className={cn(
+                      "expand-toggle-button",
+                      classNames?.expandToggle,
+                    )}
                     onClick={(event) => {
                       event.stopPropagation();
                       onToggleExpand?.(expandKey);
@@ -367,9 +412,19 @@ export function DataTableRow<T extends Record<string, unknown>>({
                     onMouseDown={(event) => event.stopPropagation()}
                   >
                     {isExpanded ? (
-                      <ChevronUp className="expand-toggle-icon" />
+                      <ChevronUp
+                        className={cn(
+                          "expand-toggle-icon",
+                          classNames?.expandToggleIcon,
+                        )}
+                      />
                     ) : (
-                      <ChevronDown className="expand-toggle-icon" />
+                      <ChevronDown
+                        className={cn(
+                          "expand-toggle-icon",
+                          classNames?.expandToggleIcon,
+                        )}
+                      />
                     )}
                   </button>
                 )}
@@ -381,7 +436,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
             {isBottomRightCell && (
               <div
                 role="presentation"
-                className="fill-handle"
+                className={cn("fill-handle", classNames?.fillHandle)}
                 onMouseDown={(event) => {
                   event.stopPropagation();
                   event.preventDefault();

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 
+import type { DataTableClassNames } from "@/components/ui/table/types"
 import { cn } from "@/lib/cn"
 
 type DataTableToolbarProps = {
@@ -10,6 +11,15 @@ type DataTableToolbarProps = {
   selectionLabel?: (selectedCount: number) => ReactNode
   toolbar?: ReactNode
   className?: string
+  classNames?: Pick<
+    DataTableClassNames,
+    | "toolbar"
+    | "toolbarLeft"
+    | "toolbarRight"
+    | "toolbarCount"
+    | "toolbarSelection"
+    | "toolbarActions"
+  >
 }
 
 function DataTableToolbar({
@@ -20,6 +30,7 @@ function DataTableToolbar({
   selectionLabel,
   toolbar,
   className,
+  classNames,
 }: DataTableToolbarProps) {
   const displayFiltered = filteredCount ?? totalCount
   const hasCount = displayFiltered !== undefined || totalCount !== undefined
@@ -36,10 +47,10 @@ function DataTableToolbar({
   if (!hasLeftContent && !hasToolbar && !hasSelectionContent) return null
 
   return (
-    <div className={cn("DataTableToolbarJSX", className)}>
-      <div className="toolbar-left">
+    <div className={cn("DataTableToolbarJSX", classNames?.toolbar, className)}>
+      <div className={cn("toolbar-left", classNames?.toolbarLeft)}>
         {hasCount && (
-          <span className="toolbar-count">
+          <span className={cn("toolbar-count", classNames?.toolbarCount)}>
             {displayFiltered !== undefined && totalCount !== undefined ? (
               <>
                 <span className="toolbar-count-primary">{displayFiltered}</span>
@@ -52,14 +63,18 @@ function DataTableToolbar({
         )}
         {summary}
       </div>
-      <div className="toolbar-right">
+      <div className={cn("toolbar-right", classNames?.toolbarRight)}>
         {hasSelectionContent &&
           (typeof selectionContent === "string" || typeof selectionContent === "number" ? (
-            <span className="toolbar-selection">{selectionContent}</span>
+            <span className={cn("toolbar-selection", classNames?.toolbarSelection)}>
+              {selectionContent}
+            </span>
           ) : (
             selectionContent
           ))}
-        {hasToolbar && <div className="toolbar-actions">{toolbar}</div>}
+        {hasToolbar && (
+          <div className={cn("toolbar-actions", classNames?.toolbarActions)}>{toolbar}</div>
+        )}
       </div>
     </div>
   )
