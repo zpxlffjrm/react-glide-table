@@ -38,6 +38,10 @@
   box-shadow: inset 1px 0 0 var(--color-neutral-border-default);
 }
 
+.DataTableRowJSX .data-table-cell.is-merged-row-first {
+  border-right: 1px solid var(--color-neutral-border-default);
+}
+
 /* Add a right vertical edge only when the next column is not merged. */
 .DataTableRowJSX .data-table-cell.is-merged.is-merged-edge-right {
   box-shadow:
@@ -67,7 +71,9 @@
  * Draw the selection border on ::after, not the cell body.
  * bottom: -1px covers the border-bottom so the vertical edge does not look
  * 1px broken at merged-cell boundaries.
- * background-image is for partial vertical borders on merged-cell step segments.
+ * Do not use inset: -1px on all sides — that makes side strokes protrude past
+ * neighboring horizontal segments at grid joints.
+ * background-image is for partial borders on merged-cell step segments.
  */
 .DataTableRowJSX .data-table-cell.cell-selection-edges::after {
   content: "";

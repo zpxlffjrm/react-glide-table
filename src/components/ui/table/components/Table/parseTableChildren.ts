@@ -1,4 +1,4 @@
-import { Children, type ReactElement, type ReactNode } from "react"
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react"
 
 import {
   isTableBodyElement,
@@ -39,10 +39,31 @@ export function parseTableChildren(children: ReactNode): ParsedTableChildren {
   return slots
 }
 
+function flattenColumnElements(children: ReactNode): ReactElement[] {
+  const result: ReactElement[] = []
+
+  for (const child of Children.toArray(children)) {
+    if (isTableColumnElement(child)) {
+      result.push(child)
+      continue
+    }
+
+    // Fragments / nested arrays are not columns themselves — walk into them.
+    if (isValidElement(child)) {
+      const nested = (child.props as { children?: ReactNode }).children
+      if (nested != null) {
+        result.push(...flattenColumnElements(nested))
+      }
+    }
+  }
+
+  return result
+}
+
 export function extractColumnElements(header: ReactElement | null): ReactElement[] {
   if (!header) return []
 
   const { children } = header.props as { children?: ReactNode }
 
-  return Children.toArray(children).filter(isTableColumnElement)
+  return flattenColumnElements(children)
 }

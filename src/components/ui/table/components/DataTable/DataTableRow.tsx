@@ -18,6 +18,7 @@ import {
   getRowIndexInMergedCell,
   hasCellSelectionEdges,
   isCellInSelection,
+  measureMergedSpanRowHeights,
 } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
 import {
@@ -221,11 +222,18 @@ export function DataTableRow<T extends Record<string, unknown>>({
           editingCell?.rowIndex === rowIndex &&
           editingCell?.colIndex === cellIndex;
 
-        const showCellHover = isRowSpanColumn ? isGroupHovered : isRowHovered;
+        const cellRowSpan = rowSpanInfo?.rowSpan ?? 1;
+        // Nested merges (category/region) start on different rows — check span range, not primary group key.
+        const isMergedCellHovered =
+          hoveredRowIndex !== null &&
+          hoveredRowIndex >= rowIndex &&
+          hoveredRowIndex <= rowIndex + cellRowSpan - 1;
+        const showCellHover = isRowSpanColumn
+          ? isMergedCellHovered
+          : isRowHovered;
         const showCellSelected = isRowSpanColumn
           ? isGroupSelected
           : isRowSelected;
-        const cellRowSpan = rowSpanInfo?.rowSpan ?? 1;
         const isMerged = cellRowSpan > 1;
         /** Draw the right edge only when the next column is not merged, so vertical lines do not stack with adjacent merged cells. */
         const showMergedRightEdge =
@@ -250,12 +258,17 @@ export function DataTableRow<T extends Record<string, unknown>>({
           activeSelectionBounds.endRow <= rowIndex + cellRowSpan - 1 &&
           cellIndex === activeSelectionBounds.endCol;
 
+        const spanRowHeights =
+          cellRowSpan > 1
+            ? measureMergedSpanRowHeights(rowIndex, cellRowSpan)
+            : undefined;
         const selectionEdgeStyle = getCellSelectionEdgeStyle(
           rowIndex,
           cellIndex,
           activeSelectionBounds,
           cellRowSpan,
           isVisuallySelectedAt,
+          spanRowHeights,
         );
 
         const resolveCellRowIndex = (clientY: number, element: HTMLElement) =>
@@ -273,6 +286,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
             }
             data-merged={isMerged && cellIndex > 0 ? "" : undefined}
             data-merged-edge-right={showMergedRightEdge ? "" : undefined}
+            data-merged-row-first={cellIndex === 0 ? "" : undefined}
             data-group-selected={
               enableRowSpan && showCellSelected ? "" : undefined
             }
@@ -330,6 +344,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
               CELL_ALIGN_CLASS[align],
               cellClassName,
               isMerged && cellIndex > 0 && "is-merged",
+              cellIndex === 0 && "is-merged-row-first",
               showMergedRightEdge && "is-merged-edge-right",
               enableRowSpan && showCellSelected && "is-group-selected",
               enableRowSpan &&
