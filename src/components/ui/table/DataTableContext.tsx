@@ -6,11 +6,12 @@ import type {
   DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 import type { ColumnRowSpanMap } from "@/components/ui/table/features/row-span/rowSpan"
-import type { RowSelectionMode } from "@/components/ui/table/types"
+import type { DataTableClassNames, RowSelectionMode } from "@/components/ui/table/types"
 
 type RowData = Record<string, unknown>
 
 export type DataTableRowContextValue = {
+  classNames?: DataTableClassNames
   rowSpan: {
     enableRowSpan: boolean
     primaryRowSpanKey?: string

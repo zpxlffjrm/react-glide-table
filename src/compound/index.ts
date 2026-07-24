@@ -6,6 +6,7 @@ export {
 } from "@/components/ui/Table"
 export type {
   ColumnDef,
+  DataTableClassNames,
   DataTableLabels,
   DataTableProps,
   DataTableSlots,
