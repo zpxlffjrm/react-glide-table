@@ -33,6 +33,8 @@ export {
   getRowIndexInMergedCell,
   hasCellSelectionEdges,
   isCellInSelection,
+  measureMergedSpanRowHeights,
+  rowRangeToHeightRatios,
   type CellSelectionBounds,
   type DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"

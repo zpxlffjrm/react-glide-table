@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createTable, Table } from "@/components/ui/Table";
+import { createTable } from "@/components/ui/Table";
 import "@/styles/index.css";
 
 type Product = {
@@ -15,13 +15,26 @@ type Product = {
 
 type BomRow = {
   id: string;
+  plant: string;
+  plantId: string;
+  line: string;
+  lineId: string;
   materialCode: string;
   materialName: string;
   qty: number;
   assemblyMaterials?: BomRow[];
 };
 
+type BomDraft = {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  qty: number;
+  assemblyMaterials?: BomDraft[];
+};
+
 const ProductTable = createTable<Product>();
+const BomTable = createTable<BomRow>();
 
 const REGIONS = ["APAC", "EMEA", "AMER"] as const;
 const CATEGORIES = ["Hardware", "Software", "Accessory", "Service"] as const;
@@ -44,74 +57,145 @@ function createProductRows(count: number): Product[] {
   });
 }
 
+function withPlantLine(
+  rows: BomDraft[],
+  plant: string,
+  plantId: string,
+  line: string,
+  lineId: string,
+): BomRow[] {
+  return rows.map((row) => ({
+    ...row,
+    plant,
+    plantId,
+    line,
+    lineId,
+    assemblyMaterials: row.assemblyMaterials
+      ? withPlantLine(row.assemblyMaterials, plant, plantId, line, lineId)
+      : undefined,
+  }));
+}
+
 function createBomRows(): BomRow[] {
   return [
-    {
-      id: "root-1",
-      materialCode: "ASM-1000",
-      materialName: "Main assembly",
-      qty: 1,
-      assemblyMaterials: [
+    ...withPlantLine(
+      [
         {
-          id: "child-1",
-          materialCode: "PRT-1100",
-          materialName: "Upper cover",
-          qty: 2,
-        },
-        {
-          id: "child-2",
-          materialCode: "PRT-1200",
-          materialName: "Lower base",
+          id: "root-1",
+          materialCode: "ASM-1000",
+          materialName: "Main assembly",
           qty: 1,
           assemblyMaterials: [
             {
-              id: "child-2-1",
-              materialCode: "PRT-1210",
-              materialName: "Base plate",
-              qty: 1,
+              id: "child-1",
+              materialCode: "PRT-1100",
+              materialName: "Upper cover",
+              qty: 2,
             },
             {
-              id: "child-2-2",
-              materialCode: "PRT-1220",
-              materialName: "Mounting bracket",
-              qty: 4,
+              id: "child-2",
+              materialCode: "PRT-1200",
+              materialName: "Lower base",
+              qty: 1,
+              assemblyMaterials: [
+                {
+                  id: "child-2-1",
+                  materialCode: "PRT-1210",
+                  materialName: "Base plate",
+                  qty: 1,
+                },
+                {
+                  id: "child-2-2",
+                  materialCode: "PRT-1220",
+                  materialName: "Mounting bracket",
+                  qty: 4,
+                },
+              ],
+            },
+            {
+              id: "child-3",
+              materialCode: "PRT-1300",
+              materialName: "Power module",
+              qty: 1,
             },
           ],
         },
         {
-          id: "child-3",
-          materialCode: "PRT-1300",
-          materialName: "Power module",
+          id: "root-2",
+          materialCode: "ASM-2000",
+          materialName: "Sub assembly",
           qty: 1,
+          assemblyMaterials: [
+            {
+              id: "child-4",
+              materialCode: "PRT-2100",
+              materialName: "Sensor board",
+              qty: 2,
+            },
+            {
+              id: "child-5",
+              materialCode: "PRT-2200",
+              materialName: "Cable harness",
+              qty: 3,
+            },
+          ],
         },
       ],
-    },
-    {
-      id: "root-2",
-      materialCode: "ASM-2000",
-      materialName: "Sub assembly",
-      qty: 1,
-      assemblyMaterials: [
+      "Seoul",
+      "p-seoul",
+      "Line A",
+      "l-a",
+    ),
+    ...withPlantLine(
+      [
         {
-          id: "child-4",
-          materialCode: "PRT-2100",
-          materialName: "Sensor board",
+          id: "root-3",
+          materialCode: "ASM-3000",
+          materialName: "Standalone module",
           qty: 2,
-        },
-        {
-          id: "child-5",
-          materialCode: "PRT-2200",
-          materialName: "Cable harness",
-          qty: 3,
+          assemblyMaterials: [
+            {
+              id: "child-6",
+              materialCode: "PRT-3100",
+              materialName: "Control board",
+              qty: 1,
+            },
+          ],
         },
       ],
-    },
-    {
-      id: "root-3",
-      materialCode: "ASM-3000",
-      materialName: "Standalone module",
-      qty: 2,
-    },
+      "Seoul",
+      "p-seoul",
+      "Line B",
+      "l-b",
+    ),
+    ...withPlantLine(
+      [
+        {
+          id: "root-4",
+          materialCode: "ASM-4000",
+          materialName: "Packaging kit",
+          qty: 1,
+          assemblyMaterials: [
+            {
+              id: "child-7",
+              materialCode: "PRT-4100",
+              materialName: "Carton box",
+              qty: 1,
+            },
+            {
+              id: "child-8",
+              materialCode: "PRT-4200",
+              materialName: "Foam insert",
+              qty: 2,
+            },
+          ],
+        },
+      ],
+      "Busan",
+      "p-busan",
+      "Line A",
+      "l-a",
+    ),
   ];
 }
 
@@ -154,6 +238,7 @@ export function App() {
   );
 
   const productCount = useMemo(() => productData.length, [productData]);
+  const bothFeatures = enableExpand && enableRowSpan;
 
   const reloadProducts = (count: number) => {
     setRowCount(count);
@@ -177,13 +262,20 @@ export function App() {
           <h1>Playground</h1>
           <p className="playground-lead">
             Points at the local <code>src</code> package. Use the toggles for
-            cell merge and tree expand, and change the row count to try
-            virtualized scrolling.
+            cell merge and tree expand (they can run together), and change the
+            row count to try virtualized scrolling.
             {enableRowSpan && (
               <>
                 {" "}
                 With <strong>Cell merge ON</strong>, virtualization is turned
                 off automatically.
+              </>
+            )}
+            {bothFeatures && (
+              <>
+                {" "}
+                Combined mode merges plant/line across the BOM tree while rows
+                stay expandable.
               </>
             )}
           </p>
@@ -193,13 +285,17 @@ export function App() {
             label="Cell merge"
             checked={enableRowSpan}
             onChange={setEnableRowSpan}
-            hint="enableRowSpan + region/category rowSpan"
+            hint={
+              enableExpand
+                ? "enableRowSpan + plant/line rowSpan on BOM"
+                : "enableRowSpan + region/category rowSpan"
+            }
           />
           <ToggleSwitch
             label="Row expand"
             checked={enableExpand}
             onChange={setEnableExpand}
-            hint="toggleField tree / BOM"
+            hint="toggleField tree / BOM (works with cell merge)"
           />
           {!enableExpand && (
             <label className="playground-field">
@@ -223,7 +319,7 @@ export function App() {
 
       <main className="playground-main">
         {enableExpand ? (
-          <Table
+          <BomTable
             data={bomData}
             getRowId={(row) => String(row.id)}
             onDataChange={setBomData}
@@ -243,28 +339,43 @@ export function App() {
               </button>
             }
           >
-            <Table.Header>
-              <Table.Column field="materialCode">Part code</Table.Column>
-              <Table.Column field="materialName" editable>
+            <BomTable.Header>
+              <BomTable.Column
+                field="plant"
+                rowSpan={enableRowSpan}
+                rowSpanKey="plantId"
+              >
+                Plant
+              </BomTable.Column>
+
+              <BomTable.Column field="materialCode">Part code</BomTable.Column>
+              <BomTable.Column field="materialName" editable>
                 Part name
-              </Table.Column>
-              <Table.Column
+              </BomTable.Column>
+              <BomTable.Column
+                field="line"
+                rowSpan={enableRowSpan}
+                rowSpanKey="lineId"
+              >
+                Line
+              </BomTable.Column>
+              <BomTable.Column
                 field="qty"
                 align="right"
                 editable
                 editType="number"
               >
                 Qty
-              </Table.Column>
-            </Table.Header>
-          </Table>
+              </BomTable.Column>
+            </BomTable.Header>
+          </BomTable>
         ) : (
           <ProductTable
             data={productData}
             getRowId={(row) => row.id}
             onDataChange={setProductData}
             enableRowSpan={enableRowSpan}
-            rowSelectionMode="multi"
+            rowSelectionMode="none"
             filteredCount={productCount}
             totalCount={productCount}
             toolbar={
@@ -283,6 +394,15 @@ export function App() {
                   Category
                 </ProductTable.Column>
               )}
+
+              <ProductTable.Column field="name" sortable editable>
+                Name
+              </ProductTable.Column>
+              {!enableRowSpan && (
+                <ProductTable.Column field="region" sortable>
+                  Region
+                </ProductTable.Column>
+              )}
               {enableRowSpan && (
                 <ProductTable.Column
                   field="region"
@@ -290,14 +410,6 @@ export function App() {
                   rowSpanKey="regionId"
                   sortable
                 >
-                  Region
-                </ProductTable.Column>
-              )}
-              <ProductTable.Column field="name" sortable editable>
-                Name
-              </ProductTable.Column>
-              {!enableRowSpan && (
-                <ProductTable.Column field="region" sortable>
                   Region
                 </ProductTable.Column>
               )}
