@@ -1,23 +1,35 @@
 import { flexRender } from "@tanstack/react-table"
+import { useMemo } from "react"
 
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow"
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
 import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants"
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
-import type { DataTableProps } from "@/components/ui/table/types"
+import type { DataTableClassNames, DataTableProps } from "@/components/ui/table/types"
 import { useGlideTable } from "@/core/useGlideTable"
 import { cn } from "@/lib/cn"
 
 function DefaultPending({
   loadingText,
   className,
+  classNames,
 }: {
   loadingText: string
   className?: string
+  classNames?: Pick<DataTableClassNames, "pending" | "loadingText" | "root">
 }) {
   return (
-    <div className={cn("DataTableJSX", "DataTableJSX--pending", className)}>
-      <span className="data-table-loading-text">{loadingText}</span>
+    <div
+      className={cn(
+        "DataTableJSX",
+        "DataTableJSX--pending",
+        classNames?.root,
+        classNames?.pending,
+        className,
+      )}>
+      <span className={cn("data-table-loading-text", classNames?.loadingText)}>
+        {loadingText}
+      </span>
     </div>
   )
 }
@@ -25,13 +37,17 @@ function DefaultPending({
 function DefaultEmpty({
   emptyText,
   columnCount,
+  classNames,
 }: {
   emptyText: string
   columnCount: number
+  classNames?: Pick<DataTableClassNames, "emptyCell">
 }) {
   return (
     <tr>
-      <td colSpan={columnCount} className="data-table-empty-cell">
+      <td
+        colSpan={columnCount}
+        className={cn("data-table-empty-cell", classNames?.emptyCell)}>
         {emptyText}
       </td>
     </tr>
@@ -41,8 +57,8 @@ function DefaultEmpty({
 /**
  * Unstyled DataTable shell: semantic HTML + interaction behavior.
  * Class hooks (`DataTableJSX`, `data-table`, …) are opt-in — no CSS is shipped.
- * Customize via `className`, column `className` / `headerClassName`, `labels`,
- * `summary` / `toolbar`, `Column.render`, and `slots`.
+ * Customize via `className`, `classNames` (Tailwind-friendly part map), column
+ * `className` / `headerClassName`, `labels`, `summary` / `toolbar`, `Column.render`, and `slots`.
  */
 function DataTable<T extends Record<string, unknown>>({
   isPending = false,
@@ -51,6 +67,7 @@ function DataTable<T extends Record<string, unknown>>({
   filteredCount,
   totalCount,
   className,
+  classNames,
   slots,
   ...glideOptions
 }: DataTableProps<T>) {
@@ -80,8 +97,19 @@ function DataTable<T extends Record<string, unknown>>({
   const PendingSlot = slots?.Pending ?? DefaultPending
   const EmptySlot = slots?.Empty ?? DefaultEmpty
 
+  const contextValue = useMemo(
+    () => ({ ...rowContextValue, classNames }),
+    [rowContextValue, classNames],
+  )
+
   if (isPending) {
-    return <PendingSlot loadingText={loadingText} className={className} />
+    return (
+      <PendingSlot
+        loadingText={loadingText}
+        className={className}
+        classNames={classNames}
+      />
+    )
   }
 
   return (
@@ -89,6 +117,7 @@ function DataTable<T extends Record<string, unknown>>({
       className={cn(
         "DataTableJSX",
         !enableCellSelection && "DataTableJSX--no-cell-selection",
+        classNames?.root,
         className,
       )}>
       <ToolbarSlot
@@ -98,17 +127,20 @@ function DataTable<T extends Record<string, unknown>>({
         selectedCount={selectedCount}
         selectionLabel={selectionLabel}
         toolbar={toolbar}
+        classNames={classNames}
       />
 
-      <div ref={scrollRef} className="data-table-scroll">
+      <div ref={scrollRef} className={cn("data-table-scroll", classNames?.scroll)}>
         <table
-          className="data-table"
+          className={cn("data-table", classNames?.table)}
           onDragStart={
             enableCellSelection ? (event) => event.preventDefault() : undefined
           }>
-          <thead className="data-table-head">
+          <thead className={cn("data-table-head", classNames?.head)}>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="data-table-head-row">
+              <tr
+                key={headerGroup.id}
+                className={cn("data-table-head-row", classNames?.headRow)}>
                 {headerGroup.headers.map((header) => {
                   const align = header.column.columnDef.meta?.align ?? "center"
                   const headerClassName = header.column.columnDef.meta?.headerClassName
@@ -120,6 +152,7 @@ function DataTable<T extends Record<string, unknown>>({
                       className={cn(
                         "data-table-head-cell",
                         CELL_ALIGN_CLASS[align],
+                        classNames?.headCell,
                         headerClassName,
                       )}>
                       {header.isPlaceholder
@@ -131,18 +164,32 @@ function DataTable<T extends Record<string, unknown>>({
               </tr>
             ))}
           </thead>
-          <DataTableContextProvider value={rowContextValue}>
-            <tbody onMouseLeave={clearHover} className="data-table-body">
+          <DataTableContextProvider value={contextValue}>
+            <tbody
+              onMouseLeave={clearHover}
+              className={cn("data-table-body", classNames?.body)}>
               {rows.length === 0 ? (
-                <EmptySlot emptyText={emptyText} columnCount={columnCount} />
+                <EmptySlot
+                  emptyText={emptyText}
+                  columnCount={columnCount}
+                  classNames={classNames}
+                />
               ) : shouldVirtualize ? (
                 <>
                   {paddingTop > 0 && (
-                    <tr aria-hidden className="data-table-virtual-spacer">
+                    <tr
+                      aria-hidden
+                      className={cn(
+                        "data-table-virtual-spacer",
+                        classNames?.virtualSpacer,
+                      )}>
                       <td
                         colSpan={columnCount}
                         style={{ height: paddingTop }}
-                        className="data-table-virtual-spacer-cell"
+                        className={cn(
+                          "data-table-virtual-spacer-cell",
+                          classNames?.virtualSpacerCell,
+                        )}
                       />
                     </tr>
                   )}
@@ -161,11 +208,19 @@ function DataTable<T extends Record<string, unknown>>({
                     )
                   })}
                   {paddingBottom > 0 && (
-                    <tr aria-hidden className="data-table-virtual-spacer">
+                    <tr
+                      aria-hidden
+                      className={cn(
+                        "data-table-virtual-spacer",
+                        classNames?.virtualSpacer,
+                      )}>
                       <td
                         colSpan={columnCount}
                         style={{ height: paddingBottom }}
-                        className="data-table-virtual-spacer-cell"
+                        className={cn(
+                          "data-table-virtual-spacer-cell",
+                          classNames?.virtualSpacerCell,
+                        )}
                       />
                     </tr>
                   )}

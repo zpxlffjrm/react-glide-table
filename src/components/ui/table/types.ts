@@ -82,6 +82,12 @@ export type DataTableProps<T extends Record<string, unknown>> = {
    * The package ships no CSS — style these hooks yourself or leave unstyled.
    */
   className?: string
+  /**
+   * Per-part class hooks for Tailwind / utility CSS.
+   * Combined with semantic hooks (`DataTableJSX`, `data-table-cell`, …).
+   * Prefer `data-*` state variants, e.g. `row: "data-[selected]:bg-blue-600"`.
+   */
+  classNames?: DataTableClassNames
 
   /** Expand key field. Enables tree conversion / expand UI when set. Default `id` */
   toggleField?: string
@@ -115,6 +121,41 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   slots?: DataTableSlots<T>
 }
 
+/**
+ * Named class hooks for the default DataTable shell.
+ * Pass Tailwind utilities directly without writing a separate CSS mapping file.
+ */
+export type DataTableClassNames = {
+  root?: string
+  pending?: string
+  loadingText?: string
+  toolbar?: string
+  toolbarLeft?: string
+  toolbarRight?: string
+  toolbarCount?: string
+  toolbarSelection?: string
+  toolbarActions?: string
+  scroll?: string
+  table?: string
+  head?: string
+  headRow?: string
+  headCell?: string
+  body?: string
+  emptyCell?: string
+  virtualSpacer?: string
+  virtualSpacerCell?: string
+  row?: string
+  cell?: string
+  cellEditInput?: string
+  expandCell?: string
+  expandCellContent?: string
+  expandCellIndent?: string
+  expandCellValue?: string
+  expandToggle?: string
+  expandToggleIcon?: string
+  fillHandle?: string
+}
+
 export type DataTableToolbarSlotProps = {
   filteredCount?: number
   totalCount?: number
@@ -123,6 +164,15 @@ export type DataTableToolbarSlotProps = {
   selectionLabel?: (selectedCount: number) => ReactNode
   toolbar?: ReactNode
   className?: string
+  classNames?: Pick<
+    DataTableClassNames,
+    | "toolbar"
+    | "toolbarLeft"
+    | "toolbarRight"
+    | "toolbarCount"
+    | "toolbarSelection"
+    | "toolbarActions"
+  >
 }
 
 export type DataTableRowSlotProps<T extends Record<string, unknown>> = {
@@ -143,9 +193,17 @@ export type DataTableSlots<T extends Record<string, unknown>> = {
   /** Full row replacement (cells, selection, edit UI) */
   Row?: ComponentType<DataTableRowSlotProps<T>>
   /** Replace the pending state view */
-  Pending?: ComponentType<{ loadingText: string; className?: string }>
+  Pending?: ComponentType<{
+    loadingText: string
+    className?: string
+    classNames?: Pick<DataTableClassNames, "pending" | "loadingText" | "root">
+  }>
   /** Replace the empty-state cell content */
-  Empty?: ComponentType<{ emptyText: string; columnCount: number }>
+  Empty?: ComponentType<{
+    emptyText: string
+    columnCount: number
+    classNames?: Pick<DataTableClassNames, "emptyCell">
+  }>
 }
 
 export type TableColumnProps<

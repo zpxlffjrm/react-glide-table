@@ -6,6 +6,7 @@ export {
   type TableCompoundComponent,
 } from "@/compound/index"
 export type {
+  DataTableClassNames,
   DataTableSlots,
   TableColumnProps,
   TableProps,

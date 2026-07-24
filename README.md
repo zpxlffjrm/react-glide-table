@@ -2,7 +2,7 @@
 
 Headless React table built on [@tanstack/react-table](https://tanstack.com/table) and [@tanstack/react-virtual](https://tanstack.com/virtual).
 
-Primary DX is a **compound API** (`createTable` / `Table.Column`) with an unstyled semantic HTML shell. Customize with `className` hooks, `slots`, and column `render`. `useGlideTable` remains the lower-level escape hatch when you need full control of markup.
+Primary DX is a **compound API** (`createTable` / `Table.Column`) with an unstyled semantic HTML shell. Customize with `className`, **`classNames` (Tailwind-friendly part map)**, `slots`, and column `render`. `useGlideTable` remains the lower-level escape hatch when you need full control of markup.
 
 The package ships **no CSS** — class names like `DataTableJSX` / `data-table` are opt-in hooks for your own styles.
 
@@ -41,9 +41,15 @@ export function Products({ data }: { data: Product[] }) {
     <ProductTable
       data={data}
       getRowId={(row) => row.id}
-      className="my-table"
-      // Optional: replace Toolbar / Row / Pending / Empty
-      // slots={{ Toolbar: MyToolbar, Row: MyRow, Empty: MyEmpty }}
+      className="rounded-lg border"
+      classNames={{
+        scroll: "max-h-[480px] overflow-auto",
+        head: "sticky top-0 z-10 bg-neutral-50",
+        headCell: "px-3 text-xs font-semibold text-neutral-500",
+        row: "hover:bg-neutral-100 data-[selected]:bg-blue-600 data-[selected]:text-white",
+        cell: "border-b border-neutral-200 px-3 text-sm",
+        toolbar: "flex items-center justify-between gap-2 p-2",
+      }}
     >
       <ProductTable.Header>
         <ProductTable.Column field="name">Name</ProductTable.Column>
@@ -61,12 +67,20 @@ export function Products({ data }: { data: Product[] }) {
 
 | Slot / prop | Role |
 | --- | --- |
+| `classNames` | Per-part Tailwind/utility classes (`root`, `scroll`, `row`, `cell`, `toolbar`, …) |
 | `slots.Toolbar` | Top summary / actions region |
 | `slots.Row` | Full row replacement (cells, selection, edit UI) |
 | `slots.Pending` / `slots.Empty` | Loading and empty states |
-| `className` / column `className` / `headerClassName` | Class hooks (style yourself) |
+| `className` / column `className` / `headerClassName` | Extra class hooks |
 | `labels` / `summary` / `toolbar` | Copy and slot nodes |
 | `Column.render` | Cell content custom render |
+
+Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
+
+- row: `data-selected`, `data-hovered`, `data-expandable`, `data-expanded`
+- cell: `data-merged`, `data-selection-fill`, `data-editable`, `data-editing`, …
+
+Example: `row: "data-[selected]:bg-blue-600"`.
 
 Row-level UI → `slots.Row`. Cell content → `Column.render`. Header/Cell are not separate slots.
 
