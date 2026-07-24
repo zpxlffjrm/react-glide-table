@@ -343,7 +343,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
               "data-table-cell",
               CELL_ALIGN_CLASS[align],
               cellClassName,
-              isMerged && cellIndex > 0 && "is-merged",
+              isMerged && "is-merged",
               cellIndex === 0 && "is-merged-row-first",
               showMergedRightEdge && "is-merged-edge-right",
               enableRowSpan && showCellSelected && "is-group-selected",
