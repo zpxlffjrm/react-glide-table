@@ -38,7 +38,7 @@ import {
   buildColumnRowSpanMap,
   collectRowSpanColumns,
 } from "@/components/ui/table/features/row-span/rowSpan";
-import type { DataTableProps } from "@/components/ui/table/types";
+import type { DataTableCopyActions, DataTableProps } from "@/components/ui/table/types";
 import type { DataTableLabels } from "@/core/labels";
 import { resolveDataTableLabels } from "@/core/labels";
 
@@ -74,6 +74,7 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   rowContextValue: DataTableRowContextValue;
   handleToggleSelect: (row: Row<T>) => void;
   clearHover: () => void;
+  copySelection: DataTableCopyActions["copySelection"];
 };
 
 export function useGlideTable<T extends Record<string, unknown>>(
@@ -107,6 +108,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     expandedRows: controlledExpandedRows,
     onExpandedRowsChange,
     preventExpand = false,
+    enableSubtreeCopy,
+    onCopyActionsReady,
     enableVirtualization = true,
     estimateRowHeight = DATA_TABLE_ROW_HEIGHT,
     virtualOverscan = DATA_TABLE_VIRTUAL_OVERSCAN,
@@ -124,6 +127,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
   }, [labelsProp, emptyText, loadingText, selectionLabel]);
 
   const enableExpand = Boolean(toggleField);
+  const resolvedEnableSubtreeCopy = enableSubtreeCopy ?? enableExpand;
   const [internalRowSelection, setInternalRowSelection] =
     useState<RowSelectionState>({});
   const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(
@@ -259,10 +263,12 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleCellMouseDown,
     handleCellMouseEnter,
     handleFillHandleMouseDown,
+    copySelection,
   } = useCellSelection({
     data: tableData,
     rows,
     enabled: enableCellSelection,
+    enableSubtreeCopy: resolvedEnableSubtreeCopy,
     onDataChange,
     onBatchChange,
   });
@@ -416,6 +422,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
     labels.collapseRow,
   ]);
 
+  useEffect(() => {
+    onCopyActionsReady?.({ copySelection });
+  }, [copySelection, onCopyActionsReady]);
+
   return {
     table,
     tableData,
@@ -436,5 +446,6 @@ export function useGlideTable<T extends Record<string, unknown>>(
     rowContextValue,
     handleToggleSelect,
     clearHover,
+    copySelection,
   };
 }

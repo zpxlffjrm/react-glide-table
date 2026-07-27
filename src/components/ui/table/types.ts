@@ -26,6 +26,11 @@ declare module "@tanstack/react-table" {
   }
 }
 
+export type DataTableCopyActions = {
+  /** Copies the active cell selection. Defaults to visible rows only. */
+  copySelection: (options?: { includeDescendants?: boolean }) => Promise<boolean>
+}
+
 export type DataTableProps<T extends Record<string, unknown>> = {
   data: T[]
   columns: ColumnDef<T, unknown>[]
@@ -102,6 +107,13 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   onExpandedRowsChange?: (next: Set<string>) => void
   /** When true, expand is disabled (children always visible) */
   preventExpand?: boolean
+  /**
+   * Enables Ctrl/Cmd+Shift+C and programmatic subtree copy for collapsed tree rows.
+   * Defaults to true when `toggleField` is set.
+   */
+  enableSubtreeCopy?: boolean
+  /** Receives copy helpers once the table mounts or updates. */
+  onCopyActionsReady?: (actions: DataTableCopyActions) => void
 
   /**
    * Enable row virtualization. Defaults to true.
