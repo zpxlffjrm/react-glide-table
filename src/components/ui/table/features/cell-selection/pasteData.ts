@@ -6,8 +6,35 @@ export type { PasteMode, RowsPastePayload }
 
 export type ParsedClipboardTSV = {
   values: string[][]
-  /** Relative tree depth per row (leading tabs / empty cells in the TSV). */
+  /**
+   * Relative tree depth per row when the TSV looks like subtree-copy indentation
+   * (first row unindented, at least one later row with leading empty cells).
+   * Otherwise all zeros — leading blanks are preserved as real cell values.
+   */
   depths: number[]
+}
+
+function countLeadingEmptyCells(cells: string[]): number {
+  let depth = 0
+  while (depth < cells.length && cells[depth] === "") {
+    depth += 1
+  }
+
+  return depth
+}
+
+/**
+ * Subtree copy encodes depth as leading empty TSV cells under an unindented root row.
+ * Plain Excel/Sheets pastes can also start with `\t` when the first column is blank —
+ * those must keep empty cells and depth 0 so column alignment stays correct.
+ */
+function looksLikeSubtreeIndentation(leadingEmptyCounts: number[]): boolean {
+  if (leadingEmptyCounts.length === 0) return false
+
+  const firstDepth = leadingEmptyCounts[0] ?? 0
+  if (firstDepth !== 0) return false
+
+  return leadingEmptyCounts.some((depth) => depth > 0)
 }
 
 /** Parse Excel/Sheets-style TSV from the clipboard. Trailing newlines are ignored. */
@@ -26,18 +53,24 @@ export function parseClipboardTSVWithDepths(text: string): ParsedClipboardTSV {
   const withoutTrailing = normalized.replace(/\n+$/, "")
   if (!withoutTrailing) return { values: [], depths: [] }
 
+  const rows = withoutTrailing.split("\n").map((line) => line.split("\t"))
+  const leadingEmptyCounts = rows.map(countLeadingEmptyCells)
+  const treatAsDepth = looksLikeSubtreeIndentation(leadingEmptyCounts)
+
   const values: string[][] = []
   const depths: number[] = []
 
-  for (const line of withoutTrailing.split("\n")) {
-    const cells = line.split("\t")
-    let depth = 0
-    while (depth < cells.length && cells[depth] === "") {
-      depth += 1
-    }
+  for (let index = 0; index < rows.length; index += 1) {
+    const cells = rows[index] ?? []
+    const depth = leadingEmptyCounts[index] ?? 0
 
-    values.push(cells.slice(depth))
-    depths.push(depth)
+    if (treatAsDepth) {
+      values.push(cells.slice(depth))
+      depths.push(depth)
+    } else {
+      values.push(cells)
+      depths.push(0)
+    }
   }
 
   return { values, depths }

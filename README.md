@@ -152,7 +152,7 @@ Cell selection ships with clipboard shortcuts. The table parses TSV and emits st
 | Ctrl/Cmd+V | Paste **overwrite** into the selection (`onRowsPaste`, `mode: "overwrite"`) |
 | Ctrl/Cmd+Shift+V | Paste **insert** rows after the selection (`mode: "insert"`, when `enableInsertPaste`) |
 
-Subtree copy encodes relative tree depth as leading tabs in the TSV so paste can rebuild parent/child nesting via `payload.depths`.
+Subtree copy encodes relative tree depth as leading tabs in the TSV so paste can rebuild parent/child nesting via `payload.depths`. Depth is only inferred when the clipboard looks like subtree indentation (first row unindented, at least one later row indented). Otherwise leading empty cells are kept as real values (e.g. Excel/Sheets blank first column) and `depths` stay `0`.
 
 ```tsx
 import type { RowsPastePayload } from "react-glide-table/compound"
@@ -192,6 +192,7 @@ Root `react-glide-table` re-exports both surfaces. Related types: `TableProps`, 
 
 - **Row span + virtualization**: when `enableRowSpan` is on, virtualization is forced off (HTML `<table>` + `rowspan` cannot safely share a virtual window).
 - **Paste is app-owned**: the library does not mutate `data` on paste — handle `onRowsPaste` (coerce types, ids, tree shape, row-span keys).
+- **Flat tree parent order**: `useConvertTreeData` attaches each child to the nearest *preceding* row whose toggle key matches `parentId` (duplicate keys after paste resolve this way). Flat inputs must list parents before their children; a child whose parent appears later becomes a root. Nested `children` arrays are flattened parent-before-child automatically.
 - **No shipped CSS**: the default renderer emits class hooks only. Bring your own styles (see playground for a CSS-skinned example).
 
 ## Local playground

@@ -69,6 +69,13 @@ describe("parseClipboardTSV", () => {
       ["Child", "2"],
     ])
   })
+
+  it("preserves leading empty cells from Excel blank first columns", () => {
+    expect(parseClipboardTSV("\tB\tC\n\tE\tF")).toEqual([
+      ["", "B", "C"],
+      ["", "E", "F"],
+    ])
+  })
 })
 
 describe("parseClipboardTSVWithDepths", () => {
@@ -80,6 +87,23 @@ describe("parseClipboardTSVWithDepths", () => {
         ["Grand", "3"],
       ],
       depths: [0, 1, 2],
+    })
+  })
+
+  it("does not treat Excel blank first columns as tree depth", () => {
+    expect(parseClipboardTSVWithDepths("\tB\tC\n\tE\tF")).toEqual({
+      values: [
+        ["", "B", "C"],
+        ["", "E", "F"],
+      ],
+      depths: [0, 0],
+    })
+  })
+
+  it("keeps a single blank-leading row as raw cells", () => {
+    expect(parseClipboardTSVWithDepths("\tOnly")).toEqual({
+      values: [["", "Only"]],
+      depths: [0],
     })
   })
 })

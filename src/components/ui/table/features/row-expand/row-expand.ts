@@ -59,6 +59,10 @@ export function toggleExpandedRowId(rowId: string, previous: Set<string>): Set<s
 /**
  * Builds a tree from flat/nested data, then returns only rows visible under expandedRows.
  * When enabled=false, returns data as-is.
+ *
+ * Flat rows attach to the nearest *preceding* parent with a matching toggle key
+ * (so duplicate keys after paste stay under the pasted parent). Parents must appear
+ * before their children; a child whose parent is later in the array becomes a root.
  */
 export const useConvertTreeData = <T extends Record<string, unknown>>({
   data,
