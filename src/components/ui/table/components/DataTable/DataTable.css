@@ -34,8 +34,8 @@
 }
 
 .DataTableJSX .data-table {
-  /* 컨테이너 너비가 줄어들 때도 컬럼의 min-width가 유지되며,
-   * 합계 폭이 컨테이너보다 크면 가로 스크롤이 생기도록 합니다. */
+  /* Keep column min-width when the container shrinks; if the total width exceeds the container,
+   * allow horizontal scrolling instead of compressing columns. */
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
