@@ -148,7 +148,12 @@ function DataTable<T extends Record<string, unknown>>({
                   return (
                     <th
                       key={header.id}
-                      style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
+                      style={{
+                        width: header.getSize() !== 150 ? header.getSize() : undefined,
+                        // 컬럼 사이징은 tanstack의 `size`를 따르지만,
+                        // 브라우저 너비가 줄어들 때 실제로 최소폭(min-width)까지 유지되도록 보장합니다.
+                        minWidth: header.getSize() !== 150 ? header.getSize() : undefined,
+                      }}
                       className={cn(
                         "data-table-head-cell",
                         CELL_ALIGN_CLASS[align],
