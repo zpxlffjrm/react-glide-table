@@ -141,6 +141,39 @@ export function ProductTable({ data }: { data: Product[] }) {
 
 Wire `rowContextValue` into your own row/cell components for edit, selection, expand, and row-span behavior.
 
+## Clipboard copy & paste
+
+Cell selection ships with clipboard shortcuts. The table parses TSV and emits structured payloads; **your app applies domain conversion and updates data**.
+
+| Shortcut | Behavior |
+| --- | --- |
+| Ctrl/Cmd+C | Copy the active selection (visible rows) |
+| Ctrl/Cmd+Shift+C | Copy including collapsed tree descendants (`enableSubtreeCopy`) |
+| Ctrl/Cmd+V | Paste **overwrite** into the selection (`onRowsPaste`, `mode: "overwrite"`) |
+| Ctrl/Cmd+Shift+V | Paste **insert** rows after the selection (`mode: "insert"`, when `enableInsertPaste`) |
+
+Subtree copy encodes relative tree depth as leading tabs in the TSV so paste can rebuild parent/child nesting via `payload.depths`.
+
+```tsx
+import type { RowsPastePayload } from "react-glide-table/compound"
+
+<ProductTable
+  data={data}
+  getRowId={(row) => row.id}
+  enableCellSelection
+  onRowsPaste={(payload: RowsPastePayload) => {
+    // overwrite: update cells from startRow using payload.values / columnIds
+    // insert: create rows after payload.endRow (or payload.anchorRowId for trees)
+    setData((prev) => applyMyPaste(prev, payload))
+  }}
+>
+  {/* columns… */}
+</ProductTable>
+```
+
+Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `onCopyActionsReady`.  
+Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboardTSVWithDepths`, `serializeSelectionToTSV`, …
+
 ## Public API
 
 | Export | Path | Role |
@@ -149,15 +182,16 @@ Wire `rowContextValue` into your own row/cell components for edit, selection, ex
 | `DataTable` | `/compound` | Unstyled default renderer (semantic HTML + slots/props) |
 | `useGlideTable` | `/core` | Headless engine escape hatch |
 | `useCellEdit` / `useCellSelection` / `useConvertTreeData` | `/core` | Feature hooks |
-| `applyCellEdit`, `applyFillData`, `buildColumnRowSpanMap`, … | `/core` | Pure helpers |
+| `applyCellEdit`, `applyFillData`, `buildRowsPastePayload`, `buildColumnRowSpanMap`, … | `/core` | Pure helpers |
 | `DEFAULT_DATA_TABLE_LABELS` / `resolveDataTableLabels` | `/core` | Optional English UI copy helpers |
 | Tree field defaults | `/core` | `id` / `parentId` / `children` / `qty` |
 
-Root `react-glide-table` re-exports both surfaces. Related types: `TableProps`, `TableColumnProps`, `DataTableProps`, `DataTableSlots`, `TableCompoundComponent`, `ColumnDef`, …
+Root `react-glide-table` re-exports both surfaces. Related types: `TableProps`, `TableColumnProps`, `DataTableProps`, `DataTableSlots`, `TableCompoundComponent`, `ColumnDef`, `RowsPastePayload`, `PasteMode`, …
 
 ## Notable constraints
 
 - **Row span + virtualization**: when `enableRowSpan` is on, virtualization is forced off (HTML `<table>` + `rowspan` cannot safely share a virtual window).
+- **Paste is app-owned**: the library does not mutate `data` on paste — handle `onRowsPaste` (coerce types, ids, tree shape, row-span keys).
 - **No shipped CSS**: the default renderer emits class hooks only. Bring your own styles (see playground for a CSS-skinned example).
 
 ## Local playground
@@ -167,7 +201,7 @@ pnpm install
 pnpm dev
 ```
 
-The playground uses `createTable` with a local CSS skin (`src/styles/index.css`) to exercise the compound API and headless core.
+The playground uses `createTable` with a local CSS skin (`src/styles/index.css`) to exercise the compound API and headless core — including cell copy/paste (overwrite + insert) on flat and tree (BOM) tables.
 
 ## License
 
