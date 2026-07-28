@@ -148,7 +148,12 @@ function DataTable<T extends Record<string, unknown>>({
                   return (
                     <th
                       key={header.id}
-                      style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
+                      style={{
+                        width: header.getSize() !== 150 ? header.getSize() : undefined,
+                        // Column sizing follows TanStack's `size`, but
+                        // ensure the column keeps its min width when the container shrinks.
+                        minWidth: header.getSize() !== 150 ? header.getSize() : undefined,
+                      }}
                       className={cn(
                         "data-table-head-cell",
                         CELL_ALIGN_CLASS[align],

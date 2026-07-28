@@ -15,6 +15,11 @@ type Product = {
   regionId: string;
   category: string;
   groupId: string;
+  supplier: string;
+  sku: string;
+  weight: number;
+  status: string;
+  note: string;
 };
 
 type BomRow = {
@@ -26,6 +31,11 @@ type BomRow = {
   materialCode: string;
   materialName: string;
   qty: number;
+  uom: string;
+  supplier: string;
+  leadTime: number;
+  warehouse: string;
+  remark: string;
   assemblyMaterials?: BomRow[];
 };
 
@@ -34,6 +44,11 @@ type BomDraft = {
   materialCode: string;
   materialName: string;
   qty: number;
+  uom?: string;
+  supplier?: string;
+  leadTime?: number;
+  warehouse?: string;
+  remark?: string;
   assemblyMaterials?: BomDraft[];
 };
 
@@ -42,6 +57,7 @@ const BomTable = createTable<BomRow>();
 
 const REGIONS = ["APAC", "EMEA", "AMER"] as const;
 const CATEGORIES = ["Hardware", "Software", "Accessory", "Service"] as const;
+const STATUSES = ["Active", "Draft", "Discontinued"] as const;
 
 function createProductRows(count: number): Product[] {
   return Array.from({ length: count }, (_, index) => {
@@ -60,6 +76,11 @@ function createProductRows(count: number): Product[] {
       regionId: `region:${region}`,
       category,
       groupId: `group:${category}`,
+      supplier: `Supplier ${(n % 10) + 1}`,
+      sku: `SKU-${String(n).padStart(5, "0")}`,
+      weight: Number(((n % 20) + 0.5).toFixed(1)),
+      status: STATUSES[n % STATUSES.length]!,
+      note: n % 5 === 0 ? `Note for item ${n}` : "",
     };
   });
 }
@@ -77,6 +98,11 @@ function withPlantLine(
     plantId,
     line,
     lineId,
+    uom: row.uom ?? "EA",
+    supplier: row.supplier ?? "Default",
+    leadTime: row.leadTime ?? 7,
+    warehouse: row.warehouse ?? "WH-A",
+    remark: row.remark ?? "",
     assemblyMaterials: row.assemblyMaterials
       ? withPlantLine(row.assemblyMaterials, plant, plantId, line, lineId)
       : undefined,
@@ -238,7 +264,7 @@ function ToggleSwitch({
 }
 
 function coerceProductValue(columnId: string, raw: string): string | number {
-  if (columnId === "qty" || columnId === "price") {
+  if (columnId === "qty" || columnId === "price" || columnId === "weight") {
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -269,7 +295,7 @@ function applyProductPaste(
       const next = { ...row };
       columnIds.forEach((columnId, colOffset) => {
         if (!(columnId in next) || pasteRow[colOffset] === undefined) return;
-        ;(next as Record<string, unknown>)[columnId] = coerceProductValue(
+        (next as Record<string, unknown>)[columnId] = coerceProductValue(
           columnId,
           pasteRow[colOffset]!,
         );
@@ -292,11 +318,16 @@ function applyProductPaste(
       regionId: base?.regionId ?? "r-0",
       category: base?.category ?? CATEGORIES[0]!,
       groupId: base?.groupId ?? "g-0",
+      supplier: base?.supplier ?? "",
+      sku: base?.sku ?? "",
+      weight: base?.weight ?? 0,
+      status: base?.status ?? STATUSES[0]!,
+      note: base?.note ?? "",
     };
 
     columnIds.forEach((columnId, colOffset) => {
       if (!(columnId in row) || pasteRow[colOffset] === undefined) return;
-      ;(row as Record<string, unknown>)[columnId] = coerceProductValue(
+      (row as Record<string, unknown>)[columnId] = coerceProductValue(
         columnId,
         pasteRow[colOffset]!,
       );
@@ -313,7 +344,7 @@ function applyProductPaste(
 }
 
 function coerceBomValue(columnId: string, raw: string): string | number {
-  if (columnId === "qty") {
+  if (columnId === "qty" || columnId === "leadTime") {
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -369,7 +400,9 @@ function findBomRootIndex(nodes: BomRow[], id: string): number {
   return nodes.findIndex(
     (node) =>
       node.id === id ||
-      Boolean(node.assemblyMaterials && findBomById(node.assemblyMaterials, id)),
+      Boolean(
+        node.assemblyMaterials && findBomById(node.assemblyMaterials, id),
+      ),
   );
 }
 
@@ -381,7 +414,7 @@ function applyBomPasteValues(
   const next = { ...row };
   columnIds.forEach((columnId, colOffset) => {
     if (!(columnId in next) || pasteRow[colOffset] === undefined) return;
-    ;(next as Record<string, unknown>)[columnId] = coerceBomValue(
+    (next as Record<string, unknown>)[columnId] = coerceBomValue(
       columnId,
       pasteRow[colOffset]!,
     );
@@ -416,6 +449,11 @@ function buildBomForestFromPaste(
       materialCode: anchor.materialCode,
       materialName: anchor.materialName,
       qty: anchor.qty,
+      uom: anchor.uom,
+      supplier: anchor.supplier,
+      leadTime: anchor.leadTime,
+      warehouse: anchor.warehouse,
+      remark: anchor.remark,
     };
     const row = applyBomPasteValues(base, pasteRow, columnIds);
 
@@ -458,9 +496,7 @@ function applyBomPaste(data: BomRow[], payload: RowsPastePayload): BomRow[] {
   if (!anchor) return data;
 
   const resolvedDepths =
-    depths && depths.length === values.length
-      ? depths
-      : values.map(() => 0);
+    depths && depths.length === values.length ? depths : values.map(() => 0);
 
   // Subtree copy encodes depth with leading tabs. Flat multi-row paste
   // (no markers) is treated as one parent + nested children for the BOM demo.
@@ -688,6 +724,22 @@ export function App() {
               >
                 Qty
               </BomTable.Column>
+              <BomTable.Column field="uom">UOM</BomTable.Column>
+              <BomTable.Column field="supplier" editable>
+                Supplier
+              </BomTable.Column>
+              <BomTable.Column
+                field="leadTime"
+                align="right"
+                editable
+                editType="number"
+              >
+                Lead time
+              </BomTable.Column>
+              <BomTable.Column field="warehouse">Warehouse</BomTable.Column>
+              <BomTable.Column field="remark" editable>
+                Remark
+              </BomTable.Column>
             </BomTable.Header>
           </BomTable>
         ) : (
@@ -712,12 +764,13 @@ export function App() {
                   field="category"
                   rowSpan
                   rowSpanKey="groupId"
+                  width={300}
                 >
                   Category
                 </ProductTable.Column>
               )}
 
-              <ProductTable.Column field="name" sortable editable>
+              <ProductTable.Column field="name" sortable editable width={300}>
                 Name
               </ProductTable.Column>
               {!enableRowSpan && (
@@ -746,6 +799,7 @@ export function App() {
                 align="right"
                 editable
                 editType="number"
+                width={100}
               >
                 Qty
               </ProductTable.Column>
@@ -756,8 +810,30 @@ export function App() {
                 editable
                 editType="number"
                 render={(value) => `$${Number(value).toLocaleString()}`}
+                width={300}
               >
                 Price
+              </ProductTable.Column>
+              <ProductTable.Column field="supplier" sortable editable>
+                Supplier
+              </ProductTable.Column>
+              <ProductTable.Column field="sku" sortable>
+                SKU
+              </ProductTable.Column>
+              <ProductTable.Column
+                field="weight"
+                sortable
+                align="right"
+                editable
+                editType="number"
+              >
+                Weight
+              </ProductTable.Column>
+              <ProductTable.Column field="status" sortable editable>
+                Status
+              </ProductTable.Column>
+              <ProductTable.Column field="note" editable>
+                Note
               </ProductTable.Column>
             </ProductTable.Header>
           </ProductTable>

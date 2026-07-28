@@ -34,7 +34,10 @@
 }
 
 .DataTableJSX .data-table {
-  width: 100%;
+  /* Keep column min-width when the container shrinks; if the total width exceeds the container,
+   * allow horizontal scrolling instead of compressing columns. */
+  width: max-content;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
 }
