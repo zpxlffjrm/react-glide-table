@@ -456,6 +456,6 @@ export function useGlideTable<T extends Record<string, unknown>>(
     rowContextValue,
     handleToggleSelect,
     clearHover,
-    copySelection,
+    copySelection: stableCopySelection,
   };
 }

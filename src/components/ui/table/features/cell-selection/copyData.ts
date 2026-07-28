@@ -10,12 +10,31 @@ function formatCellValue(value: unknown): string {
   return String(value)
 }
 
-function getColumnAccessorKey(columnDef: ColumnDef<unknown, unknown>): string | undefined {
-  if ("accessorKey" in columnDef && columnDef.accessorKey) {
-    return String(columnDef.accessorKey)
+function getNestedValue(row: Record<string, unknown>, path: string): unknown {
+  if (!path.includes(".")) return row[path]
+
+  return path.split(".").reduce<unknown>((current, key) => {
+    if (current === null || current === undefined || typeof current !== "object") {
+      return undefined
+    }
+
+    return (current as Record<string, unknown>)[key]
+  }, row)
+}
+
+function readRowColumnValue(
+  rowData: Record<string, unknown>,
+  columnDef: ColumnDef<unknown, unknown>,
+): unknown {
+  if ("accessorFn" in columnDef && typeof columnDef.accessorFn === "function") {
+    return columnDef.accessorFn(rowData, 0)
   }
 
-  return columnDef.id
+  if ("accessorKey" in columnDef && columnDef.accessorKey != null && columnDef.accessorKey !== "") {
+    return getNestedValue(rowData, String(columnDef.accessorKey))
+  }
+
+  return undefined
 }
 
 export function flattenSubtreeRows<T extends Record<string, unknown>>(row: T): T[] {
@@ -73,10 +92,11 @@ export function collectCopyRows<T extends Record<string, unknown>>(
 
     for (const descendant of flattenSubtreeRows(row.original)) {
       const descendantId = getOriginalRowId(descendant)
-      if (!descendantId || includedOriginalIds.has(descendantId)) continue
+      // Keep descendants even when they lack id/uniqueId (toggleField may be the only key).
+      if (descendantId && includedOriginalIds.has(descendantId)) continue
 
       result.push(descendant)
-      includedOriginalIds.add(descendantId)
+      if (descendantId) includedOriginalIds.add(descendantId)
     }
   }
 
@@ -97,14 +117,14 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
   return copyRows
     .map((rowData) =>
       columnCells
-        .map((cell) => {
-          const accessorKey = getColumnAccessorKey(
-            cell.column.columnDef as ColumnDef<unknown, unknown>,
-          )
-          if (!accessorKey) return ""
-
-          return formatCellValue(rowData[accessorKey])
-        })
+        .map((cell) =>
+          formatCellValue(
+            readRowColumnValue(
+              rowData,
+              cell.column.columnDef as ColumnDef<unknown, unknown>,
+            ),
+          ),
+        )
         .join("\t"),
     )
     .join("\n")

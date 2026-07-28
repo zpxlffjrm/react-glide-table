@@ -1,10 +1,11 @@
 import type { Row } from "@tanstack/react-table"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import {
   collectCopyRows,
   flattenSubtreeRows,
   serializeSelectionToTSV,
+  writeSelectionToClipboard,
 } from "@/components/ui/table/features/cell-selection/copyData"
 
 type TestRow = {
@@ -122,6 +123,44 @@ describe("collectCopyRows", () => {
       "child-2",
     ])
   })
+
+  it("includes descendants that lack id/uniqueId (toggleField-only rows)", () => {
+    type ToggleOnlyRow = {
+      materialCode: string
+      name: string
+      children?: ToggleOnlyRow[]
+    }
+
+    const parent: ToggleOnlyRow = {
+      materialCode: "ASM-1000",
+      name: "Parent",
+      children: [
+        { materialCode: "PRT-1", name: "Child 1" },
+        { materialCode: "PRT-2", name: "Child 2" },
+      ],
+    }
+
+    const visibleRows = [
+      {
+        id: "0",
+        original: parent,
+        getVisibleCells: () => [
+          {
+            column: { columnDef: { accessorKey: "name", id: "name" } },
+            getValue: () => parent.name,
+          },
+        ],
+      },
+    ] as unknown as Row<ToggleOnlyRow>[]
+
+    expect(
+      collectCopyRows(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 0 },
+        "subtree",
+      ).map((row) => row.materialCode),
+    ).toEqual(["ASM-1000", "PRT-1", "PRT-2"])
+  })
 })
 
 describe("serializeSelectionToTSV", () => {
@@ -158,5 +197,80 @@ describe("serializeSelectionToTSV", () => {
         "subtree",
       ),
     ).toBe("Root\t1\nChild\t2")
+  })
+
+  it("resolves dot-path accessorKey values", () => {
+    type NestedRow = { id: string; user: { name: string } }
+
+    const data: NestedRow[] = [{ id: "1", user: { name: "Ada" } }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      original,
+      getVisibleCells: () => [
+        {
+          column: { columnDef: { accessorKey: "user.name", id: "user.name" } },
+          getValue: () => original.user.name,
+        },
+      ],
+    })) as unknown as Row<NestedRow>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).toBe("Ada")
+  })
+
+  it("resolves accessorFn-only columns", () => {
+    type RowData = { id: string; name: string; qty: number }
+
+    const data: RowData[] = [{ id: "1", name: "X", qty: 2 }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            columnDef: {
+              id: "label",
+              accessorFn: (row: RowData) => `${row.name}-${row.qty}`,
+            },
+          },
+          getValue: () => `${original.name}-${original.qty}`,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).toBe("X-2")
+  })
+})
+describe("writeSelectionToClipboard", () => {
+  it("returns false when clipboard write fails", async () => {
+    const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("denied")),
+      },
+    })
+
+    await expect(
+      writeSelectionToClipboard(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).resolves.toBe(false)
   })
 })
