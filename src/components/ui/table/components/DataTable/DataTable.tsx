@@ -150,8 +150,8 @@ function DataTable<T extends Record<string, unknown>>({
                       key={header.id}
                       style={{
                         width: header.getSize() !== 150 ? header.getSize() : undefined,
-                        // 컬럼 사이징은 tanstack의 `size`를 따르지만,
-                        // 브라우저 너비가 줄어들 때 실제로 최소폭(min-width)까지 유지되도록 보장합니다.
+                        // Column sizing follows TanStack's `size`, but
+                        // ensure the column keeps its min width when the container shrinks.
                         minWidth: header.getSize() !== 150 ? header.getSize() : undefined,
                       }}
                       className={cn(
