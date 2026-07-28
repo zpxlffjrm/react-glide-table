@@ -204,6 +204,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
         const meta = cell.column.columnDef.meta;
         const align = meta?.align ?? "center";
         const cellClassName = meta?.className;
+        const editInputProps = meta?.editInputProps;
         const isRowSpanColumn = Boolean(enableRowSpan && meta?.rowSpan);
         const isExpandCell = cellIndex === expandCellIndex;
         const editable = isColumnEditable(cell.column.columnDef);
@@ -377,18 +378,32 @@ export function DataTableRow<T extends Record<string, unknown>>({
           >
             {isEditing ? (
               <input
+                {...editInputProps}
                 ref={editInputRef}
                 type={editType === "number" ? "number" : "text"}
                 defaultValue={draftValue}
                 className={cn(
                   "cell-edit-input",
                   CELL_ALIGN_CLASS[align],
+                  editInputProps?.className,
                   classNames?.cellEditInput,
                 )}
-                onChange={(event) => onDraftValueChange(event.target.value)}
-                onMouseDown={(event) => event.stopPropagation()}
-                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  editInputProps?.onChange?.(event);
+                  onDraftValueChange(event.target.value);
+                }}
+                onMouseDown={(event) => {
+                  editInputProps?.onMouseDown?.(event);
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  editInputProps?.onClick?.(event);
+                  event.stopPropagation();
+                }}
                 onKeyDown={(event) => {
+                  editInputProps?.onKeyDown?.(event);
+                  if (event.defaultPrevented) return;
+
                   if (event.key === "Enter") {
                     event.preventDefault();
                     onCommitEdit(event.currentTarget.value);
@@ -400,6 +415,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
                   }
                 }}
                 onBlur={(event) => {
+                  editInputProps?.onBlur?.(event);
+                  if (event.defaultPrevented) return;
                   onCommitEdit(event.currentTarget.value);
                 }}
               />
