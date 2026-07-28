@@ -38,7 +38,10 @@ import {
   buildColumnRowSpanMap,
   collectRowSpanColumns,
 } from "@/components/ui/table/features/row-span/rowSpan";
-import type { DataTableCopyActions, DataTableProps } from "@/components/ui/table/types";
+import type {
+  DataTableCopyActions,
+  DataTableProps,
+} from "@/components/ui/table/types";
 import type { DataTableLabels } from "@/core/labels";
 import { resolveDataTableLabels } from "@/core/labels";
 
@@ -425,12 +428,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const copySelectionRef = useRef(copySelection);
   useEffect(() => {
     copySelectionRef.current = copySelection;
-  });
+  }, [copySelection]);
 
-  const stableCopySelection = useCallback<DataTableCopyActions["copySelection"]>(
-    (options) => copySelectionRef.current(options),
-    [],
-  );
+  const stableCopySelection = useCallback<
+    DataTableCopyActions["copySelection"]
+  >((options) => copySelectionRef.current(options), []);
 
   useEffect(() => {
     onCopyActionsReady?.({ copySelection: stableCopySelection });
