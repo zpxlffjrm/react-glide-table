@@ -46,6 +46,10 @@ function hasSubtree(row: Record<string, unknown>): boolean {
   return Array.isArray(children) && children.length > 0
 }
 
+function getOriginalRowId(original: Record<string, unknown>): string {
+  return String(original.id ?? original.uniqueId ?? "")
+}
+
 export function collectCopyRows<T extends Record<string, unknown>>(
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
@@ -53,23 +57,26 @@ export function collectCopyRows<T extends Record<string, unknown>>(
 ): T[] {
   const { startRow, endRow } = bounds
   const result: T[] = []
-  const includedRowIds = new Set<string>()
+  const includedOriginalIds = new Set<string>()
 
   for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
     const row = visibleRows[rowIndex]
-    if (!row || includedRowIds.has(row.id)) continue
+    if (!row) continue
+
+    const originalId = getOriginalRowId(row.original)
+    if (originalId && includedOriginalIds.has(originalId)) continue
 
     result.push(row.original)
-    includedRowIds.add(row.id)
+    if (originalId) includedOriginalIds.add(originalId)
 
     if (mode !== "subtree" || !hasSubtree(row.original)) continue
 
     for (const descendant of flattenSubtreeRows(row.original)) {
-      const descendantId = String(descendant.id ?? descendant.uniqueId ?? "")
-      if (!descendantId || includedRowIds.has(descendantId)) continue
+      const descendantId = getOriginalRowId(descendant)
+      if (!descendantId || includedOriginalIds.has(descendantId)) continue
 
       result.push(descendant)
-      includedRowIds.add(descendantId)
+      includedOriginalIds.add(descendantId)
     }
   }
 
@@ -121,7 +128,11 @@ export async function writeSelectionToClipboard<T extends Record<string, unknown
   const text = serializeSelectionToTSV(visibleRows, bounds, mode)
   if (!text) return false
 
-  await navigator.clipboard.writeText(text)
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    return false
+  }
 
   return true
 }

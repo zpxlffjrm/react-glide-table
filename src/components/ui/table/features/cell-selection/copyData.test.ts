@@ -15,9 +15,9 @@ type TestRow = {
   uniqueId?: string
 }
 
-function createVisibleRows(data: TestRow[]): Row<TestRow>[] {
+function createVisibleRows(data: TestRow[], useIndexId = false): Row<TestRow>[] {
   return data.map((original, index) => ({
-    id: original.id,
+    id: useIndexId ? String(index) : original.id,
     original,
     getVisibleCells: () => [
       {
@@ -92,12 +92,28 @@ describe("collectCopyRows", () => {
     ])
   })
 
-  it("does not duplicate descendants that are already in the visible selection", () => {
+  it("does not duplicate descendants that are already in the visible selection (data-id)", () => {
     const expandedRows: TestRow[] = [
       treeRows[0]!,
       { id: "child-1", name: "Child 1", qty: 2 },
     ]
     const visibleRows = createVisibleRows(expandedRows)
+    const bounds = { startRow: 0, endRow: 1, startCol: 0, endCol: 1 }
+
+    expect(collectCopyRows(visibleRows, bounds, "subtree").map((row) => row.id)).toEqual([
+      "root",
+      "child-1",
+      "child-2",
+    ])
+  })
+
+  it("does not duplicate descendants when row.id is index-based (default getRowId)", () => {
+    const expandedRows: TestRow[] = [
+      treeRows[0]!,
+      { id: "child-1", name: "Child 1", qty: 2 },
+    ]
+    // useIndexId=true: row.id = "0", "1" (matches default useGlideTable getRowId)
+    const visibleRows = createVisibleRows(expandedRows, true)
     const bounds = { startRow: 0, endRow: 1, startCol: 0, endCol: 1 }
 
     expect(collectCopyRows(visibleRows, bounds, "subtree").map((row) => row.id)).toEqual([

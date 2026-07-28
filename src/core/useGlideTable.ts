@@ -422,9 +422,19 @@ export function useGlideTable<T extends Record<string, unknown>>(
     labels.collapseRow,
   ]);
 
+  const copySelectionRef = useRef(copySelection);
   useEffect(() => {
-    onCopyActionsReady?.({ copySelection });
-  }, [copySelection, onCopyActionsReady]);
+    copySelectionRef.current = copySelection;
+  });
+
+  const stableCopySelection = useCallback<DataTableCopyActions["copySelection"]>(
+    (options) => copySelectionRef.current(options),
+    [],
+  );
+
+  useEffect(() => {
+    onCopyActionsReady?.({ copySelection: stableCopySelection });
+  }, [onCopyActionsReady, stableCopySelection]);
 
   return {
     table,
