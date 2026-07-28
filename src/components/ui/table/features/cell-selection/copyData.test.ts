@@ -196,7 +196,33 @@ describe("serializeSelectionToTSV", () => {
         { startRow: 0, endRow: 0, startCol: 0, endCol: 1 },
         "subtree",
       ),
-    ).toBe("Root\t1\nChild\t2")
+    ).toBe("Root\t1\n\tChild\t2")
+  })
+
+  it("encodes relative depth for multi-level subtree copy", () => {
+    const visibleRows = createVisibleRows([
+      {
+        id: "root",
+        name: "Root",
+        qty: 1,
+        children: [
+          {
+            id: "child",
+            name: "Child",
+            qty: 2,
+            children: [{ id: "grand", name: "Grand", qty: 3 }],
+          },
+        ],
+      },
+    ])
+
+    expect(
+      serializeSelectionToTSV(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 1 },
+        "subtree",
+      ),
+    ).toBe("Root\t1\n\tChild\t2\n\t\tGrand\t3")
   })
 
   it("resolves dot-path accessorKey values", () => {

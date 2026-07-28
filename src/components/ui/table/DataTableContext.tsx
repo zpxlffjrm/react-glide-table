@@ -15,10 +15,10 @@ export type DataTableRowContextValue = {
   rowSpan: {
     enableRowSpan: boolean
     primaryRowSpanKey?: string
+    primaryRowSpanColumnId?: string
     columnRowSpanMap: ColumnRowSpanMap
     hoveredRowIndex: number | null
-    hoveredGroupKey: string | null
-    selectedGroupKeys: Set<string>
+    selectedRowIndices: Set<number>
     onRowHover: (rowIndex: number, rowData: RowData) => void
   }
   selection: {

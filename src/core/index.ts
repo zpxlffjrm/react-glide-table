@@ -14,8 +14,10 @@ export type {
   ColumnDef,
   DataTableCopyActions,
   DataTableProps,
+  PasteMode,
   RowSelectionMode,
   RowSelectionState,
+  RowsPastePayload,
 } from "@/components/ui/table/types"
 
 export {
@@ -46,9 +48,18 @@ export {
   serializeCopyRowsToTSV,
   serializeSelectionToTSV,
   writeSelectionToClipboard,
+  collectCopyRowEntries,
   type CopySelectionMode,
+  type CopyRowEntry,
 } from "@/components/ui/table/features/cell-selection/copyData"
 export { applyFillData, collectFillChanges } from "@/components/ui/table/features/cell-selection/fillData"
+export {
+  buildRowsPastePayload,
+  isEditablePasteTarget,
+  parseClipboardTSV,
+  parseClipboardTSVWithDepths,
+  resolvePasteColumnIds,
+} from "@/components/ui/table/features/cell-selection/pasteData"
 
 export {
   canExpandRow,

@@ -113,6 +113,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     preventExpand = false,
     enableSubtreeCopy,
     onCopyActionsReady,
+    onRowsPaste,
+    enableInsertPaste,
     enableVirtualization = true,
     estimateRowHeight = DATA_TABLE_ROW_HEIGHT,
     virtualOverscan = DATA_TABLE_VIRTUAL_OVERSCAN,
@@ -137,7 +139,6 @@ export function useGlideTable<T extends Record<string, unknown>>(
     () => new Set(),
   );
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
-  const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const shouldVirtualize = enableVirtualization && !enableRowSpan;
@@ -222,6 +223,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
   }, [enableRowSpan, columns]);
 
   const primaryRowSpanKey = rowSpanColumnKeys[0]?.rowSpanKey;
+  const primaryRowSpanColumnId = rowSpanColumnKeys[0]?.columnId;
 
   const columnRowSpanMap = useMemo(
     () => buildColumnRowSpanMap(tableData, rowSpanColumnKeys),
@@ -248,17 +250,15 @@ export function useGlideTable<T extends Record<string, unknown>>(
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
-  const selectedGroupKeys = useMemo(() => {
-    if (!enableRowSpan || !primaryRowSpanKey) return new Set<string>();
-
-    const keys = new Set<string>();
+  // Contiguous merge spans can share the same plantId/lineId after paste —
+  // highlight by selected row index, not by global key value.
+  const selectedRowIndices = useMemo(() => {
+    const indices = new Set<number>();
     for (const selectedRow of selectedRows) {
-      const value = selectedRow.original[primaryRowSpanKey];
-      if (value !== null && value !== undefined) keys.add(String(value));
+      indices.add(selectedRow.index);
     }
-
-    return keys;
-  }, [enableRowSpan, primaryRowSpanKey, selectedRows]);
+    return indices;
+  }, [selectedRows]);
 
   const {
     dragState,
@@ -272,8 +272,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
     rows,
     enabled: enableCellSelection,
     enableSubtreeCopy: resolvedEnableSubtreeCopy,
+    enableInsertPaste: enableInsertPaste ?? true,
     onDataChange,
     onBatchChange,
+    onRowsPaste,
   });
 
   const {
@@ -302,27 +304,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
 
   const clearHover = useCallback(() => {
     setHoveredRowIndex(null);
-    setHoveredGroupKey(null);
   }, []);
 
-  const handleRowHover = useCallback(
-    (rowIndex: number, rowData: T) => {
-      setHoveredRowIndex(rowIndex);
-      if (!primaryRowSpanKey) {
-        setHoveredGroupKey(null);
-
-        return;
-      }
-
-      const groupValue = rowData[primaryRowSpanKey];
-      setHoveredGroupKey(
-        groupValue === null || groupValue === undefined
-          ? null
-          : String(groupValue),
-      );
-    },
-    [primaryRowSpanKey],
-  );
+  const handleRowHover = useCallback((rowIndex: number, _rowData: T) => {
+    setHoveredRowIndex(rowIndex);
+  }, []);
 
   const handleToggleSelect = useCallback(
     (row: Row<T>) => {
@@ -351,10 +337,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
       rowSpan: {
         enableRowSpan,
         primaryRowSpanKey,
+        primaryRowSpanColumnId,
         columnRowSpanMap,
         hoveredRowIndex,
-        hoveredGroupKey,
-        selectedGroupKeys,
+        selectedRowIndices,
         onRowHover:
           handleRowHover as DataTableRowContextValue["rowSpan"]["onRowHover"],
       },
@@ -395,10 +381,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
   }, [
     enableRowSpan,
     primaryRowSpanKey,
+    primaryRowSpanColumnId,
     columnRowSpanMap,
     hoveredRowIndex,
-    hoveredGroupKey,
-    selectedGroupKeys,
+    selectedRowIndices,
     handleRowHover,
     rowSelectionMode,
     selectOnRowClick,
