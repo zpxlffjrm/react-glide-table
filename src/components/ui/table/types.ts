@@ -31,6 +31,36 @@ export type DataTableCopyActions = {
   copySelection: (options?: { includeDescendants?: boolean }) => Promise<boolean>
 }
 
+export type PasteMode = "overwrite" | "insert"
+
+export type RowsPastePayload = {
+  mode: PasteMode
+  /** Top-left of the active selection (visible row / col index) */
+  startRow: number
+  startCol: number
+  /** Bottom row of the active selection (visible row index) */
+  endRow: number
+  /**
+   * Visible row ids from `startRow` for each clipboard row (overwrite targets).
+   * Shorter than `values` when the paste runs past the last visible row.
+   */
+  rowIds: string[]
+  /**
+   * Row id at `endRow` (selection bottom).
+   * Use as the insert-after anchor for tree / nested data.
+   */
+  anchorRowId: string
+  /** Visible column ids from startCol for clipboard width */
+  columnIds: string[]
+  /** Parsed TSV matrix (rows × cols) */
+  values: string[][]
+  /**
+   * Relative tree depth per clipboard row (from leading tabs in subtree copy).
+   * All zeros when the paste has no hierarchy markers.
+   */
+  depths?: number[]
+}
+
 export type DataTableProps<T extends Record<string, unknown>> = {
   data: T[]
   columns: ColumnDef<T, unknown>[]
@@ -114,6 +144,16 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   enableSubtreeCopy?: boolean
   /** Receives copy helpers once the table mounts or updates. */
   onCopyActionsReady?: (actions: DataTableCopyActions) => void
+  /**
+   * Clipboard paste into the active cell selection.
+   * Ctrl/Cmd+V → overwrite; Ctrl/Cmd+Shift+V → insert (when `enableInsertPaste`).
+   * The app applies domain conversion and data updates.
+   */
+  onRowsPaste?: (payload: RowsPastePayload) => void
+  /**
+   * Enables Ctrl/Cmd+Shift+V insert paste. Defaults to true when `onRowsPaste` is set.
+   */
+  enableInsertPaste?: boolean
 
   /**
    * Enable row virtualization. Defaults to true.

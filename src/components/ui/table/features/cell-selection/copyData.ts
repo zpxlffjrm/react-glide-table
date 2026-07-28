@@ -4,6 +4,12 @@ import type { CellSelectionBounds } from "@/components/ui/table/features/cell-se
 
 export type CopySelectionMode = "visible" | "subtree"
 
+export type CopyRowEntry<T extends Record<string, unknown>> = {
+  row: T
+  /** Tree depth relative to the table root (0 = top-level). */
+  depth: number
+}
+
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return ""
 
@@ -69,14 +75,37 @@ function getOriginalRowId(original: Record<string, unknown>): string {
   return String(original.id ?? original.uniqueId ?? "")
 }
 
-export function collectCopyRows<T extends Record<string, unknown>>(
+function getRowDepth(original: Record<string, unknown>): number {
+  return typeof original.level === "number" ? original.level : 0
+}
+
+/**
+ * Collects copy rows with tree depth so paste can rebuild parent/child nesting.
+ * Descendant depth is derived from the walk, not only from `level`.
+ */
+export function collectCopyRowEntries<T extends Record<string, unknown>>(
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
   mode: CopySelectionMode = "visible",
-): T[] {
+): CopyRowEntry<T>[] {
   const { startRow, endRow } = bounds
-  const result: T[] = []
+  const result: CopyRowEntry<T>[] = []
   const includedOriginalIds = new Set<string>()
+
+  const appendSubtree = (node: T, depth: number) => {
+    const children = node.children
+    if (!Array.isArray(children) || children.length === 0) return
+
+    for (const child of children as T[]) {
+      const childId = getOriginalRowId(child)
+      if (!(childId && includedOriginalIds.has(childId))) {
+        result.push({ row: child, depth })
+        if (childId) includedOriginalIds.add(childId)
+      }
+
+      appendSubtree(child, depth + 1)
+    }
+  }
 
   for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
     const row = visibleRows[rowIndex]
@@ -85,28 +114,31 @@ export function collectCopyRows<T extends Record<string, unknown>>(
     const originalId = getOriginalRowId(row.original)
     if (originalId && includedOriginalIds.has(originalId)) continue
 
-    result.push(row.original)
+    const depth = getRowDepth(row.original)
+    result.push({ row: row.original, depth })
     if (originalId) includedOriginalIds.add(originalId)
 
     if (mode !== "subtree" || !hasSubtree(row.original)) continue
 
-    for (const descendant of flattenSubtreeRows(row.original)) {
-      const descendantId = getOriginalRowId(descendant)
-      // Keep descendants even when they lack id/uniqueId (toggleField may be the only key).
-      if (descendantId && includedOriginalIds.has(descendantId)) continue
-
-      result.push(descendant)
-      if (descendantId) includedOriginalIds.add(descendantId)
-    }
+    appendSubtree(row.original, depth + 1)
   }
 
   return result
+}
+
+export function collectCopyRows<T extends Record<string, unknown>>(
+  visibleRows: Row<T>[],
+  bounds: CellSelectionBounds,
+  mode: CopySelectionMode = "visible",
+): T[] {
+  return collectCopyRowEntries(visibleRows, bounds, mode).map((entry) => entry.row)
 }
 
 export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
   copyRows: T[],
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
+  depths?: number[],
 ): string {
   if (copyRows.length === 0) return ""
 
@@ -114,9 +146,16 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
   const columnCells = visibleRows[0]?.getVisibleCells().slice(startCol, endCol + 1) ?? []
   if (columnCells.length === 0) return ""
 
+  const resolvedDepths =
+    depths && depths.length === copyRows.length
+      ? depths
+      : copyRows.map((row) => getRowDepth(row))
+  const minDepth = Math.min(...resolvedDepths)
+
   return copyRows
-    .map((rowData) =>
-      columnCells
+    .map((rowData, index) => {
+      const relativeDepth = Math.max(0, (resolvedDepths[index] ?? 0) - minDepth)
+      const line = columnCells
         .map((cell) =>
           formatCellValue(
             readRowColumnValue(
@@ -125,8 +164,10 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
             ),
           ),
         )
-        .join("\t"),
-    )
+        .join("\t")
+
+      return `${"\t".repeat(relativeDepth)}${line}`
+    })
     .join("\n")
 }
 
@@ -135,9 +176,14 @@ export function serializeSelectionToTSV<T extends Record<string, unknown>>(
   bounds: CellSelectionBounds,
   mode: CopySelectionMode = "visible",
 ): string {
-  const copyRows = collectCopyRows(visibleRows, bounds, mode)
+  const entries = collectCopyRowEntries(visibleRows, bounds, mode)
 
-  return serializeCopyRowsToTSV(copyRows, visibleRows, bounds)
+  return serializeCopyRowsToTSV(
+    entries.map((entry) => entry.row),
+    visibleRows,
+    bounds,
+    entries.map((entry) => entry.depth),
+  )
 }
 
 export async function writeSelectionToClipboard<T extends Record<string, unknown>>(

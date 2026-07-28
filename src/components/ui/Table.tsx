@@ -9,6 +9,8 @@ export type {
   DataTableClassNames,
   DataTableProps,
   DataTableSlots,
+  PasteMode,
+  RowsPastePayload,
   TableColumnProps,
   TableProps,
 } from "@/components/ui/table/types"

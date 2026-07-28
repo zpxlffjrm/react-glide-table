@@ -69,11 +69,10 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
   const {
     enableRowSpan,
-    primaryRowSpanKey,
+    primaryRowSpanColumnId,
     columnRowSpanMap,
     hoveredRowIndex,
-    hoveredGroupKey,
-    selectedGroupKeys,
+    selectedRowIndices,
     onRowHover,
   } = rowSpan;
 
@@ -112,18 +111,18 @@ export function DataTableRow<T extends Record<string, unknown>>({
   const rowData = row.original;
   const isRowHovered = hoveredRowIndex === rowIndex;
   const isRowSelected = row.getIsSelected();
-  const rowGroupKey =
-    primaryRowSpanKey !== undefined &&
-    rowData[primaryRowSpanKey] !== null &&
-    rowData[primaryRowSpanKey] !== undefined
-      ? String(rowData[primaryRowSpanKey])
-      : null;
+  const { startRow: primaryGroupStart, rowSpan: primaryGroupSpan } =
+    resolveRowSpanAt(
+      primaryRowSpanColumnId
+        ? columnRowSpanMap.get(primaryRowSpanColumnId)
+        : undefined,
+      rowIndex,
+    );
   const isGroupHovered =
     enableRowSpan &&
-    hoveredGroupKey !== null &&
-    rowGroupKey === hoveredGroupKey;
-  const isGroupSelected =
-    enableRowSpan && rowGroupKey !== null && selectedGroupKeys.has(rowGroupKey);
+    hoveredRowIndex !== null &&
+    hoveredRowIndex >= primaryGroupStart &&
+    hoveredRowIndex <= primaryGroupStart + primaryGroupSpan - 1;
 
   const visibleCells = row.getVisibleCells();
   const columnIdsByIndex = visibleCells.map((cell) => cell.column.id);
@@ -231,8 +230,17 @@ export function DataTableRow<T extends Record<string, unknown>>({
         const showCellHover = isRowSpanColumn
           ? isMergedCellHovered
           : isRowHovered;
+        let isMergedCellSelected = false;
+        if (isRowSpanColumn) {
+          for (let r = rowIndex; r < rowIndex + cellRowSpan; r += 1) {
+            if (selectedRowIndices.has(r)) {
+              isMergedCellSelected = true;
+              break;
+            }
+          }
+        }
         const showCellSelected = isRowSpanColumn
-          ? isGroupSelected
+          ? isMergedCellSelected
           : isRowSelected;
         const isMerged = cellRowSpan > 1;
         /** Draw the right edge only when the next column is not merged, so vertical lines do not stack with adjacent merged cells. */

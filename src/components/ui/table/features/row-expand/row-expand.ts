@@ -137,16 +137,21 @@ export const useConvertTreeData = <T extends Record<string, unknown>>({
       processed: false,
     })) as TreeRow<T>[]
 
-    const itemMap = new Map<string, TreeRow<T>[]>()
-    dataWithLevels.forEach((item) => {
-      const key = getFieldValue(item, toggleField)
-      if (typeof key !== "string" || !key) return
-
-      if (!itemMap.has(key)) {
-        itemMap.set(key, [])
+    /** Nearest preceding row whose toggleField matches — handles duplicate codes after paste. */
+    const findNearestPrecedingParent = (
+      index: number,
+      parentKey: unknown,
+    ): TreeRow<T> | undefined => {
+      for (let i = index - 1; i >= 0; i -= 1) {
+        const candidate = dataWithLevels[i]
+        if (!candidate) continue
+        if (getFieldValue(candidate, toggleField) === parentKey) {
+          return candidate
+        }
       }
-      itemMap.get(key)?.push(item)
-    })
+
+      return undefined
+    }
 
     const rootItems: TreeRow<T>[] = []
 
@@ -157,32 +162,20 @@ export const useConvertTreeData = <T extends Record<string, unknown>>({
       }
     })
 
-    dataWithLevels.forEach((item) => {
+    dataWithLevels.forEach((item, index) => {
       const parentKey = getFieldValue(item, childField)
       if (!parentKey || item.processed) return
 
-      const parentItems = dataWithLevels.filter(
-        (parent) =>
-          getFieldValue(parent, toggleField) === parentKey && !getFieldValue(parent, childField),
-      )
-
-      if (parentItems.length > 0) {
-        const parent = parentItems[0]
+      const parent = findNearestPrecedingParent(index, parentKey)
+      if (parent) {
         item.level = parent.level + 1
         parent.children.push(item)
         item.processed = true
-      } else {
-        const otherParents = itemMap.get(String(parentKey)) || []
-        if (otherParents.length > 0) {
-          const parent = otherParents[0]
-          item.level = parent.level + 1
-          parent.children.push(item)
-          item.processed = true
-        } else {
-          rootItems.push(item)
-          item.processed = true
-        }
+        return
       }
+
+      rootItems.push(item)
+      item.processed = true
     })
 
     return rootItems
@@ -222,16 +215,25 @@ export const useConvertTreeData = <T extends Record<string, unknown>>({
 
     const flattenedData = flatten(processedData, [], 0)
 
-    flattenedData.forEach((item) => {
-      if (getFieldValue(item, childField)) {
-        const parentItem = flattenedData.find(
-          (parent) => getFieldValue(parent, toggleField) === getFieldValue(item, childField),
-        )
-        const parentAmount = parentItem ? Number(getFieldValue(parentItem, qtyField) ?? 1) : 1
-        item.parentCount = parentAmount || 1
-      } else {
+    flattenedData.forEach((item, index) => {
+      const parentKey = getFieldValue(item, childField)
+      if (!parentKey) {
         item.parentCount = 1
+        return
       }
+
+      let parentItem: TreeRow<T> | undefined
+      for (let i = index - 1; i >= 0; i -= 1) {
+        const candidate = flattenedData[i]
+        if (!candidate) continue
+        if (getFieldValue(candidate, toggleField) === parentKey) {
+          parentItem = candidate
+          break
+        }
+      }
+
+      const parentAmount = parentItem ? Number(getFieldValue(parentItem, qtyField) ?? 1) : 1
+      item.parentCount = parentAmount || 1
     })
 
     return flattenedData

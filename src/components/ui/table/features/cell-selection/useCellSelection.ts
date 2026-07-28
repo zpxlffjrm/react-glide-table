@@ -1,5 +1,5 @@
 import type { Row } from "@tanstack/react-table"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
   getActiveSelectionBounds,
@@ -16,6 +16,12 @@ import {
   collectFillChanges,
   hasFillExtension,
 } from "@/components/ui/table/features/cell-selection/fillData"
+import {
+  buildRowsPastePayload,
+  isEditablePasteTarget,
+  type PasteMode,
+  type RowsPastePayload,
+} from "@/components/ui/table/features/cell-selection/pasteData"
 
 export type CopySelectionOptions = {
   /** When true, collapsed tree descendants are included. Defaults to false. */
@@ -28,10 +34,13 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   enabled?: boolean
   /** Enables Ctrl/Cmd+Shift+C subtree copy. Defaults to true when tree expand is enabled. */
   enableSubtreeCopy?: boolean
+  /** Enables Ctrl/Cmd+Shift+V insert paste. Defaults to true. */
+  enableInsertPaste?: boolean
   onDataChange?: (data: T[]) => void
   onBatchChange?: (
     changes: Array<{ rowId: string; columnId: string; value: unknown }>,
   ) => void
+  onRowsPaste?: (payload: RowsPastePayload) => void
 }
 
 export function useCellSelection<T extends Record<string, unknown>>({
@@ -39,10 +48,13 @@ export function useCellSelection<T extends Record<string, unknown>>({
   rows,
   enabled = true,
   enableSubtreeCopy = false,
+  enableInsertPaste = true,
   onDataChange,
   onBatchChange,
+  onRowsPaste,
 }: UseCellSelectionOptions<T>) {
   const [dragState, setDragState] = useState<DragState>(INITIAL_DRAG_STATE)
+  const pendingPasteModeRef = useRef<PasteMode | null>(null)
 
   const cellSelectionBounds = getCellSelectionBounds(dragState.start, dragState.end)
   const activeSelectionBounds = enabled
@@ -143,6 +155,111 @@ export function useCellSelection<T extends Record<string, unknown>>({
 
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [activeSelectionBounds, copySelection, enableSubtreeCopy, enabled])
+
+  const emitRowsPaste = useCallback(
+    (text: string, mode: PasteMode) => {
+      if (!onRowsPaste || !activeSelectionBounds) return false
+
+      const payload = buildRowsPastePayload(
+        rows,
+        activeSelectionBounds.startRow,
+        activeSelectionBounds.startCol,
+        text,
+        mode,
+        activeSelectionBounds.endRow,
+      )
+      if (!payload) return false
+
+      onRowsPaste(payload)
+      return true
+    },
+    [activeSelectionBounds, onRowsPaste, rows],
+  )
+
+  useEffect(() => {
+    if (!enabled || !onRowsPaste) return
+
+    const pasteHandledRef = { current: false }
+    const ignoreNextPasteRef = { current: false }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeSelectionBounds) return
+      if (!(e.ctrlKey || e.metaKey)) return
+      if (e.key.toLowerCase() !== "v") return
+      if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
+        return
+      }
+
+      if (e.shiftKey && !enableInsertPaste) {
+        ignoreNextPasteRef.current = true
+        pendingPasteModeRef.current = null
+        return
+      }
+
+      const mode: PasteMode = e.shiftKey ? "insert" : "overwrite"
+      pasteHandledRef.current = false
+      ignoreNextPasteRef.current = false
+      pendingPasteModeRef.current = mode
+
+      void (async () => {
+        try {
+          const text = await navigator.clipboard.readText()
+          if (pasteHandledRef.current) return
+          if (pendingPasteModeRef.current !== mode) return
+          if (!text) return
+
+          pasteHandledRef.current = true
+          emitRowsPaste(text, mode)
+          pendingPasteModeRef.current = null
+        } catch {
+          // Fall back to the paste event's clipboardData.
+        }
+      })()
+    }
+
+    const handlePaste = (e: ClipboardEvent) => {
+      if (!activeSelectionBounds) return
+      if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
+        return
+      }
+
+      if (ignoreNextPasteRef.current) {
+        ignoreNextPasteRef.current = false
+        pendingPasteModeRef.current = null
+        return
+      }
+
+      // keydown sets the mode for Ctrl/Cmd(+Shift)+V; context-menu paste defaults to overwrite
+      const mode = pendingPasteModeRef.current ?? "overwrite"
+
+      if (pasteHandledRef.current) {
+        e.preventDefault()
+        return
+      }
+
+      const text = e.clipboardData?.getData("text/plain")
+      if (text == null || text === "") return
+
+      pasteHandledRef.current = true
+      e.preventDefault()
+      emitRowsPaste(text, mode)
+      pendingPasteModeRef.current = null
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("paste", handlePaste)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("paste", handlePaste)
+    }
+  }, [
+    activeSelectionBounds,
+    emitRowsPaste,
+    enableInsertPaste,
+    enabled,
+    onRowsPaste,
+  ])
 
   useEffect(() => {
     if (!enabled) return

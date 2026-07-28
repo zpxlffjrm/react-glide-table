@@ -1,6 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createTable } from "@/components/ui/Table";
-import type { DataTableCopyActions } from "@/components/ui/table/types";
+import type {
+  DataTableCopyActions,
+  RowsPastePayload,
+} from "@/components/ui/table/types";
 import "@/styles/index.css";
 
 type Product = {
@@ -45,15 +48,18 @@ function createProductRows(count: number): Product[] {
     const n = index + 1;
     const groupIndex = Math.floor(index / 6);
     const regionIndex = Math.floor(groupIndex / 2);
+    const region = REGIONS[regionIndex % REGIONS.length]!;
+    const category = CATEGORIES[groupIndex % CATEGORIES.length]!;
     return {
       id: String(n),
       name: `Item ${n}`,
       qty: (n % 40) + 1,
       price: 500 + (n % 50) * 120,
-      region: REGIONS[regionIndex % REGIONS.length]!,
-      regionId: `r-${regionIndex}`,
-      category: CATEGORIES[groupIndex % CATEGORIES.length]!,
-      groupId: `g-${groupIndex}`,
+      region,
+      // Value-based keys so pasted rows with the same display merge with neighbors.
+      regionId: `region:${region}`,
+      category,
+      groupId: `group:${category}`,
     };
   });
 }
@@ -78,6 +84,9 @@ function withPlantLine(
 }
 
 function createBomRows(): BomRow[] {
+  const plantKey = (plant: string) => `plant:${plant}`;
+  const lineKey = (plant: string, line: string) => `line:${plant}:${line}`;
+
   return [
     ...withPlantLine(
       [
@@ -143,9 +152,9 @@ function createBomRows(): BomRow[] {
         },
       ],
       "Seoul",
-      "p-seoul",
+      plantKey("Seoul"),
       "Line A",
-      "l-a",
+      lineKey("Seoul", "Line A"),
     ),
     ...withPlantLine(
       [
@@ -165,9 +174,9 @@ function createBomRows(): BomRow[] {
         },
       ],
       "Seoul",
-      "p-seoul",
+      plantKey("Seoul"),
       "Line B",
-      "l-b",
+      lineKey("Seoul", "Line B"),
     ),
     ...withPlantLine(
       [
@@ -193,9 +202,9 @@ function createBomRows(): BomRow[] {
         },
       ],
       "Busan",
-      "p-busan",
+      plantKey("Busan"),
       "Line A",
-      "l-a",
+      lineKey("Busan", "Line A"),
     ),
   ];
 }
@@ -228,6 +237,255 @@ function ToggleSwitch({
   );
 }
 
+function coerceProductValue(columnId: string, raw: string): string | number {
+  if (columnId === "qty" || columnId === "price") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return raw;
+}
+
+/** Keep rowSpan keys aligned with display values so merges don't hide different cells. */
+function syncProductRowSpanKeys(row: Product): Product {
+  return {
+    ...row,
+    regionId: `region:${row.region}`,
+    groupId: `group:${row.category}`,
+  };
+}
+
+function applyProductPaste(
+  data: Product[],
+  payload: RowsPastePayload,
+): Product[] {
+  const { mode, startRow, endRow, columnIds, values } = payload;
+
+  if (mode === "overwrite") {
+    return data.map((row, rowIndex) => {
+      const pasteRow = values[rowIndex - startRow];
+      if (!pasteRow) return row;
+
+      const next = { ...row };
+      columnIds.forEach((columnId, colOffset) => {
+        if (!(columnId in next) || pasteRow[colOffset] === undefined) return;
+        ;(next as Record<string, unknown>)[columnId] = coerceProductValue(
+          columnId,
+          pasteRow[colOffset]!,
+        );
+      });
+
+      const touchedSpanFields =
+        columnIds.includes("region") || columnIds.includes("category");
+      return touchedSpanFields ? syncProductRowSpanKeys(next) : next;
+    });
+  }
+
+  const inserted: Product[] = values.map((pasteRow, index) => {
+    const base = data[endRow] ?? data[startRow] ?? data[data.length - 1];
+    const row: Product = {
+      id: `paste-${Date.now()}-${index}`,
+      name: base?.name ?? "",
+      qty: base?.qty ?? 1,
+      price: base?.price ?? 0,
+      region: base?.region ?? REGIONS[0]!,
+      regionId: base?.regionId ?? "r-0",
+      category: base?.category ?? CATEGORIES[0]!,
+      groupId: base?.groupId ?? "g-0",
+    };
+
+    columnIds.forEach((columnId, colOffset) => {
+      if (!(columnId in row) || pasteRow[colOffset] === undefined) return;
+      ;(row as Record<string, unknown>)[columnId] = coerceProductValue(
+        columnId,
+        pasteRow[colOffset]!,
+      );
+    });
+
+    // Always sync keys on insert so cloned regionId/groupId cannot false-merge.
+    return syncProductRowSpanKeys(row);
+  });
+
+  const next = [...data];
+  // Insert below the selection (after endRow), not on top of the selected row.
+  next.splice(endRow + 1, 0, ...inserted);
+  return next;
+}
+
+function coerceBomValue(columnId: string, raw: string): string | number {
+  if (columnId === "qty") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return raw;
+}
+
+function syncBomRowSpanKeys(row: BomRow): BomRow {
+  return {
+    ...row,
+    plantId: `plant:${row.plant}`,
+    lineId: `line:${row.plant}:${row.line}`,
+  };
+}
+
+function findBomById(nodes: BomRow[], id: string): BomRow | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.assemblyMaterials) {
+      const found = findBomById(node.assemblyMaterials, id);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+function updateBomById(
+  nodes: BomRow[],
+  id: string,
+  updater: (row: BomRow) => BomRow,
+): BomRow[] {
+  return nodes.map((node) => {
+    if (node.id === id) return updater(node);
+    if (!node.assemblyMaterials) return node;
+
+    return {
+      ...node,
+      assemblyMaterials: updateBomById(node.assemblyMaterials, id, updater),
+    };
+  });
+}
+
+function countBomRows(nodes: BomRow[]): number {
+  return nodes.reduce(
+    (sum, node) => sum + 1 + countBomRows(node.assemblyMaterials ?? []),
+    0,
+  );
+}
+
+/** Index of the top-level root that contains `id` (itself or a descendant). */
+function findBomRootIndex(nodes: BomRow[], id: string): number {
+  return nodes.findIndex(
+    (node) =>
+      node.id === id ||
+      Boolean(node.assemblyMaterials && findBomById(node.assemblyMaterials, id)),
+  );
+}
+
+function applyBomPasteValues(
+  row: BomRow,
+  pasteRow: string[],
+  columnIds: string[],
+): BomRow {
+  const next = { ...row };
+  columnIds.forEach((columnId, colOffset) => {
+    if (!(columnId in next) || pasteRow[colOffset] === undefined) return;
+    ;(next as Record<string, unknown>)[columnId] = coerceBomValue(
+      columnId,
+      pasteRow[colOffset]!,
+    );
+  });
+
+  return syncBomRowSpanKeys(next);
+}
+
+/**
+ * Rebuild a BOM forest from flat clipboard rows using relative depths
+ * (leading tabs from subtree copy). Depth 0 rows become roots; deeper rows
+ * nest under the nearest shallower ancestor via `assemblyMaterials`.
+ */
+function buildBomForestFromPaste(
+  values: string[][],
+  depths: number[],
+  columnIds: string[],
+  anchor: BomRow,
+): BomRow[] {
+  const roots: BomRow[] = [];
+  const stack: Array<{ depth: number; row: BomRow }> = [];
+  const stamp = Date.now();
+
+  values.forEach((pasteRow, index) => {
+    const depth = depths[index] ?? 0;
+    const base: BomRow = {
+      id: `paste-${stamp}-${index}`,
+      plant: anchor.plant,
+      plantId: anchor.plantId,
+      line: anchor.line,
+      lineId: anchor.lineId,
+      materialCode: anchor.materialCode,
+      materialName: anchor.materialName,
+      qty: anchor.qty,
+    };
+    const row = applyBomPasteValues(base, pasteRow, columnIds);
+
+    while (stack.length > 0 && stack[stack.length - 1]!.depth >= depth) {
+      stack.pop();
+    }
+
+    const parent = stack[stack.length - 1];
+    if (!parent) {
+      roots.push(row);
+    } else {
+      parent.row.assemblyMaterials = [
+        ...(parent.row.assemblyMaterials ?? []),
+        row,
+      ];
+    }
+
+    stack.push({ depth, row });
+  });
+
+  return roots;
+}
+
+function applyBomPaste(data: BomRow[], payload: RowsPastePayload): BomRow[] {
+  const { mode, columnIds, values, rowIds, anchorRowId, depths } = payload;
+
+  if (mode === "overwrite") {
+    let next = data;
+    values.forEach((pasteRow, index) => {
+      const rowId = rowIds[index];
+      if (!rowId) return;
+      next = updateBomById(next, rowId, (row) =>
+        applyBomPasteValues(row, pasteRow, columnIds),
+      );
+    });
+    return next;
+  }
+
+  const anchor = findBomById(data, anchorRowId);
+  if (!anchor) return data;
+
+  const resolvedDepths =
+    depths && depths.length === values.length
+      ? depths
+      : values.map(() => 0);
+
+  // Subtree copy encodes depth with leading tabs. Flat multi-row paste
+  // (no markers) is treated as one parent + nested children for the BOM demo.
+  const hasDepthMarkers = resolvedDepths.some((depth) => depth > 0);
+  const forestDepths = hasDepthMarkers
+    ? resolvedDepths
+    : values.map((_, index) => (index === 0 ? 0 : 1));
+
+  const inserted = buildBomForestFromPaste(
+    values,
+    forestDepths,
+    columnIds,
+    anchor,
+  );
+
+  // Insert after the top-level root that owns the selection so plant/line
+  // merges stay contiguous and the new subtree keeps its own hierarchy.
+  const rootIndex = findBomRootIndex(data, anchorRowId);
+  if (rootIndex < 0) return data;
+
+  const next = [...data];
+  next.splice(rootIndex + 1, 0, ...inserted);
+  return next;
+}
+
 export function App() {
   const [rowCount, setRowCount] = useState(500);
   const [enableRowSpan, setEnableRowSpan] = useState(false);
@@ -241,6 +499,48 @@ export function App() {
 
   const productCount = useMemo(() => productData.length, [productData]);
   const bothFeatures = enableExpand && enableRowSpan;
+
+  const handleProductPaste = useCallback((payload: RowsPastePayload) => {
+    setProductData((prev) => applyProductPaste(prev, payload));
+  }, []);
+
+  const handleBomPaste = useCallback((payload: RowsPastePayload) => {
+    setBomData((prev) => applyBomPaste(prev, payload));
+
+    if (payload.mode !== "insert") return;
+
+    const depths =
+      payload.depths && payload.depths.length === payload.values.length
+        ? payload.depths
+        : payload.values.map(() => 0);
+    const hasDepthMarkers = depths.some((depth) => depth > 0);
+    const forestDepths = hasDepthMarkers
+      ? depths
+      : payload.values.map((_, index) => (index === 0 ? 0 : 1));
+    const codeIndex = payload.columnIds.indexOf("materialCode");
+    if (codeIndex < 0) return;
+
+    // DFS clipboard order: a row is expandable when the next row is deeper.
+    const codesToExpand: string[] = [];
+    for (let index = 0; index < forestDepths.length; index += 1) {
+      const nextDepth = forestDepths[index + 1];
+      if (nextDepth === undefined || nextDepth <= (forestDepths[index] ?? 0)) {
+        continue;
+      }
+      const code = payload.values[index]?.[codeIndex];
+      if (code) codesToExpand.push(code);
+    }
+
+    if (codesToExpand.length === 0) return;
+
+    setExpandedRows((prev) => {
+      const merged = new Set(prev);
+      for (const code of codesToExpand) merged.add(code);
+      return merged;
+    });
+  }, []);
+
+  const bomRowCount = useMemo(() => countBomRows(bomData), [bomData]);
 
   const reloadProducts = (count: number) => {
     setRowCount(count);
@@ -265,7 +565,9 @@ export function App() {
           <p className="playground-lead">
             Points at the local <code>src</code> package. Use the toggles for
             cell merge and tree expand (they can run together), and change the
-            row count to try virtualized scrolling.
+            row count to try virtualized scrolling. Select cells, then
+            Ctrl/Cmd+V to overwrite or Ctrl/Cmd+Shift+V to insert rows from the
+            clipboard.
             {enableRowSpan && (
               <>
                 {" "}
@@ -325,6 +627,7 @@ export function App() {
             data={bomData}
             getRowId={(row) => String(row.id)}
             onDataChange={setBomData}
+            onRowsPaste={handleBomPaste}
             toggleField="materialCode"
             flattenField="assemblyMaterials"
             childField="assemblyCode"
@@ -336,8 +639,8 @@ export function App() {
             }}
             enableRowSpan={enableRowSpan}
             rowSelectionMode="multi"
-            filteredCount={bomData.length}
-            totalCount={bomData.length}
+            filteredCount={bomRowCount}
+            totalCount={bomRowCount}
             toolbar={
               <>
                 <button
@@ -392,6 +695,7 @@ export function App() {
             data={productData}
             getRowId={(row) => row.id}
             onDataChange={setProductData}
+            onRowsPaste={handleProductPaste}
             enableRowSpan={enableRowSpan}
             rowSelectionMode="none"
             filteredCount={productCount}

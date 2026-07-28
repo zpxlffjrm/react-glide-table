@@ -10,8 +10,10 @@ export type {
   DataTableLabels,
   DataTableProps,
   DataTableSlots,
+  PasteMode,
   RowSelectionMode,
   RowSelectionState,
+  RowsPastePayload,
   TableColumnProps,
   TableProps,
 } from "@/components/ui/Table"
