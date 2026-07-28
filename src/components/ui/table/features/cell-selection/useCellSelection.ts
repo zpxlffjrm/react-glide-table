@@ -8,15 +8,26 @@ import {
   type DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 import {
+  type CopySelectionMode,
+  writeSelectionToClipboard,
+} from "@/components/ui/table/features/cell-selection/copyData"
+import {
   applyFillData,
   collectFillChanges,
   hasFillExtension,
 } from "@/components/ui/table/features/cell-selection/fillData"
 
+export type CopySelectionOptions = {
+  /** When true, collapsed tree descendants are included. Defaults to false. */
+  includeDescendants?: boolean
+}
+
 type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   data: T[]
   rows: Row<T>[]
   enabled?: boolean
+  /** Enables Ctrl/Cmd+Shift+C subtree copy. Defaults to true when tree expand is enabled. */
+  enableSubtreeCopy?: boolean
   onDataChange?: (data: T[]) => void
   onBatchChange?: (
     changes: Array<{ rowId: string; columnId: string; value: unknown }>,
@@ -27,6 +38,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
   data,
   rows,
   enabled = true,
+  enableSubtreeCopy = false,
   onDataChange,
   onBatchChange,
 }: UseCellSelectionOptions<T>) {
@@ -98,33 +110,39 @@ export function useCellSelection<T extends Record<string, unknown>>({
     }
   }, [enabled])
 
+  const copySelection = useCallback(
+    async (options?: CopySelectionOptions) => {
+      if (!enabled || !activeSelectionBounds) return false
+
+      const mode: CopySelectionMode =
+        options?.includeDescendants && enableSubtreeCopy ? "subtree" : "visible"
+
+      return writeSelectionToClipboard(rows, activeSelectionBounds, mode)
+    },
+    [activeSelectionBounds, enableSubtreeCopy, enabled, rows],
+  )
+
   useEffect(() => {
     if (!enabled) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "c" && activeSelectionBounds) {
-        const { startRow, endRow, startCol, endCol } = activeSelectionBounds
+      if (!activeSelectionBounds) return
+      if (!(e.ctrlKey || e.metaKey)) return
 
-        const selectedData = rows
-          .slice(startRow, endRow + 1)
-          .map((row) => {
-            const cells = row.getVisibleCells()
+      const isSubtreeShortcut =
+        enableSubtreeCopy && e.shiftKey && e.key.toLowerCase() === "c"
+      const isVisibleCopyShortcut = !e.shiftKey && e.key.toLowerCase() === "c"
 
-            return cells
-              .slice(startCol, endCol + 1)
-              .map((cell) => cell.getValue() as string)
-              .join("\t")
-          })
-          .join("\n")
+      if (!isSubtreeShortcut && !isVisibleCopyShortcut) return
 
-        navigator.clipboard.writeText(selectedData)
-      }
+      e.preventDefault()
+      void copySelection({ includeDescendants: isSubtreeShortcut })
     }
 
     window.addEventListener("keydown", handleKeyDown)
 
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [activeSelectionBounds, enabled, rows])
+  }, [activeSelectionBounds, copySelection, enableSubtreeCopy, enabled])
 
   useEffect(() => {
     if (!enabled) return
@@ -181,5 +199,6 @@ export function useCellSelection<T extends Record<string, unknown>>({
     handleCellMouseDown,
     handleCellMouseEnter,
     handleFillHandleMouseDown,
+    copySelection,
   }
 }

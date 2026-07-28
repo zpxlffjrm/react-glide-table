@@ -12,6 +12,7 @@ export {
 export { useGlideTable, type UseGlideTableOptions, type UseGlideTableResult } from "@/core/useGlideTable"
 export type {
   ColumnDef,
+  DataTableCopyActions,
   DataTableProps,
   RowSelectionMode,
   RowSelectionState,
@@ -39,6 +40,14 @@ export {
   type DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 export { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection"
+export {
+  collectCopyRows,
+  flattenSubtreeRows,
+  serializeCopyRowsToTSV,
+  serializeSelectionToTSV,
+  writeSelectionToClipboard,
+  type CopySelectionMode,
+} from "@/components/ui/table/features/cell-selection/copyData"
 export { applyFillData, collectFillChanges } from "@/components/ui/table/features/cell-selection/fillData"
 
 export {

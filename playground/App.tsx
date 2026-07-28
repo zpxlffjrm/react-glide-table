@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createTable } from "@/components/ui/Table";
+import type { DataTableCopyActions } from "@/components/ui/table/types";
 import "@/styles/index.css";
 
 type Product = {
@@ -236,6 +237,7 @@ export function App() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
     () => new Set(),
   );
+  const copyActionsRef = useRef<DataTableCopyActions | null>(null);
 
   const productCount = useMemo(() => productData.length, [productData]);
   const bothFeatures = enableExpand && enableRowSpan;
@@ -329,14 +331,30 @@ export function App() {
             qtyField="qty"
             expandedRows={expandedRows}
             onExpandedRowsChange={setExpandedRows}
+            onCopyActionsReady={(actions) => {
+              copyActionsRef.current = actions;
+            }}
             enableRowSpan={enableRowSpan}
             rowSelectionMode="multi"
             filteredCount={bomData.length}
             totalCount={bomData.length}
             toolbar={
-              <button type="button" className="playground-toolbar-btn">
-                Export
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="playground-toolbar-btn"
+                  onClick={() => {
+                    void copyActionsRef.current?.copySelection({
+                      includeDescendants: true,
+                    });
+                  }}
+                >
+                  Copy with descendants
+                </button>
+                <button type="button" className="playground-toolbar-btn">
+                  Export
+                </button>
+              </>
             }
           >
             <BomTable.Header>
