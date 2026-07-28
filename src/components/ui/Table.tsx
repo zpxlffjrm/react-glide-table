@@ -7,6 +7,7 @@ export {
 export type {
   DataTableLabels,
   DataTableClassNames,
+  DataTableEditInputProps,
   DataTableProps,
   DataTableSlots,
   PasteMode,

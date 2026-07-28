@@ -1,11 +1,15 @@
 import type { ColumnDef, Row, RowSelectionState, Updater } from "@tanstack/react-table"
-import type { ComponentType, ReactNode } from "react"
+import type { ComponentType, InputHTMLAttributes, ReactNode } from "react"
 
 import type { DataTableLabels } from "@/core/labels"
 
 export type RowSelectionMode = "none" | "single" | "multi"
 
 export type CellEditType = "text" | "number"
+export type DataTableEditInputProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type" | "value" | "defaultValue"
+>
 
 export type { DataTableLabels }
 
@@ -23,6 +27,8 @@ declare module "@tanstack/react-table" {
     editable?: boolean
     /** Inline editor input type. Defaults to text */
     editType?: CellEditType
+    /** Inline editor input attribute overrides */
+    editInputProps?: DataTableEditInputProps
   }
 }
 
@@ -274,6 +280,8 @@ export type TableColumnProps<
   rowSpanKey?: string
   editable?: boolean
   editType?: CellEditType
+  /** Inline editor input attribute overrides */
+  editInputProps?: DataTableEditInputProps
   className?: string
   headerClassName?: string
   render?: (value: K extends keyof T ? T[K] : unknown, row: Row<T>, index: number) => ReactNode

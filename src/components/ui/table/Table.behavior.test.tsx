@@ -298,6 +298,42 @@ describe("Table cell-edit behavior", () => {
     expect(screen.getByText("Updated")).toBeInTheDocument()
     expect(screen.queryByDisplayValue("Updated")).not.toBeInTheDocument()
   })
+
+  it("applies editInputProps on an editable column input", async () => {
+    const user = userEvent.setup()
+
+    render(
+      <SimpleTable
+        data={[{ id: "1", name: "", amount: 10 }]}
+        onDataChange={() => undefined}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column
+            field="name"
+            editable
+            editType="text"
+            editInputProps={{
+              placeholder: "이름 입력",
+              "aria-label": "name-input",
+              maxLength: 10,
+            }}
+          >
+            Name
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const cell = screen.getByRole("cell")
+    await user.dblClick(cell)
+
+    const input = screen.getByPlaceholderText("이름 입력")
+    expect(input).toBeInTheDocument()
+    expect(screen.getByLabelText("name-input")).toBeInTheDocument()
+    expect(input).toHaveAttribute("maxlength", "10")
+  })
 })
 
 describe("DataTable direct usage behavior", () => {
