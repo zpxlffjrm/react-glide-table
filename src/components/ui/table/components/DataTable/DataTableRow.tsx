@@ -37,6 +37,22 @@ export type DataTableRowProps<T extends Record<string, unknown>> = {
   measureElement?: (node: Element | null) => void;
 };
 
+function isInteractiveMouseTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+
+  const interactiveSelector = [
+    "input",
+    "textarea",
+    "select",
+    "button",
+    "a[href]",
+    "[contenteditable]:not([contenteditable='false'])",
+    "[data-table-disable-cell-selection]",
+  ].join(",");
+
+  return target.closest(interactiveSelector) !== null;
+}
+
 function resolveExpandCellIndex<T extends Record<string, unknown>>(
   cells: ReturnType<Row<T>["getVisibleCells"]>,
   toggleField?: string,
@@ -126,6 +142,41 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
   const visibleCells = row.getVisibleCells();
   const columnIdsByIndex = visibleCells.map((cell) => cell.column.id);
+  row.getIsCellDragSelected = (columnId?: string) => {
+    if (!activeSelectionBounds) return false;
+
+    if (columnId) {
+      const colIndex = columnIdsByIndex.indexOf(columnId);
+      if (colIndex < 0) return false;
+
+      const { startRow, rowSpan } = resolveRowSpanAt(
+        columnRowSpanMap.get(columnIdsByIndex[colIndex]),
+        rowIndex,
+      );
+
+      return isCellInSelection(
+        startRow,
+        colIndex,
+        activeSelectionBounds,
+        rowSpan,
+      );
+    }
+
+    for (let colIndex = 0; colIndex < columnIdsByIndex.length; colIndex += 1) {
+      const { startRow, rowSpan } = resolveRowSpanAt(
+        columnRowSpanMap.get(columnIdsByIndex[colIndex]),
+        rowIndex,
+      );
+
+      if (
+        isCellInSelection(startRow, colIndex, activeSelectionBounds, rowSpan)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
   const isVisuallySelectedAt = activeSelectionBounds
     ? (targetRow: number, targetCol: number) => {
         if (
@@ -211,6 +262,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
         const editType = getColumnEditType(cell.column.columnDef);
 
         let rowSpanInfo: RowSpanInfo | undefined;
+
         if (isRowSpanColumn) {
           rowSpanInfo = columnRowSpanMap.get(columnId)?.[rowIndex];
           if (rowSpanInfo && rowSpanInfo.rowSpan === 0) {
@@ -323,6 +375,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
               }
 
               if (!enableCellSelection) return;
+              if (isInteractiveMouseTarget(event.target)) return;
 
               event.preventDefault();
               onCellMouseDown(
