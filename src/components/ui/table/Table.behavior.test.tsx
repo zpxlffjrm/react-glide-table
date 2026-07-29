@@ -438,7 +438,7 @@ describe("DataTable direct usage behavior", () => {
         cell: ({ row, getValue }) => (
           <span data-testid={`name-cell-${row.id}`}>
             {String(getValue<string>() ?? "")}:
-            {row.getIsCellDragSelected("name") ? "selected" : "idle"}
+            {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
           </span>
         ),
       },
@@ -463,5 +463,57 @@ describe("DataTable direct usage behavior", () => {
     fireEvent.mouseUp(window)
 
     expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
+  })
+
+  it("reports getIsCellDragSelected for covered rows inside a row-span merge", () => {
+    type MergeRow = { id: string; region: string; regionId: string; name: string }
+
+    const mergeRows: MergeRow[] = [
+      { id: "1", region: "APAC", regionId: "r-apac", name: "One" },
+      { id: "2", region: "APAC", regionId: "r-apac", name: "Two" },
+      { id: "3", region: "EMEA", regionId: "r-emea", name: "Three" },
+    ]
+
+    const columns: ColumnDef<MergeRow, unknown>[] = [
+      {
+        id: "region",
+        accessorKey: "region",
+        header: "Region",
+        meta: { rowSpan: true, rowSpanKey: "regionId" },
+      },
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row, getValue }) => (
+          <span data-testid={`name-cell-${row.id}`}>
+            {String(getValue<string>() ?? "")}:
+            {row.getIsCellDragSelected?.("region") ? "region-selected" : "region-idle"}
+          </span>
+        ),
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={mergeRows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableRowSpan
+        enableVirtualization={false}
+      />,
+    )
+
+    const regionOrigin = container.querySelector("tbody tr td")
+    expect(regionOrigin).not.toBeNull()
+    if (!regionOrigin) return
+
+    fireEvent.mouseDown(regionOrigin, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    // Covered merge rows still render sibling columns; query region via startRow.
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("One:region-selected")
+    expect(screen.getByTestId("name-cell-2")).toHaveTextContent("Two:region-selected")
+    expect(screen.getByTestId("name-cell-3")).toHaveTextContent("Three:region-idle")
   })
 })

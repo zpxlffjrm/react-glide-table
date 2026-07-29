@@ -781,9 +781,9 @@ export function App() {
                 editable
                 width={300}
                 editInputProps={{
-                  placeholder: "Plant",
-                  "aria-label": "plant-input",
-                  maxLength: 10,
+                  placeholder: "Name",
+                  "aria-label": "name-input",
+                  maxLength: 40,
                 }}
               >
                 Name
@@ -816,9 +816,8 @@ export function App() {
                 editType="number"
                 width={100}
                 editInputProps={{
-                  placeholder: "Plant",
-                  "aria-label": "plant-input",
-                  maxLength: 10,
+                  placeholder: "Qty",
+                  "aria-label": "qty-input",
                 }}
               >
                 Qty

@@ -46,8 +46,7 @@ function isInteractiveMouseTarget(target: EventTarget | null): boolean {
     "select",
     "button",
     "a[href]",
-    "[contenteditable='']",
-    "[contenteditable='true']",
+    "[contenteditable]:not([contenteditable='false'])",
     "[data-table-disable-cell-selection]",
   ].join(",");
 
@@ -150,13 +149,13 @@ export function DataTableRow<T extends Record<string, unknown>>({
       const colIndex = columnIdsByIndex.indexOf(columnId);
       if (colIndex < 0) return false;
 
-      const rowSpan = resolveRowSpanAt(
+      const { startRow, rowSpan } = resolveRowSpanAt(
         columnRowSpanMap.get(columnIdsByIndex[colIndex]),
         rowIndex,
-      ).rowSpan;
+      );
 
       return isCellInSelection(
-        rowIndex,
+        startRow,
         colIndex,
         activeSelectionBounds,
         rowSpan,
@@ -164,13 +163,13 @@ export function DataTableRow<T extends Record<string, unknown>>({
     }
 
     for (let colIndex = 0; colIndex < columnIdsByIndex.length; colIndex += 1) {
-      const rowSpan = resolveRowSpanAt(
+      const { startRow, rowSpan } = resolveRowSpanAt(
         columnRowSpanMap.get(columnIdsByIndex[colIndex]),
         rowIndex,
-      ).rowSpan;
+      );
 
       if (
-        isCellInSelection(rowIndex, colIndex, activeSelectionBounds, rowSpan)
+        isCellInSelection(startRow, colIndex, activeSelectionBounds, rowSpan)
       ) {
         return true;
       }
