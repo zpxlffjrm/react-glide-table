@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps } from "react"
 import { useState } from "react"
@@ -158,6 +158,33 @@ function EditableTableHarness() {
         </SimpleTable.Column>
       </SimpleTable.Header>
     </SimpleTable>
+  )
+}
+
+function CustomCellInputHarness() {
+  const [data] = useState<SimpleRow[]>([{ id: "1", name: "Alpha", amount: 10 }])
+
+  const columns: ColumnDef<SimpleRow, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row, getValue }) => (
+        <input
+          aria-label={`name-inline-input-${row.id}`}
+          defaultValue={String(getValue<string>() ?? "")}
+        />
+      ),
+    },
+  ]
+
+  return (
+    <DataTable
+      data={data}
+      columns={columns}
+      getRowId={(row) => row.id}
+      enableVirtualization={false}
+    />
   )
 }
 
@@ -389,5 +416,104 @@ describe("DataTable direct usage behavior", () => {
 
     expect(screen.getByText("2")).toBeInTheDocument()
     expect(screen.getByText("/ 3")).toBeInTheDocument()
+  })
+
+  it("allows typing in a custom cell input with cell selection enabled", async () => {
+    const user = userEvent.setup()
+
+    render(<CustomCellInputHarness />)
+
+    await user.click(screen.getByLabelText("name-inline-input-1"))
+    await user.type(screen.getByLabelText("name-inline-input-1"), "Updated")
+
+    expect(screen.getByLabelText("name-inline-input-1")).toHaveValue("AlphaUpdated")
+  })
+
+  it("exposes cell drag-selection state via row.getIsCellDragSelected", () => {
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row, getValue }) => (
+          <span data-testid={`name-cell-${row.id}`}>
+            {String(getValue<string>() ?? "")}:
+            {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
+          </span>
+        ),
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={SIMPLE_ROWS}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      />,
+    )
+
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:idle")
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
+  })
+
+  it("reports getIsCellDragSelected for covered rows inside a row-span merge", () => {
+    type MergeRow = { id: string; region: string; regionId: string; name: string }
+
+    const mergeRows: MergeRow[] = [
+      { id: "1", region: "APAC", regionId: "r-apac", name: "One" },
+      { id: "2", region: "APAC", regionId: "r-apac", name: "Two" },
+      { id: "3", region: "EMEA", regionId: "r-emea", name: "Three" },
+    ]
+
+    const columns: ColumnDef<MergeRow, unknown>[] = [
+      {
+        id: "region",
+        accessorKey: "region",
+        header: "Region",
+        meta: { rowSpan: true, rowSpanKey: "regionId" },
+      },
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row, getValue }) => (
+          <span data-testid={`name-cell-${row.id}`}>
+            {String(getValue<string>() ?? "")}:
+            {row.getIsCellDragSelected?.("region") ? "region-selected" : "region-idle"}
+          </span>
+        ),
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={mergeRows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableRowSpan
+        enableVirtualization={false}
+      />,
+    )
+
+    const regionOrigin = container.querySelector("tbody tr td")
+    expect(regionOrigin).not.toBeNull()
+    if (!regionOrigin) return
+
+    fireEvent.mouseDown(regionOrigin, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    // Covered merge rows still render sibling columns; query region via startRow.
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("One:region-selected")
+    expect(screen.getByTestId("name-cell-2")).toHaveTextContent("Two:region-selected")
+    expect(screen.getByTestId("name-cell-3")).toHaveTextContent("Three:region-idle")
   })
 })

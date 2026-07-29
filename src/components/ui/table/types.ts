@@ -30,6 +30,16 @@ declare module "@tanstack/react-table" {
     /** Inline editor input attribute overrides */
     editInputProps?: DataTableEditInputProps
   }
+
+  interface Row<TData> {
+    /**
+     * Returns whether this row's cell is inside the active drag selection.
+     * Attached at render time by DataTableRow (optional outside that renderer).
+     * - `columnId` omitted: true when any visible cell in the row is selected.
+     * - `columnId` provided: checks only that column (row-span aware via merge origin).
+     */
+    getIsCellDragSelected?: (columnId?: string) => boolean
+  }
 }
 
 export type DataTableCopyActions = {
