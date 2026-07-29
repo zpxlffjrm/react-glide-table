@@ -701,6 +701,11 @@ export function App() {
                 field="plant"
                 rowSpan={enableRowSpan}
                 rowSpanKey="plantId"
+                editInputProps={{
+                  placeholder: "Plant",
+                  "aria-label": "plant-input",
+                  maxLength: 10,
+                }}
               >
                 Plant
               </BomTable.Column>
@@ -770,7 +775,17 @@ export function App() {
                 </ProductTable.Column>
               )}
 
-              <ProductTable.Column field="name" sortable editable width={300}>
+              <ProductTable.Column
+                field="name"
+                sortable
+                editable
+                width={300}
+                editInputProps={{
+                  placeholder: "Plant",
+                  "aria-label": "plant-input",
+                  maxLength: 10,
+                }}
+              >
                 Name
               </ProductTable.Column>
               {!enableRowSpan && (
@@ -800,6 +815,11 @@ export function App() {
                 editable
                 editType="number"
                 width={100}
+                editInputProps={{
+                  placeholder: "Plant",
+                  "aria-label": "plant-input",
+                  maxLength: 10,
+                }}
               >
                 Qty
               </ProductTable.Column>
