@@ -11,6 +11,28 @@
   "homepage": "https://github.com/zpxlffjrm/react-glide-table#readme",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "react",
+    "table",
+    "datagrid",
+    "data-grid",
+    "headless",
+    "unstyled",
+    "tanstack",
+    "tanstack-table",
+    "virtualization",
+    "virtualized",
+    "typescript",
+    "compound-components",
+    "column-resize",
+    "column-freeze",
+    "sticky-columns",
+    "row-span",
+    "cell-selection",
+    "editable",
+    "tree-table",
+    "clipboard"
+  ],
   "sideEffects": false,
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
