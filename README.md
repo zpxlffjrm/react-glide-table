@@ -234,9 +234,12 @@ Opt in with `enableColumnFreeze`. Mark columns with `frozen` — sticky insets a
 | ---------------------------------- | --------------------------------------- |
 | `enableColumnFreeze`               | Turn on sticky freeze (default `false`) |
 | `Column.frozen` / `meta.frozen`    | `true` / `"left"` or `"right"`          |
-| `data-frozen` / `data-freeze-edge` | State hooks for custom styling          |
+| `data-frozen`                      | `"left"` / `"right"` on frozen cells    |
+| `data-freeze-edge`                 | `"left"` / `"right"` / `"both"` on island boundaries |
 
-Helpers (`/core`): `buildColumnFreezeOffsets`, `getColumnFreezeStyle`, `resolveColumnFreezeSide`.
+Helpers (`/core`): `buildColumnFreezeOffsets`, `getColumnFreezeEdgeAttr`, `getColumnFreezeStyle`, `resolveColumnFreezeSide`.
+
+Contiguous same-side freezes share one island (shadow only on the outer boundary). A gap between frozen columns creates separate islands, so both sides of the gap get an edge shadow.
 
 ## Public API
 

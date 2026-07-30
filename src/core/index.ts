@@ -36,9 +36,11 @@ export { getColumnSizeStyle } from "@/components/ui/table/features/column-resize
 
 export {
   buildColumnFreezeOffsets,
+  getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
   resolveColumnFreezeSide,
   type ColumnFreezeColumnInput,
+  type ColumnFreezeEdgeSide,
   type ColumnFreezeMeta,
   type ColumnFreezeOffset,
   type ColumnFreezeSide,
