@@ -530,6 +530,53 @@ describe("DataTable direct usage behavior", () => {
     expect(container.querySelectorAll(".data-table-resize-handle")).toHaveLength(0)
   })
 
+  it("does not apply resize default min/max sizes when enableColumnResize is off", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={20}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={900}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ width: "20px" })
+    expect(headers[1]).toHaveStyle({ width: "900px" })
+  })
+
+  it("applies resize default min/max sizes when enableColumnResize is on", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnResize
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={20}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={900}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ width: "40px" })
+    expect(headers[1]).toHaveStyle({ width: "800px" })
+  })
+
   it("skips resize handle for columns with resizable={false}", () => {
     const { container } = render(
       <SimpleTable

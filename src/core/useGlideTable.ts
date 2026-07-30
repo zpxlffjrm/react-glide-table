@@ -208,10 +208,14 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const table = useReactTable({
     data: tableData,
     columns,
-    defaultColumn: {
-      minSize: DATA_TABLE_COLUMN_MIN_SIZE,
-      maxSize: DATA_TABLE_COLUMN_MAX_SIZE,
-    },
+    ...(enableColumnResize
+      ? {
+          defaultColumn: {
+            minSize: DATA_TABLE_COLUMN_MIN_SIZE,
+            maxSize: DATA_TABLE_COLUMN_MAX_SIZE,
+          },
+        }
+      : {}),
     enableColumnResizing: enableColumnResize,
     columnResizeMode,
     state: {
