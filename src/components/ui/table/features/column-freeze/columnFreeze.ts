@@ -15,12 +15,19 @@ export type ColumnFreezeColumnInput = {
   side?: ColumnFreezeSide
 }
 
+/** Which outer sides of a freeze island get a divider shadow. */
+export type ColumnFreezeEdgeSide = "left" | "right" | "both"
+
 export type ColumnFreezeOffset = {
   side: ColumnFreezeSide
   /** Cumulative sticky inset (`left` or `right` in px). */
   offset: number
-  /** Inner edge of the sticky group (shadow / divider). */
+  /** True when this cell is on an island boundary (any side). */
   isEdge: boolean
+  /** Shadow toward the previous column (scrollable / other island). */
+  edgeLeft: boolean
+  /** Shadow toward the next column (scrollable / other island). */
+  edgeRight: boolean
   /** Relative stack order within the freeze side (higher = closer to the viewport edge). */
   stack: number
 }
@@ -38,13 +45,27 @@ export function resolveColumnFreezeSide(
   return undefined
 }
 
+/** Serialize freeze-edge flags for `data-freeze-edge`. */
+export function getColumnFreezeEdgeAttr(
+  offset: Pick<ColumnFreezeOffset, "edgeLeft" | "edgeRight"> | undefined,
+): ColumnFreezeEdgeSide | undefined {
+  if (!offset) return undefined
+  if (offset.edgeLeft && offset.edgeRight) return "both"
+  if (offset.edgeLeft) return "left"
+  if (offset.edgeRight) return "right"
+
+  return undefined
+}
+
 /**
  * Build sticky insets for frozen columns without changing DOM/column order.
  *
  * - `left`: `left = Σ(widths of left-frozen columns before this one)`
  * - `right`: `right = Σ(widths of right-frozen columns after this one)`
  *
- * Middle columns may be frozen; non-frozen neighbors scroll underneath.
+ * Contiguous same-side freezes form one island — only the outer boundaries
+ * get edge shadows. Gaps between same-side freezes create separate islands,
+ * so both sides of the gap receive a shadow.
  */
 export function buildColumnFreezeOffsets(
   columns: ColumnFreezeColumnInput[],
@@ -62,6 +83,8 @@ export function buildColumnFreezeOffsets(
       side: "left",
       offset: leftOffset,
       isEdge: false,
+      edgeLeft: false,
+      edgeRight: false,
       stack: 0,
     })
     leftOffset += column.size
@@ -71,7 +94,6 @@ export function buildColumnFreezeOffsets(
     const entry = result.get(id)
     if (!entry) return
 
-    entry.isEdge = index === leftIds.length - 1
     // Leftmost sticky cells sit above later left-sticky cells while scrolling.
     entry.stack = leftIds.length - index
   })
@@ -88,6 +110,8 @@ export function buildColumnFreezeOffsets(
       side: "right",
       offset: rightOffset,
       isEdge: false,
+      edgeLeft: false,
+      edgeRight: false,
       stack: 0,
     })
     rightOffset += column.size
@@ -97,10 +121,27 @@ export function buildColumnFreezeOffsets(
     const entry = result.get(id)
     if (!entry) return
 
-    // Innermost (leftmost among right-frozen) gets the edge shadow.
-    entry.isEdge = index === rightIds.length - 1
     // Rightmost sticky cells sit above later right-sticky cells while scrolling.
     entry.stack = rightIds.length - index
+  })
+
+  // Island boundaries: same-side neighbors share an island; otherwise mark edges.
+  columns.forEach((column, index) => {
+    if (!column.side) return
+
+    const entry = result.get(column.id)
+    if (!entry) return
+
+    const prevSide = index > 0 ? columns[index - 1]?.side : undefined
+    const nextSide =
+      index < columns.length - 1 ? columns[index + 1]?.side : undefined
+
+    entry.edgeLeft = prevSide !== column.side
+    entry.edgeRight = nextSide !== column.side
+    // At the table start/end, no shadow toward the missing neighbor.
+    if (index === 0) entry.edgeLeft = false
+    if (index === columns.length - 1) entry.edgeRight = false
+    entry.isEdge = entry.edgeLeft || entry.edgeRight
   })
 
   return result

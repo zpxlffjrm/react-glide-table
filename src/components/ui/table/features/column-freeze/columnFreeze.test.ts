@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildColumnFreezeOffsets,
+  getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
   resolveColumnFreezeSide,
 } from "@/components/ui/table/features/column-freeze/columnFreeze"
@@ -25,14 +26,19 @@ describe("buildColumnFreezeOffsets", () => {
       { id: "d", size: 90 },
     ])
 
+    // Discontinuous left freezes → separate islands; both get boundary shadows.
     expect(offsets.get("a")).toMatchObject({
       side: "left",
       offset: 0,
-      isEdge: false,
+      edgeLeft: false,
+      edgeRight: true,
+      isEdge: true,
     })
     expect(offsets.get("c")).toMatchObject({
       side: "left",
       offset: 100,
+      edgeLeft: true,
+      edgeRight: true,
       isEdge: true,
     })
     expect(offsets.has("b")).toBe(false)
@@ -50,16 +56,20 @@ describe("buildColumnFreezeOffsets", () => {
     expect(offsets.get("d")).toMatchObject({
       side: "right",
       offset: 0,
-      isEdge: false,
+      edgeLeft: true,
+      edgeRight: false,
+      isEdge: true,
     })
     expect(offsets.get("b")).toMatchObject({
       side: "right",
       offset: 90,
+      edgeLeft: true,
+      edgeRight: true,
       isEdge: true,
     })
   })
 
-  it("allows a middle column to freeze alone", () => {
+  it("allows a middle column to freeze alone with both edges", () => {
     const offsets = buildColumnFreezeOffsets([
       { id: "a", size: 100 },
       { id: "b", size: 80, side: "left" },
@@ -69,8 +79,58 @@ describe("buildColumnFreezeOffsets", () => {
     expect(offsets.get("b")).toMatchObject({
       side: "left",
       offset: 0,
+      edgeLeft: true,
+      edgeRight: true,
       isEdge: true,
     })
+  })
+
+  it("marks only outer edges for contiguous same-side freezes", () => {
+    const offsets = buildColumnFreezeOffsets([
+      { id: "a", size: 100, side: "left" },
+      { id: "b", size: 80, side: "left" },
+      { id: "c", size: 60 },
+      { id: "d", size: 90, side: "right" },
+      { id: "e", size: 70, side: "right" },
+    ])
+
+    expect(offsets.get("a")).toMatchObject({
+      edgeLeft: false,
+      edgeRight: false,
+      isEdge: false,
+    })
+    expect(offsets.get("b")).toMatchObject({
+      edgeLeft: false,
+      edgeRight: true,
+      isEdge: true,
+    })
+    expect(offsets.get("d")).toMatchObject({
+      edgeLeft: true,
+      edgeRight: false,
+      isEdge: true,
+    })
+    expect(offsets.get("e")).toMatchObject({
+      edgeLeft: false,
+      edgeRight: false,
+      isEdge: false,
+    })
+  })
+})
+
+describe("getColumnFreezeEdgeAttr", () => {
+  it("serializes edge flags for data-freeze-edge", () => {
+    expect(
+      getColumnFreezeEdgeAttr({ edgeLeft: true, edgeRight: false }),
+    ).toBe("left")
+    expect(
+      getColumnFreezeEdgeAttr({ edgeLeft: false, edgeRight: true }),
+    ).toBe("right")
+    expect(
+      getColumnFreezeEdgeAttr({ edgeLeft: true, edgeRight: true }),
+    ).toBe("both")
+    expect(
+      getColumnFreezeEdgeAttr({ edgeLeft: false, edgeRight: false }),
+    ).toBeUndefined()
   })
 })
 
@@ -81,6 +141,8 @@ describe("getColumnFreezeStyle", () => {
         side: "left",
         offset: 40,
         isEdge: true,
+        edgeLeft: false,
+        edgeRight: true,
         stack: 2,
       }),
     ).toEqual({
@@ -95,6 +157,8 @@ describe("getColumnFreezeStyle", () => {
           side: "right",
           offset: 20,
           isEdge: true,
+          edgeLeft: true,
+          edgeRight: false,
           stack: 1,
         },
         { isHeader: true },

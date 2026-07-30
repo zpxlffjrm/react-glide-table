@@ -663,28 +663,36 @@ describe("DataTable direct usage behavior", () => {
   })
 
   it("stacks multiple left-frozen columns so offsets do not overlap", () => {
+    type WideRow = SimpleRow & { note: string }
+    const WideTable = createTable<WideRow>()
+    const rows: WideRow[] = SIMPLE_ROWS.map((row) => ({ ...row, note: "n" }))
+
     const { container } = render(
-      <SimpleTable
-        data={SIMPLE_ROWS}
+      <WideTable
+        data={rows}
         getRowId={(row) => row.id}
         enableVirtualization={false}
         enableColumnFreeze
       >
-        <SimpleTable.Header>
-          <SimpleTable.Column field="name" width={200} frozen>
+        <WideTable.Header>
+          <WideTable.Column field="name" width={200} frozen>
             Name
-          </SimpleTable.Column>
-          <SimpleTable.Column field="amount" width={120} frozen="left">
+          </WideTable.Column>
+          <WideTable.Column field="amount" width={120} frozen="left">
             Qty
-          </SimpleTable.Column>
-        </SimpleTable.Header>
-      </SimpleTable>,
+          </WideTable.Column>
+          <WideTable.Column field="note" width={140}>
+            Note
+          </WideTable.Column>
+        </WideTable.Header>
+      </WideTable>,
     )
 
     const headers = container.querySelectorAll("thead th")
     expect(headers[0]).toHaveStyle({ left: "0px" })
+    expect(headers[0]).not.toHaveAttribute("data-freeze-edge")
     expect(headers[1]).toHaveStyle({ left: "200px" })
-    expect(headers[1]).toHaveAttribute("data-freeze-edge")
+    expect(headers[1]).toHaveAttribute("data-freeze-edge", "right")
   })
 
   it("allows freezing a middle column while keeping neighbors scrollable", () => {
@@ -717,10 +725,50 @@ describe("DataTable direct usage behavior", () => {
     expect(headers[0]).not.toHaveAttribute("data-frozen")
     expect(headers[1]).toHaveAttribute("data-frozen", "left")
     expect(headers[1]).toHaveStyle({ left: "0px" })
+    expect(headers[1]).toHaveAttribute("data-freeze-edge", "both")
     expect(headers[2]).not.toHaveAttribute("data-frozen")
     expect(headers[0]?.textContent).toContain("Name")
     expect(headers[1]?.textContent).toContain("Qty")
     expect(headers[2]?.textContent).toContain("Note")
+  })
+
+  it("marks both sides of a gap between discontinuous right freezes", () => {
+    type WideRow = SimpleRow & { note: string; status: string }
+    const WideTable = createTable<WideRow>()
+    const rows: WideRow[] = SIMPLE_ROWS.map((row) => ({
+      ...row,
+      note: "n",
+      status: "ok",
+    }))
+
+    const { container } = render(
+      <WideTable
+        data={rows}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <WideTable.Header>
+          <WideTable.Column field="name" width={120}>
+            Name
+          </WideTable.Column>
+          <WideTable.Column field="amount" width={100} frozen="right">
+            CheckLog
+          </WideTable.Column>
+          <WideTable.Column field="note" width={140}>
+            CheckLogAt
+          </WideTable.Column>
+          <WideTable.Column field="status" width={80} frozen="right">
+            Lot
+          </WideTable.Column>
+        </WideTable.Header>
+      </WideTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[1]).toHaveAttribute("data-freeze-edge", "both")
+    expect(headers[2]).not.toHaveAttribute("data-freeze-edge")
+    expect(headers[3]).toHaveAttribute("data-freeze-edge", "left")
   })
 
   it("does not freeze columns when enableColumnFreeze is off", () => {

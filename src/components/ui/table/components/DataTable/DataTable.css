@@ -73,26 +73,39 @@
   background-color: var(--color-neutral-bg-app);
 }
 
-.DataTableJSX .data-table-head-cell--frozen-left[data-freeze-edge]::after,
-.DataTableJSX .data-table-head-cell--frozen-right[data-freeze-edge]::after {
+/* Island edge shadows — left / right / both (gaps between discontinuous freezes). */
+.DataTableJSX .data-table-head-cell[data-freeze-edge="left"]::after,
+.DataTableJSX .data-table-head-cell[data-freeze-edge="right"]::after,
+.DataTableJSX .data-table-head-cell[data-freeze-edge="both"]::after {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 4px;
   pointer-events: none;
 }
 
-.DataTableJSX .data-table-head-cell--frozen-left[data-freeze-edge]::after {
+.DataTableJSX .data-table-head-cell[data-freeze-edge="left"]::after {
+  left: 0;
+  width: 4px;
+  transform: translateX(-100%);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
+}
+
+.DataTableJSX .data-table-head-cell[data-freeze-edge="right"]::after {
   right: 0;
+  width: 4px;
   transform: translateX(100%);
   background: linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent);
 }
 
-.DataTableJSX .data-table-head-cell--frozen-right[data-freeze-edge]::after {
-  left: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
+.DataTableJSX .data-table-head-cell[data-freeze-edge="both"]::after {
+  left: -4px;
+  right: -4px;
+  background:
+    linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent) left / 4px 100%
+      no-repeat,
+    linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent) right / 4px 100%
+      no-repeat;
 }
 
 .DataTableJSX .data-table-resize-handle {

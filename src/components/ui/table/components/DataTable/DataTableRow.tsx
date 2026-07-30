@@ -20,7 +20,10 @@ import {
   isCellInSelection,
   measureMergedSpanRowHeights,
 } from "@/components/ui/table/features/cell-selection/cellSelection";
-import { getColumnFreezeStyle } from "@/components/ui/table/features/column-freeze/columnFreeze";
+import {
+  getColumnFreezeEdgeAttr,
+  getColumnFreezeStyle,
+} from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
 import {
@@ -394,7 +397,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
             data-editable={editable ? "" : undefined}
             data-editing={isEditing ? "" : undefined}
             data-frozen={freezeOffset?.side}
-            data-freeze-edge={freezeOffset?.isEdge ? "" : undefined}
+            data-freeze-edge={getColumnFreezeEdgeAttr(freezeOffset)}
             onMouseDown={(event) => {
               if (isEditing) {
                 event.stopPropagation();

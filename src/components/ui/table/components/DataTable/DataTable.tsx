@@ -5,7 +5,10 @@ import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTab
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
 import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants"
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
-import { getColumnFreezeStyle } from "@/components/ui/table/features/column-freeze/columnFreeze"
+import {
+  getColumnFreezeEdgeAttr,
+  getColumnFreezeStyle,
+} from "@/components/ui/table/features/column-freeze/columnFreeze"
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
 import type { DataTableClassNames, DataTableProps } from "@/components/ui/table/types"
 import { useGlideTable } from "@/core/useGlideTable"
@@ -181,7 +184,7 @@ function DataTable<T extends Record<string, unknown>>({
                         header.column.getIsResizing() ? "" : undefined
                       }
                       data-frozen={freezeOffset?.side}
-                      data-freeze-edge={freezeOffset?.isEdge ? "" : undefined}
+                      data-freeze-edge={getColumnFreezeEdgeAttr(freezeOffset)}
                       style={
                         Object.keys(headerStyle).length > 0
                           ? headerStyle
