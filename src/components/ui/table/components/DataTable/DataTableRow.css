@@ -50,27 +50,40 @@
   background-color: var(--color-brand-primary);
 }
 
-.DataTableRowJSX .data-table-cell--frozen-left[data-freeze-edge]::before,
-.DataTableRowJSX .data-table-cell--frozen-right[data-freeze-edge]::before {
+/* Island edge shadows — left / right / both (gaps between discontinuous freezes). */
+.DataTableRowJSX .data-table-cell[data-freeze-edge="left"]::before,
+.DataTableRowJSX .data-table-cell[data-freeze-edge="right"]::before,
+.DataTableRowJSX .data-table-cell[data-freeze-edge="both"]::before {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 4px;
   pointer-events: none;
   z-index: 1;
 }
 
-.DataTableRowJSX .data-table-cell--frozen-left[data-freeze-edge]::before {
+.DataTableRowJSX .data-table-cell[data-freeze-edge="left"]::before {
+  left: 0;
+  width: 4px;
+  transform: translateX(-100%);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
+}
+
+.DataTableRowJSX .data-table-cell[data-freeze-edge="right"]::before {
   right: 0;
+  width: 4px;
   transform: translateX(100%);
   background: linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent);
 }
 
-.DataTableRowJSX .data-table-cell--frozen-right[data-freeze-edge]::before {
-  left: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
+.DataTableRowJSX .data-table-cell[data-freeze-edge="both"]::before {
+  left: -4px;
+  right: -4px;
+  background:
+    linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent) left / 4px 100%
+      no-repeat,
+    linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent) right / 4px 100%
+      no-repeat;
 }
 
 /* Left vertical edge for merged cells. Adjacent merges each draw only their left edge to keep it 1px. */

@@ -835,6 +835,7 @@ export function App() {
                 field="price"
                 sortable
                 align="right"
+                frozen="left"
                 editable
                 editType="number"
                 render={(value) => `$${Number(value).toLocaleString()}`}
@@ -857,7 +858,12 @@ export function App() {
               >
                 Weight
               </ProductTable.Column>
-              <ProductTable.Column field="status" sortable editable frozen="right">
+              <ProductTable.Column
+                field="status"
+                sortable
+                editable
+                frozen="right"
+              >
                 Status
               </ProductTable.Column>
               <ProductTable.Column field="note" editable frozen="right">
