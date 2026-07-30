@@ -20,6 +20,8 @@ import {
   isCellInSelection,
   measureMergedSpanRowHeights,
 } from "@/components/ui/table/features/cell-selection/cellSelection";
+import { getColumnFreezeStyle } from "@/components/ui/table/features/column-freeze/columnFreeze";
+import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
 import {
   resolveRowSpanAt,
@@ -80,8 +82,19 @@ export function DataTableRow<T extends Record<string, unknown>>({
   virtualIndex,
   measureElement,
 }: DataTableRowProps<T>) {
-  const { classNames, rowSpan, selection, cellSelection, cellEdit, expand } =
-    useDataTableRowContext();
+  const {
+    classNames,
+    rowSpan,
+    selection,
+    cellSelection,
+    cellEdit,
+    expand,
+    columnResize,
+    columnFreeze,
+  } = useDataTableRowContext();
+
+  const { enableColumnResize } = columnResize;
+  const { enableColumnFreeze, offsets: freezeOffsets } = columnFreeze;
 
   const {
     enableRowSpan,
@@ -339,6 +352,19 @@ export function DataTableRow<T extends Record<string, unknown>>({
           getRowIndexInMergedCell(clientY, element, rowIndex, cellRowSpan);
 
         const hasSelectionEdges = hasCellSelectionEdges(selectionEdgeStyle);
+        const sizeStyle = getColumnSizeStyle(cell.column.getSize(), {
+          force: enableColumnResize,
+          lockMax: enableColumnResize,
+        });
+        const freezeOffset = enableColumnFreeze
+          ? freezeOffsets.get(columnId)
+          : undefined;
+        const freezeStyle = getColumnFreezeStyle(freezeOffset);
+        const cellStyle = {
+          ...sizeStyle,
+          ...freezeStyle,
+          ...(selectionEdgeStyle as CSSProperties | undefined),
+        } as CSSProperties;
 
         return (
           <td
@@ -367,6 +393,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
             data-selection-edges={hasSelectionEdges ? "" : undefined}
             data-editable={editable ? "" : undefined}
             data-editing={isEditing ? "" : undefined}
+            data-frozen={freezeOffset?.side}
+            data-freeze-edge={freezeOffset?.isEdge ? "" : undefined}
             onMouseDown={(event) => {
               if (isEditing) {
                 event.stopPropagation();
@@ -407,9 +435,10 @@ export function DataTableRow<T extends Record<string, unknown>>({
               event.stopPropagation();
               onStartEdit(rowIndex, cellIndex);
             }}
-            style={selectionEdgeStyle as CSSProperties | undefined}
+            style={Object.keys(cellStyle).length > 0 ? cellStyle : undefined}
             className={cn(
               "data-table-cell",
+              freezeOffset && `data-table-cell--frozen-${freezeOffset.side}`,
               CELL_ALIGN_CLASS[align],
               cellClassName,
               isMerged && "is-merged",

@@ -33,6 +33,46 @@
   font-weight: 400;
 }
 
+.DataTableRowJSX .data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell--frozen-right {
+  background-color: var(--color-neutral-bg-surface);
+}
+
+.DataTableRowJSX.row-hoverable:hover .data-table-cell--frozen-left,
+.DataTableRowJSX.row-hoverable:hover .data-table-cell--frozen-right,
+.DataTableRowJSX.row-hovered .data-table-cell--frozen-left,
+.DataTableRowJSX.row-hovered .data-table-cell--frozen-right {
+  background-color: var(--color-neutral-border-default);
+}
+
+.DataTableRowJSX.is-selected .data-table-cell--frozen-left,
+.DataTableRowJSX.is-selected .data-table-cell--frozen-right {
+  background-color: var(--color-brand-primary);
+}
+
+.DataTableRowJSX .data-table-cell--frozen-left[data-freeze-edge]::before,
+.DataTableRowJSX .data-table-cell--frozen-right[data-freeze-edge]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.DataTableRowJSX .data-table-cell--frozen-left[data-freeze-edge]::before {
+  right: 0;
+  transform: translateX(100%);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent);
+}
+
+.DataTableRowJSX .data-table-cell--frozen-right[data-freeze-edge]::before {
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
+}
+
 /* Left vertical edge for merged cells. Adjacent merges each draw only their left edge to keep it 1px. */
 .DataTableRowJSX .data-table-cell.is-merged {
   box-shadow: inset 1px 0 0 var(--color-neutral-border-default);
@@ -54,6 +94,11 @@
   color: #ffffff;
 }
 
+.DataTableRowJSX .data-table-cell.is-group-selected.data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell.is-group-selected.data-table-cell--frozen-right {
+  background-color: var(--color-brand-primary);
+}
+
 .DataTableRowJSX .data-table-cell.is-group-selected * {
   color: #ffffff;
 }
@@ -62,9 +107,19 @@
   background-color: var(--color-neutral-border-default);
 }
 
+.DataTableRowJSX .data-table-cell.is-group-hovered.data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell.is-group-hovered.data-table-cell--frozen-right {
+  background-color: var(--color-neutral-border-default);
+}
+
 .DataTableRowJSX .data-table-cell.cell-selection-fill {
   background-color: var(--color-brand-surface);
   color: #000000;
+}
+
+.DataTableRowJSX .data-table-cell.cell-selection-fill.data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell.cell-selection-fill.data-table-cell--frozen-right {
+  background-color: var(--color-brand-surface);
 }
 
 /*

@@ -12,6 +12,8 @@ export {
 export { useGlideTable, type UseGlideTableOptions, type UseGlideTableResult } from "@/core/useGlideTable"
 export type {
   ColumnDef,
+  ColumnResizeMode,
+  ColumnSizingState,
   DataTableCopyActions,
   DataTableProps,
   PasteMode,
@@ -29,6 +31,18 @@ export {
   type EditingCell,
 } from "@/components/ui/table/features/cell-edit/cellEdit"
 export { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit"
+
+export { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
+
+export {
+  buildColumnFreezeOffsets,
+  getColumnFreezeStyle,
+  resolveColumnFreezeSide,
+  type ColumnFreezeColumnInput,
+  type ColumnFreezeMeta,
+  type ColumnFreezeOffset,
+  type ColumnFreezeSide,
+} from "@/components/ui/table/features/column-freeze/columnFreeze"
 
 export {
   CELL_SELECTION_EDGES_CLASS,
