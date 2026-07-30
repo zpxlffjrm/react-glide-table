@@ -6,6 +6,10 @@ export {
 } from "@/components/ui/Table"
 export type {
   ColumnDef,
+  ColumnFreezeMeta,
+  ColumnFreezeSide,
+  ColumnResizeMode,
+  ColumnSizingState,
   DataTableClassNames,
   DataTableLabels,
   DataTableProps,

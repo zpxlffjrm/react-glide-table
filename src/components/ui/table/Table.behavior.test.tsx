@@ -516,4 +516,183 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-2")).toHaveTextContent("Two:region-selected")
     expect(screen.getByTestId("name-cell-3")).toHaveTextContent("Three:region-idle")
   })
+
+  it("renders resize handles when enableColumnResize is on", () => {
+    const { container } = renderSimpleTable({ enableColumnResize: true })
+
+    expect(container.querySelectorAll(".data-table-resize-handle")).toHaveLength(2)
+    expect(container.querySelector(".DataTableJSX--column-resize")).not.toBeNull()
+  })
+
+  it("hides resize handles when enableColumnResize is off", () => {
+    const { container } = renderSimpleTable()
+
+    expect(container.querySelectorAll(".data-table-resize-handle")).toHaveLength(0)
+  })
+
+  it("skips resize handle for columns with resizable={false}", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnResize
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={200}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" resizable={false}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelectorAll(".data-table-resize-handle")).toHaveLength(1)
+  })
+
+  it("applies controlled columnSizing to header and body cells", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnResize
+        columnSizing={{ name: 240 }}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={150}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={100}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const nameHeader = container.querySelectorAll("thead th")[0]
+    const nameCell = container.querySelector("tbody tr td")
+
+    expect(nameHeader).toHaveStyle({ width: "240px", minWidth: "240px" })
+    expect(nameCell).toHaveStyle({ width: "240px", minWidth: "240px" })
+  })
+
+  it("applies sticky left/right freeze without reordering columns", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={200} frozen>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={120} frozen="right">
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelector(".DataTableJSX--column-freeze")).not.toBeNull()
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveAttribute("data-frozen", "left")
+    expect(headers[0]).toHaveStyle({ position: "sticky", left: "0px" })
+    expect(headers[1]).toHaveAttribute("data-frozen", "right")
+    expect(headers[1]).toHaveStyle({ position: "sticky", right: "0px" })
+
+    // DOM order stays name → amount (no pin reordering).
+    expect(headers[0]?.textContent).toContain("Name")
+    expect(headers[1]?.textContent).toContain("Qty")
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).toHaveAttribute("data-frozen", "left")
+    expect(firstCell).toHaveStyle({ position: "sticky", left: "0px" })
+  })
+
+  it("stacks multiple left-frozen columns so offsets do not overlap", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={200} frozen>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={120} frozen="left">
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ left: "0px" })
+    expect(headers[1]).toHaveStyle({ left: "200px" })
+    expect(headers[1]).toHaveAttribute("data-freeze-edge")
+  })
+
+  it("allows freezing a middle column while keeping neighbors scrollable", () => {
+    type WideRow = SimpleRow & { note: string }
+    const WideTable = createTable<WideRow>()
+    const rows: WideRow[] = SIMPLE_ROWS.map((row) => ({ ...row, note: "n" }))
+
+    const { container } = render(
+      <WideTable
+        data={rows}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <WideTable.Header>
+          <WideTable.Column field="name" width={160}>
+            Name
+          </WideTable.Column>
+          <WideTable.Column field="amount" width={100} frozen>
+            Qty
+          </WideTable.Column>
+          <WideTable.Column field="note" width={140}>
+            Note
+          </WideTable.Column>
+        </WideTable.Header>
+      </WideTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).not.toHaveAttribute("data-frozen")
+    expect(headers[1]).toHaveAttribute("data-frozen", "left")
+    expect(headers[1]).toHaveStyle({ left: "0px" })
+    expect(headers[2]).not.toHaveAttribute("data-frozen")
+    expect(headers[0]?.textContent).toContain("Name")
+    expect(headers[1]?.textContent).toContain("Qty")
+    expect(headers[2]?.textContent).toContain("Note")
+  })
+
+  it("does not freeze columns when enableColumnFreeze is off", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" frozen>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount">Qty</SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelector("[data-frozen]")).toBeNull()
+    expect(container.querySelector(".DataTableJSX--column-freeze")).toBeNull()
+  })
 })

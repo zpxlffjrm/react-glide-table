@@ -78,7 +78,7 @@ export function Products({ data }: { data: Product[] }) {
 Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
 
 - row: `data-selected`, `data-hovered`, `data-expandable`, `data-expanded`
-- cell: `data-merged`, `data-selection-fill`, `data-editable`, `data-editing`, …
+- cell: `data-merged`, `data-selection-fill`, `data-editable`, `data-editing`, `data-frozen`, …
 
 Example: `row: "data-[selected]:bg-blue-600"`.
 
@@ -173,6 +173,67 @@ import type { RowsPastePayload } from "react-glide-table/compound"
 
 Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `onCopyActionsReady`.  
 Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboardTSVWithDepths`, `serializeSelectionToTSV`, …
+
+## Column resize
+
+Opt in with `enableColumnResize`. Drag the handle on the right edge of a header cell; double-click resets to the column’s default `width` / `size`.
+
+```tsx
+<ProductTable
+  data={data}
+  enableColumnResize
+  // optional controlled sizing
+  // columnSizing={sizing}
+  // onColumnSizingChange={setSizing}
+>
+  <ProductTable.Header>
+    <ProductTable.Column field="name" width={200} minWidth={80} maxWidth={480}>
+      Name
+    </ProductTable.Column>
+    <ProductTable.Column field="sku" resizable={false}>
+      SKU
+    </ProductTable.Column>
+  </ProductTable.Header>
+</ProductTable>
+```
+
+| Prop | Role |
+| --- | --- |
+| `enableColumnResize` | Turn on header drag resize (default `false`) |
+| `columnSizing` / `onColumnSizingChange` | Controlled width map `{ [columnId]: px }` |
+| `columnResizeMode` | `"onChange"` (live) or `"onEnd"` |
+| `Column.width` / `minWidth` / `maxWidth` | Default / clamp sizes |
+| `Column.resizable={false}` | Disable resize for one column |
+| `classNames.resizeHandle` | Style hook for the drag handle |
+
+## Column freeze
+
+Opt in with `enableColumnFreeze`. Mark columns with `frozen` — sticky insets are stacked so frozen cells never overlap, and **column order is unchanged** (middle columns may also freeze).
+
+```tsx
+<ProductTable data={data} enableColumnFreeze>
+  <ProductTable.Header>
+    <ProductTable.Column field="name" frozen width={200}>
+      Name
+    </ProductTable.Column>
+    <ProductTable.Column field="sku">SKU</ProductTable.Column>
+    <ProductTable.Column field="qty" frozen="left">
+      Qty
+    </ProductTable.Column>
+    <ProductTable.Column field="status" frozen="right">
+      Status
+    </ProductTable.Column>
+  </ProductTable.Header>
+</ProductTable>
+```
+
+| Prop | Role |
+| --- | --- |
+| `enableColumnFreeze` | Turn on sticky freeze (default `false`) |
+| `Column.frozen` / `meta.frozen` | `true` / `"left"` or `"right"` |
+| `data-frozen` / `data-freeze-edge` | State hooks for custom styling |
+
+Helpers (`/core`): `buildColumnFreezeOffsets`, `getColumnFreezeStyle`, `resolveColumnFreezeSide`.
 
 ## Public API
 

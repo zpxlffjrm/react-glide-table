@@ -1,4 +1,5 @@
 import {
+  type ColumnSizingState,
   type Row,
   type Table,
   getCoreRowModel,
@@ -20,12 +21,19 @@ import {
 } from "react";
 
 import {
+  DATA_TABLE_COLUMN_MAX_SIZE,
+  DATA_TABLE_COLUMN_MIN_SIZE,
   DATA_TABLE_ROW_HEIGHT,
   DATA_TABLE_VIRTUAL_OVERSCAN,
 } from "@/components/ui/table/constants";
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
+import {
+  buildColumnFreezeOffsets,
+  resolveColumnFreezeSide,
+  type ColumnFreezeOffset,
+} from "@/components/ui/table/features/column-freeze/columnFreeze";
 import {
   toggleExpandedRowId,
   useConvertTreeData,
@@ -44,6 +52,8 @@ import type {
 } from "@/components/ui/table/types";
 import type { DataTableLabels } from "@/core/labels";
 import { resolveDataTableLabels } from "@/core/labels";
+
+const EMPTY_COLUMN_FREEZE_OFFSETS = new Map<string, ColumnFreezeOffset>();
 
 export type UseGlideTableOptions<T extends Record<string, unknown>> = Omit<
   DataTableProps<T>,
@@ -68,6 +78,8 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   loadingText: string;
   selectionLabel: DataTableLabels["selection"];
   enableCellSelection: boolean;
+  enableColumnResize: boolean;
+  enableColumnFreeze: boolean;
   shouldVirtualize: boolean;
   scrollRef: RefObject<HTMLDivElement | null>;
   rowVirtualizer: Virtualizer<HTMLDivElement, Element>;
@@ -118,6 +130,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enableVirtualization = true,
     estimateRowHeight = DATA_TABLE_ROW_HEIGHT,
     virtualOverscan = DATA_TABLE_VIRTUAL_OVERSCAN,
+    enableColumnResize = false,
+    columnSizing: controlledColumnSizing,
+    onColumnSizingChange,
+    columnResizeMode = "onChange",
+    enableColumnFreeze = false,
   } = options;
 
   const labels = useMemo(() => {
@@ -135,6 +152,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const resolvedEnableSubtreeCopy = enableSubtreeCopy ?? enableExpand;
   const [internalRowSelection, setInternalRowSelection] =
     useState<RowSelectionState>({});
+  const [internalColumnSizing, setInternalColumnSizing] =
+    useState<ColumnSizingState>({});
   const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(
     () => new Set(),
   );
@@ -156,6 +175,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     controlledRowSelection,
     internalRowSelection,
   );
+
+  const columnSizing = controlledColumnSizing ?? internalColumnSizing;
 
   const expandedRows = controlledExpandedRows ?? internalExpandedRows;
 
@@ -187,9 +208,29 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const table = useReactTable({
     data: tableData,
     columns,
+    defaultColumn: {
+      minSize: DATA_TABLE_COLUMN_MIN_SIZE,
+      maxSize: DATA_TABLE_COLUMN_MAX_SIZE,
+    },
+    enableColumnResizing: enableColumnResize,
+    columnResizeMode,
     state: {
       rowSelection: rowSelectionMode === "none" ? {} : rowSelection,
+      ...(enableColumnResize ? { columnSizing } : {}),
     },
+    onColumnSizingChange: enableColumnResize
+      ? (updater) => {
+          if (onColumnSizingChange) {
+            onColumnSizingChange(updater);
+
+            return;
+          }
+
+          setInternalColumnSizing((previous) =>
+            typeof updater === "function" ? updater(previous) : updater,
+          );
+        }
+      : undefined,
     enableRowSelection:
       rowSelectionMode === "none"
         ? false
@@ -234,6 +275,19 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const selectedCount = selectedRows.length;
   const rows = table.getRowModel().rows;
   const columnCount = table.getAllLeafColumns().length || 1;
+  const visibleLeafColumns = table.getVisibleLeafColumns();
+
+  const columnFreezeOffsets = useMemo(() => {
+    if (!enableColumnFreeze) return EMPTY_COLUMN_FREEZE_OFFSETS;
+
+    return buildColumnFreezeOffsets(
+      visibleLeafColumns.map((column) => ({
+        id: column.id,
+        size: column.getSize(),
+        side: resolveColumnFreezeSide(column.columnDef.meta?.frozen),
+      })),
+    );
+  }, [enableColumnFreeze, visibleLeafColumns, columnSizing]);
 
   const rowVirtualizer = useVirtualizer({
     count: shouldVirtualize ? rows.length : 0,
@@ -377,6 +431,13 @@ export function useGlideTable<T extends Record<string, unknown>>(
         expandRowLabel: labels.expandRow,
         collapseRowLabel: labels.collapseRow,
       },
+      columnResize: {
+        enableColumnResize,
+      },
+      columnFreeze: {
+        enableColumnFreeze,
+        offsets: columnFreezeOffsets,
+      },
     };
   }, [
     enableRowSpan,
@@ -409,6 +470,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleToggleExpand,
     labels.expandRow,
     labels.collapseRow,
+    enableColumnResize,
+    enableColumnFreeze,
+    columnFreezeOffsets,
   ]);
 
   const copySelectionRef = useRef(copySelection);
@@ -435,6 +499,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     loadingText: labels.loading,
     selectionLabel: labels.selection,
     enableCellSelection,
+    enableColumnResize,
+    enableColumnFreeze,
     shouldVirtualize,
     scrollRef,
     rowVirtualizer,
