@@ -674,6 +674,8 @@ export function App() {
               copyActionsRef.current = actions;
             }}
             enableRowSpan={enableRowSpan}
+            enableColumnResize
+            enableColumnFreeze
             rowSelectionMode="multi"
             filteredCount={bomRowCount}
             totalCount={bomRowCount}
@@ -699,6 +701,7 @@ export function App() {
             <BomTable.Header>
               <BomTable.Column
                 field="plant"
+                frozen
                 rowSpan={enableRowSpan}
                 rowSpanKey="plantId"
                 editInputProps={{
@@ -710,7 +713,9 @@ export function App() {
                 Plant
               </BomTable.Column>
 
-              <BomTable.Column field="materialCode">Part code</BomTable.Column>
+              <BomTable.Column field="materialCode" frozen>
+                Part code
+              </BomTable.Column>
               <BomTable.Column field="materialName" editable>
                 Part name
               </BomTable.Column>
@@ -742,7 +747,7 @@ export function App() {
                 Lead time
               </BomTable.Column>
               <BomTable.Column field="warehouse">Warehouse</BomTable.Column>
-              <BomTable.Column field="remark" editable>
+              <BomTable.Column field="remark" editable frozen="right">
                 Remark
               </BomTable.Column>
             </BomTable.Header>
@@ -754,6 +759,8 @@ export function App() {
             onDataChange={setProductData}
             onRowsPaste={handleProductPaste}
             enableRowSpan={enableRowSpan}
+            enableColumnResize
+            enableColumnFreeze
             rowSelectionMode="none"
             filteredCount={productCount}
             totalCount={productCount}
@@ -779,6 +786,7 @@ export function App() {
                 field="name"
                 sortable
                 editable
+                frozen
                 width={300}
                 editInputProps={{
                   placeholder: "Name",
@@ -814,6 +822,7 @@ export function App() {
                 align="right"
                 editable
                 editType="number"
+                frozen="left"
                 width={100}
                 editInputProps={{
                   placeholder: "Qty",
@@ -848,10 +857,10 @@ export function App() {
               >
                 Weight
               </ProductTable.Column>
-              <ProductTable.Column field="status" sortable editable>
+              <ProductTable.Column field="status" sortable editable frozen="right">
                 Status
               </ProductTable.Column>
-              <ProductTable.Column field="note" editable>
+              <ProductTable.Column field="note" editable frozen="right">
                 Note
               </ProductTable.Column>
             </ProductTable.Header>

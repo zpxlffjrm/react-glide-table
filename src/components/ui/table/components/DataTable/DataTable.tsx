@@ -5,6 +5,8 @@ import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTab
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
 import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants"
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
+import { getColumnFreezeStyle } from "@/components/ui/table/features/column-freeze/columnFreeze"
+import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
 import type { DataTableClassNames, DataTableProps } from "@/components/ui/table/types"
 import { useGlideTable } from "@/core/useGlideTable"
 import { cn } from "@/lib/cn"
@@ -77,10 +79,13 @@ function DataTable<T extends Record<string, unknown>>({
     rows,
     columnCount,
     selectedCount,
+    labels,
     emptyText,
     loadingText,
     selectionLabel,
     enableCellSelection,
+    enableColumnResize,
+    enableColumnFreeze,
     shouldVirtualize,
     scrollRef,
     rowVirtualizer,
@@ -96,6 +101,7 @@ function DataTable<T extends Record<string, unknown>>({
   const RowSlot = slots?.Row ?? DataTableRow
   const PendingSlot = slots?.Pending ?? DefaultPending
   const EmptySlot = slots?.Empty ?? DefaultEmpty
+  const freezeOffsets = rowContextValue.columnFreeze.offsets
 
   const contextValue = useMemo(
     () => ({ ...rowContextValue, classNames }),
@@ -117,6 +123,8 @@ function DataTable<T extends Record<string, unknown>>({
       className={cn(
         "DataTableJSX",
         !enableCellSelection && "DataTableJSX--no-cell-selection",
+        enableColumnResize && "DataTableJSX--column-resize",
+        enableColumnFreeze && "DataTableJSX--column-freeze",
         classNames?.root,
         className,
       )}>
@@ -133,6 +141,11 @@ function DataTable<T extends Record<string, unknown>>({
       <div ref={scrollRef} className={cn("data-table-scroll", classNames?.scroll)}>
         <table
           className={cn("data-table", classNames?.table)}
+          style={
+            enableColumnResize
+              ? { width: table.getTotalSize() }
+              : undefined
+          }
           onDragStart={
             enableCellSelection ? (event) => event.preventDefault() : undefined
           }>
@@ -144,18 +157,39 @@ function DataTable<T extends Record<string, unknown>>({
                 {headerGroup.headers.map((header) => {
                   const align = header.column.columnDef.meta?.align ?? "center"
                   const headerClassName = header.column.columnDef.meta?.headerClassName
+                  const canResize =
+                    enableColumnResize && header.column.getCanResize()
+                  const sizeStyle = getColumnSizeStyle(header.getSize(), {
+                    force: enableColumnResize,
+                    lockMax: enableColumnResize,
+                  })
+                  const freezeOffset = enableColumnFreeze
+                    ? freezeOffsets.get(header.column.id)
+                    : undefined
+                  const freezeStyle = getColumnFreezeStyle(freezeOffset, {
+                    isHeader: true,
+                  })
+                  const headerStyle = {
+                    ...sizeStyle,
+                    ...freezeStyle,
+                  }
 
                   return (
                     <th
                       key={header.id}
-                      style={{
-                        width: header.getSize() !== 150 ? header.getSize() : undefined,
-                        // Column sizing follows TanStack's `size`, but
-                        // ensure the column keeps its min width when the container shrinks.
-                        minWidth: header.getSize() !== 150 ? header.getSize() : undefined,
-                      }}
+                      data-resizing={
+                        header.column.getIsResizing() ? "" : undefined
+                      }
+                      data-frozen={freezeOffset?.side}
+                      data-freeze-edge={freezeOffset?.isEdge ? "" : undefined}
+                      style={
+                        Object.keys(headerStyle).length > 0
+                          ? headerStyle
+                          : undefined
+                      }
                       className={cn(
                         "data-table-head-cell",
+                        freezeOffset && `data-table-head-cell--frozen-${freezeOffset.side}`,
                         CELL_ALIGN_CLASS[align],
                         classNames?.headCell,
                         headerClassName,
@@ -163,6 +197,23 @@ function DataTable<T extends Record<string, unknown>>({
                       {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}
+                      {canResize ? (
+                        <div
+                          role="separator"
+                          aria-orientation="vertical"
+                          aria-label={labels.resizeColumn}
+                          data-table-disable-cell-selection=""
+                          className={cn(
+                            "data-table-resize-handle",
+                            classNames?.resizeHandle,
+                          )}
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          onDoubleClick={() => {
+                            header.column.resetSize()
+                          }}
+                        />
+                      ) : null}
                     </th>
                   )
                 })}

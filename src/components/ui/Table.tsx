@@ -15,4 +15,12 @@ export type {
   TableColumnProps,
   TableProps,
 } from "@/components/ui/table/types"
-export type { ColumnDef, RowSelectionState, RowSelectionMode } from "@/components/ui/table/types"
+export type {
+  ColumnDef,
+  ColumnFreezeMeta,
+  ColumnFreezeSide,
+  ColumnResizeMode,
+  ColumnSizingState,
+  RowSelectionState,
+  RowSelectionMode,
+} from "@/components/ui/table/types"

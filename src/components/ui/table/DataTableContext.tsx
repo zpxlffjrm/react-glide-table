@@ -5,6 +5,7 @@ import type {
   CellSelectionBounds,
   DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
+import type { ColumnFreezeOffset } from "@/components/ui/table/features/column-freeze/columnFreeze"
 import type { ColumnRowSpanMap } from "@/components/ui/table/features/row-span/rowSpan"
 import type { DataTableClassNames, RowSelectionMode } from "@/components/ui/table/types"
 
@@ -51,6 +52,13 @@ export type DataTableRowContextValue = {
     onToggleExpand?: (rowKey: string) => void
     expandRowLabel: string
     collapseRowLabel: string
+  }
+  columnResize: {
+    enableColumnResize: boolean
+  }
+  columnFreeze: {
+    enableColumnFreeze: boolean
+    offsets: Map<string, ColumnFreezeOffset>
   }
 }
 

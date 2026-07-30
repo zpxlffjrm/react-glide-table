@@ -1,6 +1,15 @@
-import type { ColumnDef, Row, RowSelectionState, Updater } from "@tanstack/react-table"
+import type {
+  ColumnDef,
+  ColumnResizeMode,
+  ColumnSizingState,
+  OnChangeFn,
+  Row,
+  RowSelectionState,
+  Updater,
+} from "@tanstack/react-table"
 import type { ComponentType, InputHTMLAttributes, ReactNode } from "react"
 
+import type { ColumnFreezeMeta } from "@/components/ui/table/features/column-freeze/columnFreeze"
 import type { DataTableLabels } from "@/core/labels"
 
 export type RowSelectionMode = "none" | "single" | "multi"
@@ -12,6 +21,11 @@ export type DataTableEditInputProps = Omit<
 >
 
 export type { DataTableLabels }
+
+export type {
+  ColumnFreezeMeta,
+  ColumnFreezeSide,
+} from "@/components/ui/table/features/column-freeze/columnFreeze"
 
 declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -29,6 +43,12 @@ declare module "@tanstack/react-table" {
     editType?: CellEditType
     /** Inline editor input attribute overrides */
     editInputProps?: DataTableEditInputProps
+    /**
+     * Freeze (sticky) this column without reordering.
+     * `true` / `"left"` stick to the scrollport left; `"right"` to the right.
+     * Middle columns are allowed; multiple frozen columns stack via cumulative offsets.
+     */
+    frozen?: ColumnFreezeMeta
   }
 
   interface Row<TData> {
@@ -183,6 +203,27 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   virtualOverscan?: number
 
   /**
+   * Enable drag-to-resize on column headers. Defaults to false.
+   * Opt out per column with `Column.resizable={false}` / `enableResizing: false`.
+   */
+  enableColumnResize?: boolean
+  /** Controlled column sizing map (`{ [columnId]: widthPx }`) */
+  columnSizing?: ColumnSizingState
+  onColumnSizingChange?: OnChangeFn<ColumnSizingState>
+  /**
+   * When to commit resize updates. Defaults to `"onChange"` (live while dragging).
+   * Use `"onEnd"` to update only after the pointer is released.
+   */
+  columnResizeMode?: ColumnResizeMode
+
+  /**
+   * Enable sticky freeze columns. Defaults to false.
+   * Mark columns with `Column.frozen` / `meta.frozen` (`true` | `"left"` | `"right"`).
+   * Does not reorder columns; offsets stack so frozen cells do not overlap.
+   */
+  enableColumnFreeze?: boolean
+
+  /**
    * Optional UI part replacements for the unstyled DataTable renderer.
    * Use with `createTable` / `Table.Column`, or pass columns directly to `DataTable`.
    */
@@ -208,6 +249,8 @@ export type DataTableClassNames = {
   head?: string
   headRow?: string
   headCell?: string
+  /** Column resize drag handle inside a header cell */
+  resizeHandle?: string
   body?: string
   emptyCell?: string
   virtualSpacer?: string
@@ -284,7 +327,23 @@ export type TableColumnProps<
   virtual?: boolean
   children?: ReactNode
   sortable?: boolean
+  /** Initial / default column width in px (TanStack `size`) */
   width?: number
+  /** Minimum resize width in px. Defaults to the table min when omitted */
+  minWidth?: number
+  /** Maximum resize width in px. Defaults to the table max when omitted */
+  maxWidth?: number
+  /**
+   * When false, this column cannot be resized even if `enableColumnResize` is on.
+   * Defaults to true.
+   */
+  resizable?: boolean
+  /**
+   * Freeze (sticky) without changing column order.
+   * `true` / `"left"` → left edge; `"right"` → right edge.
+   * Requires `enableColumnFreeze`. Middle columns are allowed.
+   */
+  frozen?: ColumnFreezeMeta
   align?: "left" | "center" | "right"
   rowSpan?: boolean
   rowSpanKey?: string
@@ -301,4 +360,4 @@ export type TableProps<T extends Record<string, unknown>> = Omit<DataTableProps<
   children: ReactNode
 }
 
-export type { ColumnDef, RowSelectionState }
+export type { ColumnDef, ColumnResizeMode, ColumnSizingState, RowSelectionState }
