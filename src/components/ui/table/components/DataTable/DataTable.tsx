@@ -10,9 +10,25 @@ import {
   getColumnFreezeStyle,
 } from "@/components/ui/table/features/column-freeze/columnFreeze"
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
-import type { DataTableClassNames, DataTableProps } from "@/components/ui/table/types"
+import type {
+  DataTableClassNames,
+  DataTableProps,
+  DataTableScrollSlotProps,
+} from "@/components/ui/table/types"
 import { useGlideTable } from "@/core/useGlideTable"
 import { cn } from "@/lib/cn"
+
+function DefaultScroll({
+  scrollRef,
+  children,
+  className,
+}: DataTableScrollSlotProps) {
+  return (
+    <div ref={scrollRef} className={cn("data-table-scroll", className)}>
+      {children}
+    </div>
+  )
+}
 
 function DefaultPending({
   loadingText,
@@ -63,7 +79,8 @@ function DefaultEmpty({
  * Unstyled DataTable shell: semantic HTML + interaction behavior.
  * Class hooks (`DataTableJSX`, `data-table`, …) are opt-in — no CSS is shipped.
  * Customize via `className`, `classNames` (Tailwind-friendly part map), column
- * `className` / `headerClassName`, `labels`, `summary` / `toolbar`, `Column.render`, and `slots`.
+ * `className` / `headerClassName`, `labels`, `summary` / `toolbar`, `Column.render`, and `slots`
+ * (`Toolbar`, `Scroll`, `Row`, `Pending`, `Empty`).
  */
 function DataTable<T extends Record<string, unknown>>({
   isPending = false,
@@ -101,6 +118,7 @@ function DataTable<T extends Record<string, unknown>>({
   } = useGlideTable(glideOptions)
 
   const ToolbarSlot = slots?.Toolbar ?? DataTableToolbar
+  const ScrollSlot = slots?.Scroll ?? DefaultScroll
   const RowSlot = slots?.Row ?? DataTableRow
   const PendingSlot = slots?.Pending ?? DefaultPending
   const EmptySlot = slots?.Empty ?? DefaultEmpty
@@ -141,7 +159,7 @@ function DataTable<T extends Record<string, unknown>>({
         classNames={classNames}
       />
 
-      <div ref={scrollRef} className={cn("data-table-scroll", classNames?.scroll)}>
+      <ScrollSlot scrollRef={scrollRef} className={classNames?.scroll}>
         <table
           className={cn("data-table", classNames?.table)}
           style={
@@ -296,7 +314,7 @@ function DataTable<T extends Record<string, unknown>>({
             </tbody>
           </DataTableContextProvider>
         </table>
-      </div>
+      </ScrollSlot>
     </div>
   )
 }
