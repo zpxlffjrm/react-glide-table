@@ -418,6 +418,41 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByText("/ 3")).toBeInTheDocument()
   })
 
+  it("replaces the scroll container via slots.Scroll", () => {
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+      },
+    ]
+
+    render(
+      <DataTable
+        data={SIMPLE_ROWS}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        classNames={{ scroll: "scroll-from-classnames" }}
+        slots={{
+          Scroll: ({ scrollRef, className, children }) => (
+            <section
+              ref={scrollRef}
+              data-testid="custom-scroll"
+              className={className}>
+              {children}
+            </section>
+          ),
+        }}
+      />,
+    )
+
+    const scroll = screen.getByTestId("custom-scroll")
+    expect(scroll.tagName).toBe("SECTION")
+    expect(scroll).toHaveClass("scroll-from-classnames")
+    expect(within(scroll).getByRole("table")).toBeInTheDocument()
+  })
+
   it("allows typing in a custom cell input with cell selection enabled", async () => {
     const user = userEvent.setup()
 

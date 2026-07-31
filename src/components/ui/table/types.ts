@@ -7,7 +7,12 @@ import type {
   RowSelectionState,
   Updater,
 } from "@tanstack/react-table"
-import type { ComponentType, InputHTMLAttributes, ReactNode } from "react"
+import type {
+  ComponentType,
+  InputHTMLAttributes,
+  ReactNode,
+  Ref,
+} from "react"
 
 import type { ColumnFreezeMeta } from "@/components/ui/table/features/column-freeze/columnFreeze"
 import type { DataTableLabels } from "@/core/labels"
@@ -294,6 +299,18 @@ export type DataTableRowSlotProps<T extends Record<string, unknown>> = {
 }
 
 /**
+ * Scroll-region slot props for the semantic DataTable shell.
+ *
+ * `scrollRef` must be attached to the element that actually owns overflow
+ * scrolling — row virtualization reads it via `getScrollElement`.
+ */
+export type DataTableScrollSlotProps = {
+  children: ReactNode
+  className?: string
+  scrollRef: Ref<HTMLDivElement | null>
+}
+
+/**
  * Slot replacements for the default DataTable shell (semantic HTML + behavior only).
  * Row-level custom UI → `Row`; cell content → `Table.Column` / column `render`.
  * Header/Cell are not split into separate slots in this contract.
@@ -301,6 +318,11 @@ export type DataTableRowSlotProps<T extends Record<string, unknown>> = {
 export type DataTableSlots<T extends Record<string, unknown>> = {
   /** Top summary / actions region */
   Toolbar?: ComponentType<DataTableToolbarSlotProps>
+  /**
+   * Table scroll container. Must forward `scrollRef` to the real scroll element
+   * (required for virtualization).
+   */
+  Scroll?: ComponentType<DataTableScrollSlotProps>
   /** Full row replacement (cells, selection, edit UI) */
   Row?: ComponentType<DataTableRowSlotProps<T>>
   /** Replace the pending state view */

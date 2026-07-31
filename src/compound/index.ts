@@ -13,6 +13,7 @@ export type {
   DataTableClassNames,
   DataTableLabels,
   DataTableProps,
+  DataTableScrollSlotProps,
   DataTableSlots,
   PasteMode,
   RowSelectionMode,
