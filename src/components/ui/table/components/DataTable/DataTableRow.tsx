@@ -384,6 +384,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 ? ""
                 : undefined
             }
+            data-selected={!enableRowSpan && showCellSelected ? "" : undefined}
             data-group-selected={
               enableRowSpan && showCellSelected ? "" : undefined
             }
