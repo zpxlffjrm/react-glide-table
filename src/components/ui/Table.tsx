@@ -9,6 +9,7 @@ export type {
   DataTableClassNames,
   DataTableEditInputProps,
   DataTableProps,
+  DataTableScrollSlotProps,
   DataTableSlots,
   PasteMode,
   RowsPastePayload,

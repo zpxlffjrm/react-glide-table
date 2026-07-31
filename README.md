@@ -69,6 +69,7 @@ export function Products({ data }: { data: Product[] }) {
 | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `classNames`                                         | Per-part Tailwind/utility classes (`root`, `scroll`, `row`, `cell`, `toolbar`, …) |
 | `slots.Toolbar`                                      | Top summary / actions region                                                      |
+| `slots.Scroll`                                       | Scroll container (must attach `scrollRef` to the real overflow element)           |
 | `slots.Row`                                          | Full row replacement (cells, selection, edit UI)                                  |
 | `slots.Pending` / `slots.Empty`                      | Loading and empty states                                                          |
 | `className` / column `className` / `headerClassName` | Extra class hooks                                                                 |
@@ -83,6 +84,8 @@ Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
 Example: `row: "data-[selected]:bg-blue-600"`.
 
 Row-level UI → `slots.Row`. Cell content → `Column.render`. Header/Cell are not separate slots.
+
+`slots.Scroll` receives `{ scrollRef, className, children }`. Attach `scrollRef` to the element that owns overflow scrolling — virtualization depends on it. Styling-only changes can stay on `classNames.scroll`.
 
 ## Escape hatch (`useGlideTable`)
 
@@ -253,7 +256,7 @@ Contiguous same-side freezes share one island (shadow only on the outer boundary
 | `DEFAULT_DATA_TABLE_LABELS` / `resolveDataTableLabels`                                | `/core`     | Optional English UI copy helpers                                  |
 | Tree field defaults                                                                   | `/core`     | `id` / `parentId` / `children` / `qty`                            |
 
-Root `react-glide-table` re-exports both surfaces. Related types: `TableProps`, `TableColumnProps`, `DataTableProps`, `DataTableSlots`, `TableCompoundComponent`, `ColumnDef`, `RowsPastePayload`, `PasteMode`, …
+Root `react-glide-table` re-exports both surfaces. Related types: `TableProps`, `TableColumnProps`, `DataTableProps`, `DataTableSlots`, `DataTableScrollSlotProps`, `TableCompoundComponent`, `ColumnDef`, `RowsPastePayload`, `PasteMode`, …
 
 ## Notable constraints
 
