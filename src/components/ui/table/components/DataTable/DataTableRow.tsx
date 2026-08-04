@@ -435,6 +435,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
               onCellMouseDown(
                 resolveCellRowIndex(event.clientY, event.currentTarget),
                 cellIndex,
+                { shiftKey: event.shiftKey },
               );
             }}
             onMouseEnter={(event) => {

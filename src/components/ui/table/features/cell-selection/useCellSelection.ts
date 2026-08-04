@@ -2,9 +2,13 @@ import type { Row } from "@tanstack/react-table"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
+  clampCellPosition,
   getActiveSelectionBounds,
+  getCellNavigationDelta,
   getCellSelectionBounds,
   INITIAL_DRAG_STATE,
+  type CellMouseDownOptions,
+  type CellPosition,
   type DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 import {
@@ -32,6 +36,8 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   data: T[]
   rows: Row<T>[]
   enabled?: boolean
+  /** Visible leaf column count used to clamp keyboard navigation. */
+  columnCount?: number
   /** Enables Ctrl/Cmd+Shift+C subtree copy. Defaults to true when tree expand is enabled. */
   enableSubtreeCopy?: boolean
   /** Enables Ctrl/Cmd+Shift+V insert paste. Defaults to true. */
@@ -41,20 +47,29 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
     changes: Array<{ rowId: string; columnId: string; value: unknown }>,
   ) => void
   onRowsPaste?: (payload: RowsPastePayload) => void
+  /** Called after keyboard navigation moves the active (end) cell. */
+  onCellNavigate?: (position: CellPosition) => void
 }
 
 export function useCellSelection<T extends Record<string, unknown>>({
   data,
   rows,
   enabled = true,
+  columnCount = 0,
   enableSubtreeCopy = false,
   enableInsertPaste = true,
   onDataChange,
   onBatchChange,
   onRowsPaste,
+  onCellNavigate,
 }: UseCellSelectionOptions<T>) {
   const [dragState, setDragState] = useState<DragState>(INITIAL_DRAG_STATE)
   const pendingPasteModeRef = useRef<PasteMode | null>(null)
+  const dragStateRef = useRef(dragState)
+  const onCellNavigateRef = useRef(onCellNavigate)
+
+  dragStateRef.current = dragState
+  onCellNavigateRef.current = onCellNavigate
 
   const cellSelectionBounds = getCellSelectionBounds(dragState.start, dragState.end)
   const activeSelectionBounds = enabled
@@ -62,16 +77,29 @@ export function useCellSelection<T extends Record<string, unknown>>({
     : null
 
   const handleCellMouseDown = useCallback(
-    (rowIndex: number, colIndex: number) => {
+    (rowIndex: number, colIndex: number, options?: CellMouseDownOptions) => {
       if (!enabled) return
 
-      setDragState({
-        isSelecting: true,
-        isFillDragging: false,
-        start: { row: rowIndex, col: colIndex },
-        end: { row: rowIndex, col: colIndex },
-        fillAnchor: null,
-        fillEnd: null,
+      setDragState((prev) => {
+        if (options?.shiftKey && prev.start) {
+          return {
+            ...prev,
+            isSelecting: true,
+            isFillDragging: false,
+            end: { row: rowIndex, col: colIndex },
+            fillAnchor: null,
+            fillEnd: null,
+          }
+        }
+
+        return {
+          isSelecting: true,
+          isFillDragging: false,
+          start: { row: rowIndex, col: colIndex },
+          end: { row: rowIndex, col: colIndex },
+          fillAnchor: null,
+          fillEnd: null,
+        }
       })
     },
     [enabled],
@@ -121,6 +149,74 @@ export function useCellSelection<T extends Record<string, unknown>>({
       setDragState(INITIAL_DRAG_STATE)
     }
   }, [enabled])
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
+        return
+      }
+
+      const delta = getCellNavigationDelta(e.key)
+      if (!delta) return
+
+      const prev = dragStateRef.current
+      if (!prev.start || !prev.end) return
+      if (prev.isSelecting || prev.isFillDragging) return
+
+      const rowCount = rows.length
+      const resolvedColumnCount =
+        columnCount > 0
+          ? columnCount
+          : (rows[0]?.getVisibleCells().length ?? 0)
+
+      if (rowCount <= 0 || resolvedColumnCount <= 0) return
+
+      const nextEnd = clampCellPosition(
+        {
+          row: prev.end.row + delta.row,
+          col: prev.end.col + delta.col,
+        },
+        rowCount,
+        resolvedColumnCount,
+      )
+
+      if (nextEnd.row === prev.end.row && nextEnd.col === prev.end.col) return
+
+      e.preventDefault()
+
+      const nextState: DragState = e.shiftKey
+        ? {
+            ...prev,
+            isSelecting: false,
+            isFillDragging: false,
+            end: nextEnd,
+            fillAnchor: null,
+            fillEnd: null,
+          }
+        : {
+            isSelecting: false,
+            isFillDragging: false,
+            start: nextEnd,
+            end: nextEnd,
+            fillAnchor: null,
+            fillEnd: null,
+          }
+
+      // Keep the ref in sync immediately so key-repeat events compose
+      // before React re-renders and reassigns dragStateRef from state.
+      dragStateRef.current = nextState
+      setDragState(nextState)
+
+      onCellNavigateRef.current?.(nextEnd)
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [columnCount, enabled, rows])
 
   const copySelection = useCallback(
     async (options?: CopySelectionOptions) => {

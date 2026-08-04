@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table/constants";
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
+import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import {
   buildColumnFreezeOffsets,
@@ -353,6 +354,50 @@ export function useGlideTable<T extends Record<string, unknown>>(
     return indices;
   }, [selectedRows]);
 
+  const scrollCellIntoView = useCallback(
+    (
+      rowIndex: number,
+      colIndex: number,
+      options?: { align?: "auto" | "center" | "nearest" },
+    ) => {
+      const align = options?.align ?? "nearest";
+      const blockAlign = align === "center" ? "center" : "nearest";
+
+      if (shouldVirtualize) {
+        rowVirtualizer.scrollToIndex(rowIndex, {
+          align: align === "nearest" ? "auto" : align,
+        });
+      }
+
+      const scrollElement = scrollRef.current;
+      if (!scrollElement) return;
+
+      const scrollToMatchedCell = () => {
+        const cell = scrollElement.querySelector(
+          `[data-row-index="${rowIndex}"][data-col-index="${colIndex}"]`,
+        );
+        if (cell instanceof HTMLElement) {
+          cell.scrollIntoView({ block: blockAlign, inline: "nearest" });
+        }
+      };
+
+      if (shouldVirtualize) {
+        requestAnimationFrame(scrollToMatchedCell);
+        return;
+      }
+
+      scrollToMatchedCell();
+    },
+    [rowVirtualizer, shouldVirtualize],
+  );
+
+  const handleCellNavigate = useCallback(
+    (position: CellPosition) => {
+      scrollCellIntoView(position.row, position.col, { align: "nearest" });
+    },
+    [scrollCellIntoView],
+  );
+
   const {
     dragState,
     activeSelectionBounds,
@@ -364,11 +409,13 @@ export function useGlideTable<T extends Record<string, unknown>>(
     data: tableData,
     rows,
     enabled: enableCellSelection,
+    columnCount: visibleLeafColumns.length,
     enableSubtreeCopy: resolvedEnableSubtreeCopy,
     enableInsertPaste: enableInsertPaste ?? true,
     onDataChange,
     onBatchChange,
     onRowsPaste,
+    onCellNavigate: handleCellNavigate,
   });
 
   const {
@@ -381,7 +428,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
   } = useCellEdit({ data: tableData, rows, onDataChange, onCellChange });
 
   const handleCellMouseDownWithCommit = useCallback(
-    (rowIndex: number, colIndex: number) => {
+    (
+      rowIndex: number,
+      colIndex: number,
+      options?: { shiftKey?: boolean },
+    ) => {
       const isSameEditingCell =
         editingCell?.rowIndex === rowIndex &&
         editingCell?.colIndex === colIndex;
@@ -390,7 +441,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
         return;
       }
 
-      handleCellMouseDown(rowIndex, colIndex);
+      handleCellMouseDown(rowIndex, colIndex, options);
     },
     [commitEdit, editingCell, handleCellMouseDown],
   );
@@ -399,24 +450,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     (item: SearchResultItem) => {
       const [colIndex, rowIndex] = item;
       handleCellMouseDownWithCommit(rowIndex, colIndex);
-
-      if (shouldVirtualize) {
-        rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
-
-        return;
-      }
-
-      const scrollElement = scrollRef.current;
-      if (!scrollElement) return;
-
-      const cell = scrollElement.querySelector(
-        `[data-row-index="${rowIndex}"][data-col-index="${colIndex}"]`,
-      );
-      if (cell instanceof HTMLElement) {
-        cell.scrollIntoView({ block: "center", inline: "nearest" });
-      }
+      scrollCellIntoView(rowIndex, colIndex, { align: "center" });
     },
-    [handleCellMouseDownWithCommit, rowVirtualizer, shouldVirtualize],
+    [handleCellMouseDownWithCommit, scrollCellIntoView],
   );
 
   const resolveSearchRowId = useCallback(

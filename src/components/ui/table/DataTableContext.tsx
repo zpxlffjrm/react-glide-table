@@ -2,6 +2,7 @@ import { createContext, use, type ReactNode } from "react"
 
 import type { EditingCell } from "@/components/ui/table/features/cell-edit/cellEdit"
 import type {
+  CellMouseDownOptions,
   CellSelectionBounds,
   DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
@@ -33,7 +34,11 @@ export type DataTableRowContextValue = {
     enableCellSelection: boolean
     activeSelectionBounds: CellSelectionBounds | null
     dragState: DragState
-    onCellMouseDown: (rowIndex: number, colIndex: number) => void
+    onCellMouseDown: (
+      rowIndex: number,
+      colIndex: number,
+      options?: CellMouseDownOptions,
+    ) => void
     onCellMouseEnter: (rowIndex: number, colIndex: number) => void
     onFillHandleMouseDown: (rowIndex: number, colIndex: number) => void
   }
