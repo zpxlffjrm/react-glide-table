@@ -47,6 +47,33 @@ export {
 } from "@/components/ui/table/features/column-freeze/columnFreeze"
 
 export {
+  buildFlatSearchCorpus,
+  buildSearchMatchKey,
+  buildSearchMatchKeys,
+  buildTreeSearchCorpus,
+  cellValueToSearchText,
+  collectAncestorKeysToExpand,
+  collectSearchMatchesInRange,
+  createSearchRegex,
+  escapeSearchRegex,
+  formatSearchResultLabel,
+  INLINE_SEARCH_MAX_RESULTS,
+  mapSearchResultToVisibleItem,
+  mapSearchResultsToVisibleKeys,
+  nextSearchIndex,
+  nextSearchStride,
+  previousSearchIndex,
+  type SearchCorpusRow,
+  type SearchResultItem,
+  type SearchStatus,
+} from "@/components/ui/table/features/inline-search/inlineSearch"
+export {
+  useInlineSearch,
+  type UseInlineSearchOptions,
+  type UseInlineSearchResult,
+} from "@/components/ui/table/features/inline-search/useInlineSearch"
+
+export {
   CELL_SELECTION_EDGES_CLASS,
   getCellSelectionEdgeStyle,
   getRowIndexInMergedCell,
