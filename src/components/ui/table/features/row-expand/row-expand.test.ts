@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { renderHook } from "@testing-library/react"
 
-import { useConvertTreeData } from "@/components/ui/table/features/row-expand/row-expand"
+import {
+  useConvertTreeData,
+  type TreeRow,
+} from "@/components/ui/table/features/row-expand/row-expand"
 
 type BomNode = {
   id: string
@@ -67,8 +70,12 @@ describe("useConvertTreeData duplicate toggle keys", () => {
 
     expect(ids).toEqual(["root-1", "child-1", "root-2", "paste-0", "paste-1"])
 
-    const firstParent = visible.find((row) => row.id === "root-1")
-    const pastedParent = visible.find((row) => row.id === "paste-0")
+    const firstParent = visible.find((row) => row.id === "root-1") as
+      | TreeRow<BomNode>
+      | undefined
+    const pastedParent = visible.find((row) => row.id === "paste-0") as
+      | TreeRow<BomNode>
+      | undefined
 
     expect(firstParent?.children.map((child) => child.id)).toEqual(["child-1"])
     expect(pastedParent?.children.map((child) => child.id)).toEqual(["paste-1"])

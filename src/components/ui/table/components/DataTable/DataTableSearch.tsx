@@ -100,13 +100,16 @@ export function DataTableSearch({
       return
     }
 
-    if (event.key === "Enter") {
+    if (event.key === "ArrowDown" || (event.key === "Enter" && !event.shiftKey)) {
       event.preventDefault()
-      if (event.shiftKey) {
-        onPrevious()
-      } else {
-        onNext()
-      }
+      onNext()
+
+      return
+    }
+
+    if (event.key === "ArrowUp" || (event.key === "Enter" && event.shiftKey)) {
+      event.preventDefault()
+      onPrevious()
     }
   }
 

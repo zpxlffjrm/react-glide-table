@@ -149,6 +149,77 @@ describe("tree search corpus", () => {
     ).toEqual([1, 5])
   })
 
+  it("keeps corpus↔visible mapping stable with toggle-field ids when collapsed", () => {
+    type Node = {
+      materialCode: string
+      name: string
+      level?: number
+      children?: Node[]
+    }
+
+    const roots: Node[] = [
+      {
+        materialCode: "A",
+        name: "Parent A",
+        level: 0,
+        children: [
+          { materialCode: "A1", name: "Hidden A1", level: 1 },
+          { materialCode: "A2", name: "Hidden A2", level: 1 },
+        ],
+      },
+      {
+        materialCode: "B",
+        name: "Visible B",
+        level: 0,
+      },
+    ]
+
+    const indexGetRowId = (_row: Node, index: number) => String(index)
+    const toggleGetRowId = (row: Node) => row.materialCode
+
+    const indexCorpus = buildTreeSearchCorpus(roots, {
+      toggleField: "materialCode",
+      getRowId: indexGetRowId,
+    })
+    const toggleCorpus = buildTreeSearchCorpus(roots, {
+      toggleField: "materialCode",
+      getRowId: toggleGetRowId,
+    })
+
+    // Collapsed: only A and B are visible (indices 0, 1).
+    const visibleCollapsed = [roots[0]!, roots[1]!]
+    const indexVisibleMap = new Map(
+      visibleCollapsed.map((row, index) => [indexGetRowId(row, index), index]),
+    )
+    const toggleVisibleMap = new Map(
+      visibleCollapsed.map((row, index) => [toggleGetRowId(row), index]),
+    )
+
+    const bIndexInIndexCorpus = indexCorpus.findIndex(
+      (row) => row.data.materialCode === "B",
+    )
+    const bIndexInToggleCorpus = toggleCorpus.findIndex(
+      (row) => row.data.materialCode === "B",
+    )
+
+    expect(bIndexInIndexCorpus).toBeGreaterThan(1)
+    expect(
+      mapSearchResultToVisibleItem(
+        [0, bIndexInIndexCorpus],
+        indexCorpus,
+        indexVisibleMap,
+      ),
+    ).toBeNull()
+
+    expect(
+      mapSearchResultToVisibleItem(
+        [0, bIndexInToggleCorpus],
+        toggleCorpus,
+        toggleVisibleMap,
+      ),
+    ).toEqual([0, 1])
+  })
+
   it("lists only missing ancestor keys to expand", () => {
     expect(
       collectAncestorKeysToExpand(

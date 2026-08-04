@@ -113,8 +113,10 @@ export function useInlineSearch({
       window.cancelAnimationFrame(searchHandleRef.current)
       searchHandleRef.current = undefined
     }
+    // Leave the aborted controller in place so an already-scheduled rAF tick
+    // still sees `signal.aborted` and exits. A fresh controller is created in
+    // `beginSearch` when a new scan starts.
     abortControllerRef.current?.abort()
-    abortControllerRef.current = new AbortController()
   }, [])
 
   const emitResultsChanged = useCallback(
@@ -216,6 +218,7 @@ export function useInlineSearch({
       }
 
       cancelSearch()
+      abortControllerRef.current = new AbortController()
       searchHandleRef.current = window.requestAnimationFrame(tick)
     },
     [
@@ -234,11 +237,10 @@ export function useInlineSearch({
   }, [controlledShowSearch])
 
   const closeSearch = useCallback(() => {
-    if (onSearchClose) {
-      onSearchClose()
-    } else if (controlledShowSearch === undefined) {
+    if (controlledShowSearch === undefined) {
       setInternalShowSearch(false)
     }
+    onSearchClose?.()
 
     setSearchStatus(undefined)
     setInternalResults([])
@@ -292,7 +294,8 @@ export function useInlineSearch({
   useEffect(() => {
     if (!enabled) return
 
-    setSearchValue("")
+    // Clear match state on open/close, but keep the query so controlled
+    // consumers (and reopen UX) are not wiped via onSearchValueChange("").
     setSearchStatus(undefined)
     setInternalResults([])
     emitResultsChanged([], -1)

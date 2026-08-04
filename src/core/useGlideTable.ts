@@ -420,9 +420,21 @@ export function useGlideTable<T extends Record<string, unknown>>(
   );
 
   const resolveSearchRowId = useCallback(
-    (row: T, index: number) =>
-      getRowId ? getRowId(row, index) : String(index),
-    [getRowId],
+    (row: T, index: number) => {
+      if (getRowId) return getRowId(row, index);
+
+      // Tree corpus includes collapsed rows, so index-based IDs desync from
+      // the visible row list. Prefer a stable field on the row data.
+      if (enableExpand && toggleField) {
+        const toggleValue = row[toggleField as keyof T];
+        if (toggleValue != null && String(toggleValue).length > 0) {
+          return String(toggleValue);
+        }
+      }
+
+      return String(index);
+    },
+    [enableExpand, getRowId, toggleField],
   );
 
   const searchCorpus = useMemo(() => {
