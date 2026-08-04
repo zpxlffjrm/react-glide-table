@@ -4,12 +4,16 @@ import { useMemo } from "react"
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow"
 import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch"
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
-import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants"
+import {
+  CELL_ALIGN_CLASS,
+  DATA_TABLE_HEADER_ROW_HEIGHT,
+} from "@/components/ui/table/constants"
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
 import {
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
 } from "@/components/ui/table/features/column-freeze/columnFreeze"
+import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups"
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
 import type {
   DataTableClassNames,
@@ -127,6 +131,7 @@ function DataTable<T extends Record<string, unknown>>({
   const PendingSlot = slots?.Pending ?? DefaultPending
   const EmptySlot = slots?.Empty ?? DefaultEmpty
   const freezeOffsets = rowContextValue.columnFreeze.offsets
+  const headerGroups = getMergedHeaderGroups(table.getHeaderGroups())
 
   const contextValue = useMemo(
     () => ({ ...rowContextValue, classNames }),
@@ -198,7 +203,7 @@ function DataTable<T extends Record<string, unknown>>({
             enableCellSelection ? (event) => event.preventDefault() : undefined
           }>
           <thead className={cn("data-table-head", classNames?.head)}>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {headerGroups.map((headerGroup) => (
               <tr
                 key={headerGroup.id}
                 className={cn("data-table-head-row", classNames?.headRow)}>
@@ -216,6 +221,7 @@ function DataTable<T extends Record<string, unknown>>({
                     : undefined
                   const freezeStyle = getColumnFreezeStyle(freezeOffset, {
                     isHeader: true,
+                    headerTop: header.depth * DATA_TABLE_HEADER_ROW_HEIGHT,
                   })
                   const headerStyle = {
                     ...sizeStyle,
@@ -225,6 +231,8 @@ function DataTable<T extends Record<string, unknown>>({
                   return (
                     <th
                       key={header.id}
+                      colSpan={header.colSpan}
+                      rowSpan={header.mergedRowSpan}
                       data-resizing={
                         header.column.getIsResizing() ? "" : undefined
                       }

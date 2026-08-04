@@ -14,6 +14,7 @@ export type {
   PasteMode,
   RowsPastePayload,
   SearchResultItem,
+  TableColumnGroupProps,
   TableColumnProps,
   TableProps,
 } from "@/components/ui/table/types"

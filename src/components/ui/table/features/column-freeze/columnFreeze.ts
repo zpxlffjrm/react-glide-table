@@ -150,7 +150,7 @@ export function buildColumnFreezeOffsets(
 /** Sticky position styles for a frozen header or body cell. */
 export function getColumnFreezeStyle(
   offset: ColumnFreezeOffset | undefined,
-  options?: { isHeader?: boolean },
+  options?: { isHeader?: boolean; headerTop?: number },
 ): CSSProperties | undefined {
   if (!offset) return undefined
 
@@ -160,6 +160,6 @@ export function getColumnFreezeStyle(
     position: "sticky",
     ...(offset.side === "left" ? { left: offset.offset } : { right: offset.offset }),
     zIndex: zBase + offset.stack,
-    ...(options?.isHeader ? { top: 0 } : {}),
+    ...(options?.isHeader ? { top: options.headerTop ?? 0 } : {}),
   }
 }
