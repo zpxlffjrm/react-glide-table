@@ -1,8 +1,8 @@
-.DataTableJSX {
+.DataTableJSX--inline-search {
   position: relative;
 }
 
-.DataTableJSX .data-table-search {
+.DataTableJSX--inline-search .data-table-search {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -18,13 +18,13 @@
   box-shadow: 0 10px 30px rgb(15 23 42 / 12%);
 }
 
-.DataTableJSX .data-table-search-row {
+.DataTableJSX--inline-search .data-table-search-row {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.DataTableJSX .data-table-search-input {
+.DataTableJSX--inline-search .data-table-search-input {
   flex: 1;
   min-width: 0;
   height: 32px;
@@ -37,12 +37,12 @@
   font-size: 13px;
 }
 
-.DataTableJSX .data-table-search-input:focus {
+.DataTableJSX--inline-search .data-table-search-input:focus {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 1px;
 }
 
-.DataTableJSX .data-table-search-button {
+.DataTableJSX--inline-search .data-table-search-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -56,24 +56,24 @@
   cursor: pointer;
 }
 
-.DataTableJSX .data-table-search-button:hover {
+.DataTableJSX--inline-search .data-table-search-button:hover {
   background-color: var(--color-neutral-bg-app);
   color: var(--color-neutral-text-primary);
 }
 
-.DataTableJSX .data-table-search-status {
+.DataTableJSX--inline-search .data-table-search-status {
   font-size: 12px;
   color: var(--color-neutral-text-muted);
 }
 
-.DataTableJSX .data-table-search-progress {
+.DataTableJSX--inline-search .data-table-search-progress {
   height: 2px;
   overflow: hidden;
   border-radius: 999px;
   background-color: var(--color-neutral-border-default);
 }
 
-.DataTableJSX .data-table-search-progress-bar {
+.DataTableJSX--inline-search .data-table-search-progress-bar {
   height: 100%;
   background-color: var(--color-brand-primary);
   transition: width 80ms linear;

@@ -95,7 +95,11 @@ export function DataTableSearch({
     ) {
       event.preventDefault()
       event.stopPropagation()
-      onClose()
+      // Controlled open without onSearchClose: keep the overlay mounted and
+      // only block the browser find dialog.
+      if (canClose) {
+        onClose()
+      }
 
       return
     }

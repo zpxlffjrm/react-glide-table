@@ -424,11 +424,25 @@ export function useGlideTable<T extends Record<string, unknown>>(
       if (getRowId) return getRowId(row, index);
 
       // Tree corpus includes collapsed rows, so index-based IDs desync from
-      // the visible row list. Prefer a stable field on the row data.
-      if (enableExpand && toggleField) {
-        const toggleValue = row[toggleField as keyof T];
-        if (toggleValue != null && String(toggleValue).length > 0) {
-          return String(toggleValue);
+      // the visible row list. Prefer stable per-row fields; toggleField can
+      // collide (duplicate expand keys), so only use it as a last resort.
+      if (enableExpand) {
+        const record = row as Record<string, unknown>;
+        const idValue = record.id;
+        if (idValue != null && String(idValue).length > 0) {
+          return String(idValue);
+        }
+
+        const uniqueId = record.uniqueId;
+        if (uniqueId != null && String(uniqueId).length > 0) {
+          return String(uniqueId);
+        }
+
+        if (toggleField) {
+          const toggleValue = record[toggleField];
+          if (toggleValue != null && String(toggleValue).length > 0) {
+            return String(toggleValue);
+          }
         }
       }
 

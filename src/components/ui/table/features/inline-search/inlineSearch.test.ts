@@ -220,6 +220,89 @@ describe("tree search corpus", () => {
     ).toEqual([0, 1])
   })
 
+  it("prefers unique row ids over colliding toggleField values", () => {
+    type Node = {
+      id: string
+      materialCode: string
+      name: string
+      level?: number
+      children?: Node[]
+    }
+
+    const roots: Node[] = [
+      {
+        id: "root-1",
+        materialCode: "ASM-1000",
+        name: "First assembly",
+        level: 0,
+        children: [
+          {
+            id: "child-1",
+            materialCode: "PRT-1100",
+            name: "Cover",
+            level: 1,
+          },
+        ],
+      },
+      {
+        id: "root-2",
+        materialCode: "ASM-1000",
+        name: "Duplicate assembly",
+        level: 0,
+        children: [
+          {
+            id: "child-2",
+            materialCode: "PRT-1100",
+            name: "Cover copy",
+            level: 1,
+          },
+        ],
+      },
+    ]
+
+    const resolveLikeGlideTable = (row: Node, index: number) => {
+      if (row.id) return row.id
+      if (row.materialCode) return row.materialCode
+      return String(index)
+    }
+
+    const corpus = buildTreeSearchCorpus(roots, {
+      toggleField: "materialCode",
+      getRowId: resolveLikeGlideTable,
+    })
+
+    expect(corpus.map((row) => row.id)).toEqual([
+      "root-1",
+      "child-1",
+      "root-2",
+      "child-2",
+    ])
+
+    const visibleExpanded = [
+      roots[0]!,
+      roots[0]!.children![0]!,
+      roots[1]!,
+      roots[1]!.children![0]!,
+    ]
+    const visibleMap = new Map(
+      visibleExpanded.map((row, index) => [
+        resolveLikeGlideTable(row, index),
+        index,
+      ]),
+    )
+
+    const duplicateChildIndex = corpus.findIndex(
+      (row) => row.id === "child-2",
+    )
+    expect(
+      mapSearchResultToVisibleItem(
+        [0, duplicateChildIndex],
+        corpus,
+        visibleMap,
+      ),
+    ).toEqual([0, 3])
+  })
+
   it("lists only missing ancestor keys to expand", () => {
     expect(
       collectAncestorKeysToExpand(
