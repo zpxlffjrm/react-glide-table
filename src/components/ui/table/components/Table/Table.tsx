@@ -2,14 +2,21 @@ import { useCallback, useMemo, useState } from "react"
 import type { ReactElement } from "react"
 
 import { DataTable } from "@/components/ui/table/components/DataTable/DataTable"
-import { buildColumnDef } from "@/components/ui/table/components/Table/buildColumnDef"
 import {
-  extractColumnElements,
+  buildColumnDefsFromTree,
+  countLeafColumns,
+} from "@/components/ui/table/components/Table/buildColumnDef"
+import {
+  extractColumnTree,
   parseTableChildren,
 } from "@/components/ui/table/components/Table/parseTableChildren"
 import { TableBody } from "@/components/ui/table/components/Table/TableBody"
-import { TABLE_COLUMN_DISPLAY_NAME } from "@/components/ui/table/components/Table/tableChildTypes"
+import {
+  TABLE_COLUMN_DISPLAY_NAME,
+  TABLE_COLUMN_GROUP_DISPLAY_NAME,
+} from "@/components/ui/table/components/Table/tableChildTypes"
 import { TableColumn } from "@/components/ui/table/components/Table/TableColumn"
+import { TableColumnGroup } from "@/components/ui/table/components/Table/TableColumnGroup"
 import {
   paginateTableData,
   sortTableData,
@@ -20,7 +27,11 @@ import {
   TablePagination,
   type TablePaginationProps,
 } from "@/components/ui/table/components/Table/TablePagination"
-import type { TableColumnProps, TableProps } from "@/components/ui/table/types"
+import type {
+  TableColumnGroupProps,
+  TableColumnProps,
+  TableProps,
+} from "@/components/ui/table/types"
 import { cn } from "@/lib/cn"
 
 
@@ -29,6 +40,7 @@ type TableCompoundComponent<T extends Record<string, unknown>> = ((
 ) => ReactElement) & {
   Header: typeof TableHeader
   Column: <K extends string>(props: TableColumnProps<T, K>) => null
+  ColumnGroup: (props: TableColumnGroupProps) => null
   Body: typeof TableBody
   Pagination: typeof TablePagination
 }
@@ -62,11 +74,12 @@ function TableRoot<T extends Record<string, unknown>>({
     })
   }, [])
 
-  const columns = useMemo(() => {
-    return extractColumnElements(header).map((columnElement) =>
-      buildColumnDef(columnElement.props as TableColumnProps<T>, sort, handleSort),
-    )
-  }, [header, sort, handleSort])
+  const columnTree = useMemo(() => extractColumnTree<T>(header), [header])
+
+  const columns = useMemo(
+    () => buildColumnDefsFromTree(columnTree, sort, handleSort),
+    [columnTree, sort, handleSort],
+  )
 
   const paginationProps = paginationElement?.props as TablePaginationProps | undefined
   const pageSize = paginationProps?.pageSize ?? 10
@@ -81,7 +94,7 @@ function TableRoot<T extends Record<string, unknown>>({
     return paginateTableData(sortedData, page, pageSize)
   }, [data, sort, paginationProps, page, pageSize])
 
-  if (columns.length === 0) {
+  if (countLeafColumns(columnTree) === 0) {
     console.warn("[Table] Declare at least one Table.Column inside Table.Header.")
   }
 
@@ -116,6 +129,13 @@ function createTable<T extends Record<string, unknown>>(): TableCompoundComponen
   }
   Column.displayName = TABLE_COLUMN_DISPLAY_NAME
 
+  function ColumnGroup(props: TableColumnGroupProps) {
+    void props
+
+    return null
+  }
+  ColumnGroup.displayName = TABLE_COLUMN_GROUP_DISPLAY_NAME
+
   return Object.assign(
     function BoundTable(props: TableProps<T>) {
       return <TableRoot<T> {...props} />
@@ -123,6 +143,7 @@ function createTable<T extends Record<string, unknown>>(): TableCompoundComponen
     {
       Header: TableHeader,
       Column,
+      ColumnGroup,
       Body: TableBody,
       Pagination: TablePagination,
     },
@@ -132,9 +153,25 @@ function createTable<T extends Record<string, unknown>>(): TableCompoundComponen
 const Table = Object.assign(TableRoot, {
   Header: TableHeader,
   Column: TableColumn,
+  ColumnGroup: TableColumnGroup,
   Body: TableBody,
   Pagination: TablePagination,
 })
 
-export { createTable, Table, TableBody, TableColumn, TableHeader, TablePagination, TableRoot }
-export type { TableCompoundComponent, TablePaginationProps, TableProps, TableColumnProps }
+export {
+  createTable,
+  Table,
+  TableBody,
+  TableColumn,
+  TableColumnGroup,
+  TableHeader,
+  TablePagination,
+  TableRoot,
+}
+export type {
+  TableCompoundComponent,
+  TablePaginationProps,
+  TableProps,
+  TableColumnGroupProps,
+  TableColumnProps,
+}

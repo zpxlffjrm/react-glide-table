@@ -9,6 +9,7 @@ export type {
   DataTableClassNames,
   DataTableScrollSlotProps,
   DataTableSlots,
+  TableColumnGroupProps,
   TableColumnProps,
   TableProps,
 } from "@/compound/index"

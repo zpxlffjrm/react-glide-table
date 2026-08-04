@@ -265,6 +265,45 @@ describe("Table / createTable behavior", () => {
   })
 })
 
+describe("Table column groups", () => {
+  it("renders a multi-row header with group colSpan and mixed leaf columns", () => {
+    type GroupedRow = SimpleRow & { note: string }
+
+    const GroupedTable = createTable<GroupedRow>()
+    const rows: GroupedRow[] = SIMPLE_ROWS.map((row) => ({
+      ...row,
+      note: `n-${row.id}`,
+    }))
+
+    const { container } = render(
+      <GroupedTable data={rows} getRowId={(row) => row.id} enableVirtualization={false}>
+        <GroupedTable.Header>
+          <GroupedTable.ColumnGroup header="Identity" align="center">
+            <GroupedTable.Column field="name">Name</GroupedTable.Column>
+            <GroupedTable.Column field="amount">Amount</GroupedTable.Column>
+          </GroupedTable.ColumnGroup>
+          <GroupedTable.Column field="note">Note</GroupedTable.Column>
+        </GroupedTable.Header>
+      </GroupedTable>,
+    )
+
+    const headRows = container.querySelectorAll(".data-table-head-row")
+    expect(headRows).toHaveLength(2)
+
+    const groupHeader = screen.getByText("Identity")
+    expect(groupHeader.closest("th")).toHaveAttribute("colspan", "2")
+
+    expect(screen.getByText("Name")).toBeInTheDocument()
+    expect(screen.getByText("Amount")).toBeInTheDocument()
+    expect(screen.getByText("Note")).toBeInTheDocument()
+
+    const noteHeader = screen.getByText("Note").closest("th")
+    expect(noteHeader).toHaveAttribute("rowspan", "2")
+
+    expect(getBodyRowTexts(container, 0)).toEqual(["Charlie", "Alpha", "Bravo"])
+  })
+})
+
 describe("Table row-expand behavior", () => {
   it("auto-expands root rows after load and shows child rows", async () => {
     render(<ExpandTableHarness />)

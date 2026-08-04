@@ -20,6 +20,7 @@ export type {
   RowSelectionState,
   RowsPastePayload,
   SearchResultItem,
+  TableColumnGroupProps,
   TableColumnProps,
   TableProps,
 } from "@/components/ui/Table"
