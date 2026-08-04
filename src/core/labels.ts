@@ -8,6 +8,12 @@ export type DataTableLabels = {
   collapseRow: string
   /** Accessible label for the column resize handle */
   resizeColumn: string
+  /** Built-in find-in-page search overlay */
+  searchPlaceholder: string
+  searchResultHint: string
+  searchPrevious: string
+  searchNext: string
+  searchClose: string
 }
 
 /** Default copy. Override via the `labels` option. */
@@ -19,6 +25,11 @@ export const DEFAULT_DATA_TABLE_LABELS: DataTableLabels = {
   expandRow: "Expand row",
   collapseRow: "Collapse row",
   resizeColumn: "Resize column",
+  searchPlaceholder: "Search…",
+  searchResultHint: "Type to search",
+  searchPrevious: "Previous result",
+  searchNext: "Next result",
+  searchClose: "Close search",
 }
 
 export function resolveDataTableLabels(

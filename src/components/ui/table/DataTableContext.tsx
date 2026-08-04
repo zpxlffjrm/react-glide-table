@@ -6,6 +6,7 @@ import type {
   DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 import type { ColumnFreezeOffset } from "@/components/ui/table/features/column-freeze/columnFreeze"
+import type { SearchResultItem } from "@/components/ui/table/features/inline-search/inlineSearch"
 import type { ColumnRowSpanMap } from "@/components/ui/table/features/row-span/rowSpan"
 import type { DataTableClassNames, RowSelectionMode } from "@/components/ui/table/types"
 
@@ -59,6 +60,11 @@ export type DataTableRowContextValue = {
   columnFreeze: {
     enableColumnFreeze: boolean
     offsets: Map<string, ColumnFreezeOffset>
+  }
+  inlineSearch: {
+    enabled: boolean
+    matchKeys: Set<string>
+    activeMatch: SearchResultItem | null
   }
 }
 

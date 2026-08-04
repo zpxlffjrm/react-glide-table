@@ -9,6 +9,10 @@
   background-color: var(--color-neutral-bg-surface);
 }
 
+.DataTableJSX--inline-search {
+  position: relative;
+}
+
 .DataTableJSX--pending {
   display: flex;
   align-items: center;

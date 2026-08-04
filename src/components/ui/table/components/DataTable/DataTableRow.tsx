@@ -25,6 +25,9 @@ import {
   getColumnFreezeStyle,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
+import {
+  buildSearchMatchKey,
+} from "@/components/ui/table/features/inline-search/inlineSearch";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
 import {
   resolveRowSpanAt,
@@ -94,10 +97,16 @@ export function DataTableRow<T extends Record<string, unknown>>({
     expand,
     columnResize,
     columnFreeze,
+    inlineSearch,
   } = useDataTableRowContext();
 
   const { enableColumnResize } = columnResize;
   const { enableColumnFreeze, offsets: freezeOffsets } = columnFreeze;
+  const {
+    enabled: enableInlineSearch,
+    matchKeys: searchMatchKeys,
+    activeMatch,
+  } = inlineSearch;
 
   const {
     enableRowSpan,
@@ -369,9 +378,20 @@ export function DataTableRow<T extends Record<string, unknown>>({
           ...(selectionEdgeStyle as CSSProperties | undefined),
         } as CSSProperties;
 
+        const searchMatchKey = buildSearchMatchKey(cellIndex, rowIndex);
+        const isSearchMatch =
+          enableInlineSearch && searchMatchKeys.has(searchMatchKey);
+        const isSearchActive =
+          isSearchMatch &&
+          activeMatch !== null &&
+          activeMatch[0] === cellIndex &&
+          activeMatch[1] === rowIndex;
+
         return (
           <td
             key={cell.id}
+            data-row-index={rowIndex}
+            data-col-index={cellIndex}
             rowSpan={
               rowSpanInfo && rowSpanInfo.rowSpan > 1
                 ? rowSpanInfo.rowSpan
@@ -395,6 +415,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
             }
             data-selection-fill={isCellDragSelected ? "" : undefined}
             data-selection-edges={hasSelectionEdges ? "" : undefined}
+            data-search-match={isSearchMatch ? "" : undefined}
+            data-search-active={isSearchActive ? "" : undefined}
             data-editable={editable ? "" : undefined}
             data-editing={isEditing ? "" : undefined}
             data-frozen={freezeOffset?.side}
@@ -458,6 +480,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 "is-group-hovered",
               isCellDragSelected && CELL_SELECTION_FILL_CLASS,
               hasSelectionEdges && CELL_SELECTION_EDGES_CLASS,
+              isSearchMatch && "is-search-match",
+              isSearchActive && "is-search-active",
               editable && "is-editable",
               classNames?.cell,
             )}

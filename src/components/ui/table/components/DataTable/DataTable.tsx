@@ -2,6 +2,7 @@ import { flexRender } from "@tanstack/react-table"
 import { useMemo } from "react"
 
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow"
+import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch"
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
 import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants"
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
@@ -106,8 +107,10 @@ function DataTable<T extends Record<string, unknown>>({
     enableCellSelection,
     enableColumnResize,
     enableColumnFreeze,
+    enableInlineSearch,
     shouldVirtualize,
     scrollRef,
+    rootRef,
     rowVirtualizer,
     virtualRows,
     paddingTop,
@@ -115,6 +118,7 @@ function DataTable<T extends Record<string, unknown>>({
     rowContextValue,
     handleToggleSelect,
     clearHover,
+    inlineSearch,
   } = useGlideTable(glideOptions)
 
   const ToolbarSlot = slots?.Toolbar ?? DataTableToolbar
@@ -141,11 +145,13 @@ function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div
+      ref={rootRef}
       className={cn(
         "DataTableJSX",
         !enableCellSelection && "DataTableJSX--no-cell-selection",
         enableColumnResize && "DataTableJSX--column-resize",
         enableColumnFreeze && "DataTableJSX--column-freeze",
+        enableInlineSearch && "DataTableJSX--inline-search",
         classNames?.root,
         className,
       )}>
@@ -159,6 +165,27 @@ function DataTable<T extends Record<string, unknown>>({
         classNames={classNames}
       />
 
+      {enableInlineSearch ? (
+        <DataTableSearch
+          showSearch={inlineSearch.showSearch}
+          searchValue={inlineSearch.searchValue}
+          searchStatus={inlineSearch.searchStatus}
+          searchInputId={inlineSearch.searchInputId}
+          searchInputRef={inlineSearch.searchInputRef}
+          canClose={inlineSearch.canClose}
+          placeholder={labels.searchPlaceholder}
+          resultHint={labels.searchResultHint}
+          previousLabel={labels.searchPrevious}
+          nextLabel={labels.searchNext}
+          closeLabel={labels.searchClose}
+          rowsTotal={inlineSearch.searchRowCount}
+          classNames={classNames}
+          onSearchValueChange={inlineSearch.setSearchValue}
+          onClose={inlineSearch.closeSearch}
+          onNext={inlineSearch.goToNext}
+          onPrevious={inlineSearch.goToPrevious}
+        />
+      ) : null}
       <ScrollSlot scrollRef={scrollRef} className={classNames?.scroll}>
         <table
           className={cn("data-table", classNames?.table)}

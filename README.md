@@ -79,7 +79,7 @@ export function Products({ data }: { data: Product[] }) {
 Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
 
 - row: `data-selected`, `data-hovered`, `data-expandable`, `data-expanded`
-- cell: `data-merged`, `data-selection-fill`, `data-editable`, `data-editing`, `data-frozen`, …
+- cell: `data-merged`, `data-selection-fill`, `data-editable`, `data-editing`, `data-frozen`, `data-search-match`, `data-search-active`, …
 
 Example: `row: "data-[selected]:bg-blue-600"`.
 
@@ -244,6 +244,36 @@ Helpers (`/core`): `buildColumnFreezeOffsets`, `getColumnFreezeEdgeAttr`, `getCo
 
 Contiguous same-side freezes share one island (shadow only on the outer boundary). A gap between frozen columns creates separate islands, so both sides of the gap get an edge shadow.
 
+## Built-in search (find in page)
+
+Opt in with `enableInlineSearch` for a Glide Data Grid–style search overlay ([demo](https://glideapps.github.io/glide-data-grid/?path=/story/glide-data-grid-dataeditor-demos--built-in-search)). This **highlights matching cells** and navigates between them — it does **not** filter rows.
+
+On tree tables (`toggleField`), search also scans **collapsed** descendants. Navigating to a collapsed match expands the ancestor path so the cell becomes visible.
+
+```tsx
+<ProductTable data={data} enableInlineSearch>
+  {/* columns… */}
+</ProductTable>
+```
+
+| Shortcut / control | Behavior |
+| ------------------ | -------- |
+| Ctrl/Cmd+F | Open (or focus) the search box |
+| Enter / ↓ | Next match |
+| Shift+Enter / ↑ | Previous match |
+| Escape / Ctrl+F (in box) / ✕ | Close |
+
+| Prop | Role |
+| ---- | ---- |
+| `enableInlineSearch` | Turn on search (default `false`) |
+| `showSearch` / `onSearchClose` | Controlled overlay visibility |
+| `searchValue` / `onSearchValueChange` | Controlled query |
+| `searchResults` / `onSearchResultsChanged` | Override / observe matches (`[colIndex, rowIndex]`) |
+| `data-search-match` / `data-search-active` | Match highlight hooks on cells |
+| `classNames.search*` | Style the overlay |
+
+Helpers (`/core`): `useInlineSearch`, `collectSearchMatchesInRange`, `formatSearchResultLabel`, …
+
 ## Public API
 
 | Export                                                                                | Path        | Role                                                              |
@@ -251,7 +281,7 @@ Contiguous same-side freezes share one island (shadow only on the outer boundary
 | `createTable` / `Table`                                                               | `/compound` | Compound column DSL (`Header` / `Column` / `Body` / `Pagination`) |
 | `DataTable`                                                                           | `/compound` | Unstyled default renderer (semantic HTML + slots/props)           |
 | `useGlideTable`                                                                       | `/core`     | Headless engine escape hatch                                      |
-| `useCellEdit` / `useCellSelection` / `useConvertTreeData`                             | `/core`     | Feature hooks                                                     |
+| `useCellEdit` / `useCellSelection` / `useConvertTreeData` / `useInlineSearch`         | `/core`     | Feature hooks                                                     |
 | `applyCellEdit`, `applyFillData`, `buildRowsPastePayload`, `buildColumnRowSpanMap`, … | `/core`     | Pure helpers                                                      |
 | `DEFAULT_DATA_TABLE_LABELS` / `resolveDataTableLabels`                                | `/core`     | Optional English UI copy helpers                                  |
 | Tree field defaults                                                                   | `/core`     | `id` / `parentId` / `children` / `qty`                            |

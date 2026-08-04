@@ -1,0 +1,80 @@
+.DataTableJSX--inline-search {
+  position: relative;
+}
+
+.DataTableJSX--inline-search .data-table-search {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-neutral-border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--color-neutral-bg-surface);
+  box-shadow: 0 10px 30px rgb(15 23 42 / 12%);
+}
+
+.DataTableJSX--inline-search .data-table-search-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.DataTableJSX--inline-search .data-table-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-neutral-border-default);
+  border-radius: var(--radius-sm, 6px);
+  background-color: var(--color-neutral-bg-app);
+  color: var(--color-neutral-text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.DataTableJSX--inline-search .data-table-search-input:focus {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 1px;
+}
+
+.DataTableJSX--inline-search .data-table-search-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--color-neutral-text-secondary);
+  cursor: pointer;
+}
+
+.DataTableJSX--inline-search .data-table-search-button:hover {
+  background-color: var(--color-neutral-bg-app);
+  color: var(--color-neutral-text-primary);
+}
+
+.DataTableJSX--inline-search .data-table-search-status {
+  font-size: 12px;
+  color: var(--color-neutral-text-muted);
+}
+
+.DataTableJSX--inline-search .data-table-search-progress {
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: var(--color-neutral-border-default);
+}
+
+.DataTableJSX--inline-search .data-table-search-progress-bar {
+  height: 100%;
+  background-color: var(--color-brand-primary);
+  transition: width 80ms linear;
+}
