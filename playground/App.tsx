@@ -784,93 +784,101 @@ export function App() {
                 </ProductTable.Column>
               )}
 
-              <ProductTable.Column
-                field="name"
-                sortable
-                editable
-                frozen
-                width={300}
-                editInputProps={{
-                  placeholder: "Name",
-                  "aria-label": "name-input",
-                  maxLength: 40,
-                }}
-              >
-                Name
-              </ProductTable.Column>
-              {!enableRowSpan && (
-                <ProductTable.Column field="region" sortable>
-                  Region
-                </ProductTable.Column>
-              )}
-              {enableRowSpan && (
+              <ProductTable.ColumnGroup header="Identity" align="center">
                 <ProductTable.Column
-                  field="region"
-                  rowSpan
-                  rowSpanKey="regionId"
+                  field="name"
                   sortable
+                  editable
+                  frozen
+                  width={300}
+                  editInputProps={{
+                    placeholder: "Name",
+                    "aria-label": "name-input",
+                    maxLength: 40,
+                  }}
                 >
-                  Region
+                  Name
                 </ProductTable.Column>
-              )}
-              {!enableRowSpan && (
-                <ProductTable.Column field="category" sortable>
-                  Category
+                {!enableRowSpan && (
+                  <ProductTable.Column field="region" sortable>
+                    Region
+                  </ProductTable.Column>
+                )}
+                {enableRowSpan && (
+                  <ProductTable.Column
+                    field="region"
+                    rowSpan
+                    rowSpanKey="regionId"
+                    sortable
+                  >
+                    Region
+                  </ProductTable.Column>
+                )}
+                {!enableRowSpan && (
+                  <ProductTable.Column field="category" sortable>
+                    Category
+                  </ProductTable.Column>
+                )}
+                <ProductTable.Column field="sku" sortable>
+                  SKU
                 </ProductTable.Column>
-              )}
-              <ProductTable.Column
-                field="qty"
-                sortable
-                align="right"
-                editable
-                editType="number"
-                frozen="left"
-                width={100}
-                editInputProps={{
-                  placeholder: "Qty",
-                  "aria-label": "qty-input",
-                }}
-              >
-                Qty
-              </ProductTable.Column>
-              <ProductTable.Column
-                field="price"
-                sortable
-                align="right"
-                frozen="left"
-                editable
-                editType="number"
-                render={(value) => `$${Number(value).toLocaleString()}`}
-                width={300}
-              >
-                Price
-              </ProductTable.Column>
-              <ProductTable.Column field="supplier" sortable editable>
-                Supplier
-              </ProductTable.Column>
-              <ProductTable.Column field="sku" sortable>
-                SKU
-              </ProductTable.Column>
-              <ProductTable.Column
-                field="weight"
-                sortable
-                align="right"
-                editable
-                editType="number"
-              >
-                Weight
-              </ProductTable.Column>
-              <ProductTable.Column
-                field="status"
-                sortable
-                editable
-                frozen="right"
-              >
-                Status
-              </ProductTable.Column>
-              <ProductTable.Column field="note" editable frozen="right">
-                Note
-              </ProductTable.Column>
+              </ProductTable.ColumnGroup>
+
+              <ProductTable.ColumnGroup header="Metrics" align="center">
+                <ProductTable.Column
+                  field="qty"
+                  sortable
+                  align="right"
+                  editable
+                  editType="number"
+                  frozen="left"
+                  width={100}
+                  editInputProps={{
+                    placeholder: "Qty",
+                    "aria-label": "qty-input",
+                  }}
+                >
+                  Qty
+                </ProductTable.Column>
+                <ProductTable.Column
+                  field="price"
+                  sortable
+                  align="right"
+                  frozen="left"
+                  editable
+                  editType="number"
+                  render={(value) => `$${Number(value).toLocaleString()}`}
+                  width={300}
+                >
+                  Price
+                </ProductTable.Column>
+                <ProductTable.Column
+                  field="weight"
+                  sortable
+                  align="right"
+                  editable
+                  editType="number"
+                >
+                  Weight
+                </ProductTable.Column>
+              </ProductTable.ColumnGroup>
+
+              <ProductTable.ColumnGroup header="Details" align="center">
+                <ProductTable.Column field="supplier" sortable editable>
+                  Supplier
+                </ProductTable.Column>
+                <ProductTable.Column
+                  field="status"
+                  sortable
+                  editable
+                  frozen="right"
+                >
+                  Status
+                </ProductTable.Column>
+                <ProductTable.Column field="note" editable frozen="right">
+                  Note
+                </ProductTable.Column>
+              </ProductTable.ColumnGroup>
             </ProductTable.Header>
           </ProductTable>
         )}

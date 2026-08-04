@@ -410,6 +410,17 @@ export type TableColumnProps<
   render?: (value: K extends keyof T ? T[K] : unknown, row: Row<T>, index: number) => ReactNode
 }
 
+/** Declares a multi-row header group wrapping leaf `Table.Column`s. */
+export type TableColumnGroupProps = {
+  /** Group header label shown in the top header row */
+  header: ReactNode
+  children: ReactNode
+  /** Stable group id. Auto-generated when omitted */
+  id?: string
+  align?: "left" | "center" | "right"
+  headerClassName?: string
+}
+
 export type TableProps<T extends Record<string, unknown>> = Omit<DataTableProps<T>, "columns"> & {
   children: ReactNode
 }

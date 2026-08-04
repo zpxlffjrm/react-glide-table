@@ -169,5 +169,24 @@ describe("getColumnFreezeStyle", () => {
       zIndex: 31,
       top: 0,
     })
+
+    expect(
+      getColumnFreezeStyle(
+        {
+          side: "left",
+          offset: 0,
+          isEdge: true,
+          edgeLeft: false,
+          edgeRight: true,
+          stack: 0,
+        },
+        { isHeader: true, headerTop: 40 },
+      ),
+    ).toEqual({
+      position: "sticky",
+      left: 0,
+      zIndex: 30,
+      top: 40,
+    })
   })
 })

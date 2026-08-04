@@ -10,6 +10,8 @@ export const CELL_SELECTION_FILL_CLASS = "cell-selection-fill"
 
 /** Fixed DataTable row height (.DataTableRowJSX height) */
 export const DATA_TABLE_ROW_HEIGHT = 44
+/** Header row height used for multi-row sticky `top` offsets (.data-table-head-row) */
+export const DATA_TABLE_HEADER_ROW_HEIGHT = 40
 /** Extra rows to pre-render outside the viewport when virtualizing */
 export const DATA_TABLE_VIRTUAL_OVERSCAN = 8
 /** Default column size when `width` is omitted (TanStack Table default) */
