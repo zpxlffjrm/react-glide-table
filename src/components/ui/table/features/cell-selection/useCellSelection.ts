@@ -187,25 +187,28 @@ export function useCellSelection<T extends Record<string, unknown>>({
 
       e.preventDefault()
 
-      if (e.shiftKey) {
-        setDragState({
-          ...prev,
-          isSelecting: false,
-          isFillDragging: false,
-          end: nextEnd,
-          fillAnchor: null,
-          fillEnd: null,
-        })
-      } else {
-        setDragState({
-          isSelecting: false,
-          isFillDragging: false,
-          start: nextEnd,
-          end: nextEnd,
-          fillAnchor: null,
-          fillEnd: null,
-        })
-      }
+      const nextState: DragState = e.shiftKey
+        ? {
+            ...prev,
+            isSelecting: false,
+            isFillDragging: false,
+            end: nextEnd,
+            fillAnchor: null,
+            fillEnd: null,
+          }
+        : {
+            isSelecting: false,
+            isFillDragging: false,
+            start: nextEnd,
+            end: nextEnd,
+            fillAnchor: null,
+            fillEnd: null,
+          }
+
+      // Keep the ref in sync immediately so key-repeat events compose
+      // before React re-renders and reassigns dragStateRef from state.
+      dragStateRef.current = nextState
+      setDragState(nextState)
 
       onCellNavigateRef.current?.(nextEnd)
     }
