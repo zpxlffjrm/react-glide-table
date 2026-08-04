@@ -603,7 +603,7 @@ export function App() {
             cell merge and tree expand (they can run together), and change the
             row count to try virtualized scrolling. Select cells, then
             Ctrl/Cmd+V to overwrite or Ctrl/Cmd+Shift+V to insert rows from the
-            clipboard.
+            clipboard. Press Ctrl/Cmd+F for built-in find-in-page search.
             {enableRowSpan && (
               <>
                 {" "}
@@ -676,6 +676,7 @@ export function App() {
             enableRowSpan={enableRowSpan}
             enableColumnResize
             enableColumnFreeze
+            enableInlineSearch
             rowSelectionMode="multi"
             filteredCount={bomRowCount}
             totalCount={bomRowCount}
@@ -761,6 +762,7 @@ export function App() {
             enableRowSpan={enableRowSpan}
             enableColumnResize
             enableColumnFreeze
+            enableInlineSearch
             rowSelectionMode="none"
             filteredCount={productCount}
             totalCount={productCount}

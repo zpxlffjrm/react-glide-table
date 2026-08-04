@@ -2,10 +2,12 @@ import { createContext, use, type ReactNode } from "react"
 
 import type { EditingCell } from "@/components/ui/table/features/cell-edit/cellEdit"
 import type {
+  CellMouseDownOptions,
   CellSelectionBounds,
   DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection"
 import type { ColumnFreezeOffset } from "@/components/ui/table/features/column-freeze/columnFreeze"
+import type { SearchResultItem } from "@/components/ui/table/features/inline-search/inlineSearch"
 import type { ColumnRowSpanMap } from "@/components/ui/table/features/row-span/rowSpan"
 import type { DataTableClassNames, RowSelectionMode } from "@/components/ui/table/types"
 
@@ -32,7 +34,11 @@ export type DataTableRowContextValue = {
     enableCellSelection: boolean
     activeSelectionBounds: CellSelectionBounds | null
     dragState: DragState
-    onCellMouseDown: (rowIndex: number, colIndex: number) => void
+    onCellMouseDown: (
+      rowIndex: number,
+      colIndex: number,
+      options?: CellMouseDownOptions,
+    ) => void
     onCellMouseEnter: (rowIndex: number, colIndex: number) => void
     onFillHandleMouseDown: (rowIndex: number, colIndex: number) => void
   }
@@ -59,6 +65,11 @@ export type DataTableRowContextValue = {
   columnFreeze: {
     enableColumnFreeze: boolean
     offsets: Map<string, ColumnFreezeOffset>
+  }
+  inlineSearch: {
+    enabled: boolean
+    matchKeys: Set<string>
+    activeMatch: SearchResultItem | null
   }
 }
 

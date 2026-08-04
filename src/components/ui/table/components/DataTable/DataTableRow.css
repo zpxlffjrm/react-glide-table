@@ -135,6 +135,31 @@
   background-color: var(--color-brand-surface);
 }
 
+.DataTableRowJSX .data-table-cell.is-search-match,
+.DataTableRowJSX .data-table-cell[data-search-match] {
+  background-color: color-mix(in srgb, #fde68a 70%, transparent);
+}
+
+.DataTableRowJSX .data-table-cell.is-search-active,
+.DataTableRowJSX .data-table-cell[data-search-active] {
+  background-color: #fbbf24;
+  box-shadow: inset 0 0 0 2px #d97706;
+}
+
+.DataTableRowJSX .data-table-cell.is-search-match.data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell.is-search-match.data-table-cell--frozen-right,
+.DataTableRowJSX .data-table-cell[data-search-match].data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell[data-search-match].data-table-cell--frozen-right {
+  background-color: color-mix(in srgb, #fde68a 85%, var(--color-neutral-bg-surface));
+}
+
+.DataTableRowJSX .data-table-cell.is-search-active.data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell.is-search-active.data-table-cell--frozen-right,
+.DataTableRowJSX .data-table-cell[data-search-active].data-table-cell--frozen-left,
+.DataTableRowJSX .data-table-cell[data-search-active].data-table-cell--frozen-right {
+  background-color: #fbbf24;
+}
+
 /*
  * Draw the selection border on ::after, not the cell body.
  * bottom: -1px covers the border-bottom so the vertical edge does not look

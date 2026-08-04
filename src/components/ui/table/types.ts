@@ -15,7 +15,10 @@ import type {
 } from "react"
 
 import type { ColumnFreezeMeta } from "@/components/ui/table/features/column-freeze/columnFreeze"
+import type { SearchResultItem } from "@/components/ui/table/features/inline-search/inlineSearch"
 import type { DataTableLabels } from "@/core/labels"
+
+export type { SearchResultItem }
 
 export type RowSelectionMode = "none" | "single" | "multi"
 
@@ -229,6 +232,29 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   enableColumnFreeze?: boolean
 
   /**
+   * Enable Glide-style built-in find-in-page search (Ctrl/Cmd+F).
+   * Highlights matching cells; Enter / buttons navigate without filtering rows.
+   * Defaults to false.
+   */
+  enableInlineSearch?: boolean
+  /** Controlled search overlay visibility. When omitted, Ctrl/Cmd+F toggles internally. */
+  showSearch?: boolean
+  /** Controlled search query string. */
+  searchValue?: string
+  onSearchValueChange?: (value: string) => void
+  /**
+   * Emitted when the overlay close control is used (X / Escape / Ctrl+F in the box).
+   * Providing this shows the close button. For controlled `showSearch`, set it false here.
+   */
+  onSearchClose?: () => void
+  /** Override the internal match list (`[colIndex, rowIndex]`). */
+  searchResults?: readonly SearchResultItem[]
+  onSearchResultsChanged?: (
+    results: readonly SearchResultItem[],
+    navIndex: number,
+  ) => void
+
+  /**
    * Optional UI part replacements for the unstyled DataTable renderer.
    * Use with `createTable` / `Table.Column`, or pass columns directly to `DataTable`.
    */
@@ -270,6 +296,12 @@ export type DataTableClassNames = {
   expandToggle?: string
   expandToggleIcon?: string
   fillHandle?: string
+  /** Built-in search overlay root */
+  search?: string
+  searchInput?: string
+  searchButton?: string
+  searchStatus?: string
+  searchProgress?: string
 }
 
 export type DataTableToolbarSlotProps = {

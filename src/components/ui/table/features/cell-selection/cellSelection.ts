@@ -43,6 +43,58 @@ export function getCellSelectionBounds(
   };
 }
 
+export type CellNavigationDelta = {
+  row: number;
+  col: number;
+};
+
+export type CellMouseDownOptions = {
+  shiftKey?: boolean;
+};
+
+/**
+ * Maps Arrow / WASD keys to a one-step cell navigation delta.
+ * Returns null for unrelated keys.
+ */
+export function getCellNavigationDelta(
+  key: string,
+): CellNavigationDelta | null {
+  switch (key) {
+    case "ArrowUp":
+    case "w":
+    case "W":
+      return { row: -1, col: 0 };
+    case "ArrowDown":
+    case "s":
+    case "S":
+      return { row: 1, col: 0 };
+    case "ArrowLeft":
+    case "a":
+    case "A":
+      return { row: 0, col: -1 };
+    case "ArrowRight":
+    case "d":
+    case "D":
+      return { row: 0, col: 1 };
+    default:
+      return null;
+  }
+}
+
+export function clampCellPosition(
+  position: CellPosition,
+  rowCount: number,
+  columnCount: number,
+): CellPosition {
+  const maxRow = Math.max(rowCount - 1, 0);
+  const maxCol = Math.max(columnCount - 1, 0);
+
+  return {
+    row: Math.min(Math.max(position.row, 0), maxRow),
+    col: Math.min(Math.max(position.col, 0), maxCol),
+  };
+}
+
 /**
  * Reads per-row heights for a merged cell span from the table body.
  * Expand + merge yields unequal row heights (e.g. parent 25px / child 22px);

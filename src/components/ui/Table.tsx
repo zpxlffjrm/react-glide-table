@@ -13,6 +13,7 @@ export type {
   DataTableSlots,
   PasteMode,
   RowsPastePayload,
+  SearchResultItem,
   TableColumnProps,
   TableProps,
 } from "@/components/ui/table/types"

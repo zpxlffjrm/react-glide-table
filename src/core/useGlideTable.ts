@@ -28,12 +28,22 @@ import {
 } from "@/components/ui/table/constants";
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
+import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import {
   buildColumnFreezeOffsets,
   resolveColumnFreezeSide,
   type ColumnFreezeOffset,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
+import type { SearchResultItem } from "@/components/ui/table/features/inline-search/inlineSearch";
+import {
+  buildFlatSearchCorpus,
+  buildTreeSearchCorpus,
+  collectAncestorKeysToExpand,
+  mapSearchResultToVisibleItem,
+  mapSearchResultsToVisibleKeys,
+} from "@/components/ui/table/features/inline-search/inlineSearch";
+import { useInlineSearch } from "@/components/ui/table/features/inline-search/useInlineSearch";
 import {
   toggleExpandedRowId,
   useConvertTreeData,
@@ -54,6 +64,7 @@ import type { DataTableLabels } from "@/core/labels";
 import { resolveDataTableLabels } from "@/core/labels";
 
 const EMPTY_COLUMN_FREEZE_OFFSETS = new Map<string, ColumnFreezeOffset>();
+const EMPTY_SEARCH_MATCH_KEYS = new Set<string>();
 
 export type UseGlideTableOptions<T extends Record<string, unknown>> = Omit<
   DataTableProps<T>,
@@ -80,8 +91,10 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   enableCellSelection: boolean;
   enableColumnResize: boolean;
   enableColumnFreeze: boolean;
+  enableInlineSearch: boolean;
   shouldVirtualize: boolean;
   scrollRef: RefObject<HTMLDivElement | null>;
+  rootRef: RefObject<HTMLDivElement | null>;
   rowVirtualizer: Virtualizer<HTMLDivElement, Element>;
   virtualRows: VirtualItem[];
   paddingTop: number;
@@ -90,6 +103,21 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   handleToggleSelect: (row: Row<T>) => void;
   clearHover: () => void;
   copySelection: DataTableCopyActions["copySelection"];
+  inlineSearch: {
+    showSearch: boolean;
+    searchValue: string;
+    searchStatus: ReturnType<typeof useInlineSearch>["searchStatus"];
+    searchInputRef: RefObject<HTMLInputElement | null>;
+    searchInputId: string;
+    canClose: boolean;
+    /** Total searchable rows (includes collapsed tree rows). */
+    searchRowCount: number;
+    setSearchValue: (value: string) => void;
+    closeSearch: () => void;
+    goToNext: () => void;
+    goToPrevious: () => void;
+    openSearch: () => void;
+  };
 };
 
 export function useGlideTable<T extends Record<string, unknown>>(
@@ -135,6 +163,13 @@ export function useGlideTable<T extends Record<string, unknown>>(
     onColumnSizingChange,
     columnResizeMode = "onChange",
     enableColumnFreeze = false,
+    enableInlineSearch = false,
+    showSearch,
+    searchValue,
+    onSearchValueChange,
+    onSearchClose,
+    searchResults,
+    onSearchResultsChanged,
   } = options;
 
   const labels = useMemo(() => {
@@ -159,6 +194,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
   );
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const shouldVirtualize = enableVirtualization && !enableRowSpan;
 
@@ -318,6 +354,50 @@ export function useGlideTable<T extends Record<string, unknown>>(
     return indices;
   }, [selectedRows]);
 
+  const scrollCellIntoView = useCallback(
+    (
+      rowIndex: number,
+      colIndex: number,
+      options?: { align?: "auto" | "center" | "nearest" },
+    ) => {
+      const align = options?.align ?? "nearest";
+      const blockAlign = align === "center" ? "center" : "nearest";
+
+      if (shouldVirtualize) {
+        rowVirtualizer.scrollToIndex(rowIndex, {
+          align: align === "nearest" ? "auto" : align,
+        });
+      }
+
+      const scrollElement = scrollRef.current;
+      if (!scrollElement) return;
+
+      const scrollToMatchedCell = () => {
+        const cell = scrollElement.querySelector(
+          `[data-row-index="${rowIndex}"][data-col-index="${colIndex}"]`,
+        );
+        if (cell instanceof HTMLElement) {
+          cell.scrollIntoView({ block: blockAlign, inline: "nearest" });
+        }
+      };
+
+      if (shouldVirtualize) {
+        requestAnimationFrame(scrollToMatchedCell);
+        return;
+      }
+
+      scrollToMatchedCell();
+    },
+    [rowVirtualizer, shouldVirtualize],
+  );
+
+  const handleCellNavigate = useCallback(
+    (position: CellPosition) => {
+      scrollCellIntoView(position.row, position.col, { align: "nearest" });
+    },
+    [scrollCellIntoView],
+  );
+
   const {
     dragState,
     activeSelectionBounds,
@@ -329,11 +409,13 @@ export function useGlideTable<T extends Record<string, unknown>>(
     data: tableData,
     rows,
     enabled: enableCellSelection,
+    columnCount: visibleLeafColumns.length,
     enableSubtreeCopy: resolvedEnableSubtreeCopy,
     enableInsertPaste: enableInsertPaste ?? true,
     onDataChange,
     onBatchChange,
     onRowsPaste,
+    onCellNavigate: handleCellNavigate,
   });
 
   const {
@@ -346,7 +428,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
   } = useCellEdit({ data: tableData, rows, onDataChange, onCellChange });
 
   const handleCellMouseDownWithCommit = useCallback(
-    (rowIndex: number, colIndex: number) => {
+    (
+      rowIndex: number,
+      colIndex: number,
+      options?: { shiftKey?: boolean },
+    ) => {
       const isSameEditingCell =
         editingCell?.rowIndex === rowIndex &&
         editingCell?.colIndex === colIndex;
@@ -355,10 +441,226 @@ export function useGlideTable<T extends Record<string, unknown>>(
         return;
       }
 
-      handleCellMouseDown(rowIndex, colIndex);
+      handleCellMouseDown(rowIndex, colIndex, options);
     },
     [commitEdit, editingCell, handleCellMouseDown],
   );
+
+  const navigateToSearchResult = useCallback(
+    (item: SearchResultItem) => {
+      const [colIndex, rowIndex] = item;
+      handleCellMouseDownWithCommit(rowIndex, colIndex);
+      scrollCellIntoView(rowIndex, colIndex, { align: "center" });
+    },
+    [handleCellMouseDownWithCommit, scrollCellIntoView],
+  );
+
+  const resolveSearchRowId = useCallback(
+    (row: T, index: number) => {
+      if (getRowId) return getRowId(row, index);
+
+      // Tree corpus includes collapsed rows, so index-based IDs desync from
+      // the visible row list. Prefer stable per-row fields; toggleField can
+      // collide (duplicate expand keys), so only use it as a last resort.
+      if (enableExpand) {
+        const record = row as Record<string, unknown>;
+        const idValue = record.id;
+        if (idValue != null && String(idValue).length > 0) {
+          return String(idValue);
+        }
+
+        const uniqueId = record.uniqueId;
+        if (uniqueId != null && String(uniqueId).length > 0) {
+          return String(uniqueId);
+        }
+
+        if (toggleField) {
+          const toggleValue = record[toggleField];
+          if (toggleValue != null && String(toggleValue).length > 0) {
+            return String(toggleValue);
+          }
+        }
+      }
+
+      return String(index);
+    },
+    [enableExpand, getRowId, toggleField],
+  );
+
+  const searchCorpus = useMemo(() => {
+    if (!enableInlineSearch) return [];
+
+    if (enableExpand && toggleField) {
+      return buildTreeSearchCorpus(tableData, {
+        toggleField,
+        getRowId: resolveSearchRowId,
+      });
+    }
+
+    return buildFlatSearchCorpus(tableData, resolveSearchRowId);
+  }, [
+    enableExpand,
+    enableInlineSearch,
+    resolveSearchRowId,
+    tableData,
+    toggleField,
+  ]);
+
+  const searchCorpusRef = useRef(searchCorpus);
+  searchCorpusRef.current = searchCorpus;
+
+  const visibleRowIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      map.set(resolveSearchRowId(row.original as T, row.index), row.index);
+    }
+    return map;
+  }, [resolveSearchRowId, rows]);
+
+  const getSearchCellValue = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      const corpusRow = searchCorpusRef.current[rowIndex];
+      const column = visibleLeafColumns[colIndex];
+      if (!corpusRow || !column) return undefined;
+
+      // Prefer TanStack accessor resolution when the row is currently visible.
+      const visibleIndex = visibleRowIndexById.get(corpusRow.id);
+      if (visibleIndex !== undefined) {
+        const visibleRow = rows[visibleIndex];
+        if (visibleRow) {
+          return visibleRow.getValue(column.id);
+        }
+      }
+
+      const columnDef = column.columnDef;
+      if (
+        "accessorFn" in columnDef &&
+        typeof columnDef.accessorFn === "function"
+      ) {
+        return columnDef.accessorFn(corpusRow.data, rowIndex);
+      }
+
+      if (
+        "accessorKey" in columnDef &&
+        columnDef.accessorKey != null &&
+        columnDef.accessorKey !== ""
+      ) {
+        return corpusRow.data[String(columnDef.accessorKey) as keyof T];
+      }
+
+      return corpusRow.data[column.id as keyof T];
+    },
+    [rows, visibleLeafColumns, visibleRowIndexById],
+  );
+
+  const pendingSearchNavRef = useRef<{
+    colIndex: number;
+    rowId: string;
+  } | null>(null);
+
+  const focusSearchResult = useCallback(
+    (colIndex: number, visibleRowIndex: number) => {
+      navigateToSearchResult([colIndex, visibleRowIndex]);
+    },
+    [navigateToSearchResult],
+  );
+
+  const navigateToCorpusSearchResult = useCallback(
+    (item: SearchResultItem) => {
+      const [colIndex, corpusRowIndex] = item;
+      const corpusRow = searchCorpusRef.current[corpusRowIndex];
+      if (!corpusRow) return;
+
+      const missingKeys = collectAncestorKeysToExpand(corpusRow, expandedRows);
+      if (missingKeys.length > 0) {
+        pendingSearchNavRef.current = {
+          colIndex,
+          rowId: corpusRow.id,
+        };
+        const next = new Set(expandedRows);
+        for (const key of corpusRow.ancestorToggleKeys) {
+          next.add(key);
+        }
+        handleExpandedRowsChange(next);
+
+        return;
+      }
+
+      const visibleItem = mapSearchResultToVisibleItem(
+        item,
+        searchCorpusRef.current,
+        visibleRowIndexById,
+      );
+      if (!visibleItem) return;
+
+      focusSearchResult(visibleItem[0], visibleItem[1]);
+    },
+    [
+      expandedRows,
+      focusSearchResult,
+      handleExpandedRowsChange,
+      visibleRowIndexById,
+    ],
+  );
+
+  useEffect(() => {
+    const pending = pendingSearchNavRef.current;
+    if (!pending) return;
+
+    const visibleRowIndex = visibleRowIndexById.get(pending.rowId);
+    if (visibleRowIndex === undefined) return;
+
+    pendingSearchNavRef.current = null;
+    focusSearchResult(pending.colIndex, visibleRowIndex);
+  }, [focusSearchResult, rows, visibleRowIndexById]);
+
+  const initialSearchStartRow = virtualRows[0]?.index ?? 0;
+
+  const inlineSearch = useInlineSearch({
+    enabled: enableInlineSearch,
+    rowCount: searchCorpus.length,
+    columnCount: visibleLeafColumns.length,
+    getCellValue: getSearchCellValue,
+    initialStartRow: initialSearchStartRow,
+    showSearch,
+    searchValue,
+    searchResults,
+    onSearchValueChange,
+    onSearchClose,
+    onSearchResultsChanged,
+    onNavigateToResult: navigateToCorpusSearchResult,
+    rootRef,
+  });
+
+  const visibleSearchMatchKeys = useMemo(() => {
+    if (!enableInlineSearch) return EMPTY_SEARCH_MATCH_KEYS;
+
+    return mapSearchResultsToVisibleKeys(
+      inlineSearch.searchResults,
+      searchCorpus,
+      visibleRowIndexById,
+    );
+  }, [
+    enableInlineSearch,
+    inlineSearch.searchResults,
+    searchCorpus,
+    visibleRowIndexById,
+  ]);
+
+  const visibleActiveMatch = useMemo(() => {
+    if (!enableInlineSearch || !inlineSearch.activeMatch) return null;
+
+    return mapSearchResultToVisibleItem(
+      inlineSearch.activeMatch,
+      searchCorpus,
+      visibleRowIndexById,
+    );
+  }, [
+    enableInlineSearch,
+    inlineSearch.activeMatch,
+    searchCorpus,
+    visibleRowIndexById,
+  ]);
 
   const clearHover = useCallback(() => {
     setHoveredRowIndex(null);
@@ -442,6 +744,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
         enableColumnFreeze,
         offsets: columnFreezeOffsets,
       },
+      inlineSearch: {
+        enabled: enableInlineSearch,
+        matchKeys: visibleSearchMatchKeys,
+        activeMatch: visibleActiveMatch,
+      },
     };
   }, [
     enableRowSpan,
@@ -477,6 +784,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enableColumnResize,
     enableColumnFreeze,
     columnFreezeOffsets,
+    enableInlineSearch,
+    visibleSearchMatchKeys,
+    visibleActiveMatch,
   ]);
 
   const copySelectionRef = useRef(copySelection);
@@ -505,8 +815,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enableCellSelection,
     enableColumnResize,
     enableColumnFreeze,
+    enableInlineSearch,
     shouldVirtualize,
     scrollRef,
+    rootRef,
     rowVirtualizer,
     virtualRows,
     paddingTop,
@@ -515,5 +827,19 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleToggleSelect,
     clearHover,
     copySelection: stableCopySelection,
+    inlineSearch: {
+      showSearch: inlineSearch.showSearch,
+      searchValue: inlineSearch.searchValue,
+      searchStatus: inlineSearch.searchStatus,
+      searchInputRef: inlineSearch.searchInputRef,
+      searchInputId: inlineSearch.searchInputId,
+      canClose: inlineSearch.canClose,
+      searchRowCount: searchCorpus.length,
+      setSearchValue: inlineSearch.setSearchValue,
+      closeSearch: inlineSearch.closeSearch,
+      goToNext: inlineSearch.goToNext,
+      goToPrevious: inlineSearch.goToPrevious,
+      openSearch: inlineSearch.openSearch,
+    },
   };
 }

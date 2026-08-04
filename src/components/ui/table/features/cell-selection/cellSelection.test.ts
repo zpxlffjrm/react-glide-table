@@ -1,10 +1,50 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clampCellPosition,
+  getCellNavigationDelta,
   getCellSelectionEdgeStyle,
   getMergedCellStepEdges,
   rowRangeToHeightRatios,
 } from "@/components/ui/table/features/cell-selection/cellSelection";
+
+describe("getCellNavigationDelta", () => {
+  it("maps arrow and WASD keys", () => {
+    expect(getCellNavigationDelta("ArrowUp")).toEqual({ row: -1, col: 0 });
+    expect(getCellNavigationDelta("w")).toEqual({ row: -1, col: 0 });
+    expect(getCellNavigationDelta("ArrowDown")).toEqual({ row: 1, col: 0 });
+    expect(getCellNavigationDelta("S")).toEqual({ row: 1, col: 0 });
+    expect(getCellNavigationDelta("ArrowLeft")).toEqual({ row: 0, col: -1 });
+    expect(getCellNavigationDelta("a")).toEqual({ row: 0, col: -1 });
+    expect(getCellNavigationDelta("ArrowRight")).toEqual({ row: 0, col: 1 });
+    expect(getCellNavigationDelta("D")).toEqual({ row: 0, col: 1 });
+  });
+
+  it("returns null for unrelated keys", () => {
+    expect(getCellNavigationDelta("Enter")).toBeNull();
+    expect(getCellNavigationDelta("Tab")).toBeNull();
+  });
+});
+
+describe("clampCellPosition", () => {
+  it("clamps to table bounds", () => {
+    expect(clampCellPosition({ row: -1, col: 5 }, 10, 4)).toEqual({
+      row: 0,
+      col: 3,
+    });
+    expect(clampCellPosition({ row: 99, col: -2 }, 10, 4)).toEqual({
+      row: 9,
+      col: 0,
+    });
+  });
+
+  it("handles empty tables", () => {
+    expect(clampCellPosition({ row: 2, col: 2 }, 0, 0)).toEqual({
+      row: 0,
+      col: 0,
+    });
+  });
+});
 
 describe("rowRangeToHeightRatios", () => {
   it("falls back to equal splits without heights", () => {
