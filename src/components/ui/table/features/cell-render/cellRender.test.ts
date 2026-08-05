@@ -88,6 +88,7 @@ describe("commitCellValue", () => {
       rows: [
         {
           id: "1",
+          index: 0,
           getAllCells: () => [],
           getVisibleCells: () => [],
         } as never,
@@ -103,5 +104,60 @@ describe("commitCellValue", () => {
 
     expect(ok).toBe(true)
     expect(changes).toEqual([{ rowId: "1", columnId: "name", value: "B" }])
+  })
+
+  it("patches onDataChange by row.index when model order differs from data", () => {
+    const data = [
+      { id: "a", name: "A" },
+      { id: "b", name: "B" },
+    ]
+
+    // Sorted model: B first (visual 0), A second — original indices stay 1 / 0
+    const rows = [
+      {
+        id: "b",
+        index: 1,
+        getAllCells: () => [
+          {
+            column: {
+              id: "name",
+              columnDef: { accessorKey: "name", id: "name" },
+            },
+          },
+        ],
+        getVisibleCells: () => [],
+      },
+      {
+        id: "a",
+        index: 0,
+        getAllCells: () => [
+          {
+            column: {
+              id: "name",
+              columnDef: { accessorKey: "name", id: "name" },
+            },
+          },
+        ],
+        getVisibleCells: () => [],
+      },
+    ] as never
+
+    let next: typeof data | null = null
+    const ok = commitCellValue({
+      data,
+      rows,
+      rowId: "b",
+      columnId: "name",
+      value: "B2",
+      onDataChange: (updated) => {
+        next = updated
+      },
+    })
+
+    expect(ok).toBe(true)
+    expect(next).toEqual([
+      { id: "a", name: "A" },
+      { id: "b", name: "B2" },
+    ])
   })
 })

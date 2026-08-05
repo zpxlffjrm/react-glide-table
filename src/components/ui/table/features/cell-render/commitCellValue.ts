@@ -32,20 +32,24 @@ export function commitCellValue<T extends Record<string, unknown>>({
     return true
   }
 
-  const rowIndex = rows.findIndex((row) => row.id === rowId)
-  if (rowIndex < 0) return false
+  // Prefer id lookup + TanStack `row.index` (original data index). The position
+  // in the current row model can differ under sort/filter.
+  const row = rows.find((item) => item.id === rowId)
+  if (!row) return false
 
-  const row = rows[rowIndex]
   const cell =
-    row?.getAllCells().find((item) => item.column.id === columnId) ??
-    row?.getVisibleCells().find((item) => item.column.id === columnId)
+    row.getAllCells().find((item) => item.column.id === columnId) ??
+    row.getVisibleCells().find((item) => item.column.id === columnId)
   if (!cell) return false
 
   const accessorKey = getColumnAccessorKey(cell.column.columnDef)
   if (!accessorKey) return false
 
+  const dataIndex = row.index
+  if (dataIndex < 0 || dataIndex >= data.length) return false
+
   const next = data.map((item) => ({ ...item }))
-  const target = next[rowIndex]
+  const target = next[dataIndex]
   if (!target) return false
 
   ;(target as Record<string, unknown>)[accessorKey] = value
