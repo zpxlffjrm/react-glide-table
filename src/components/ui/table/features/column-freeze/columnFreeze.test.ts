@@ -5,6 +5,7 @@ import {
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
   resolveColumnFreezeSide,
+  resolveHeaderFreezeOffset,
 } from "@/components/ui/table/features/column-freeze/columnFreeze"
 
 describe("resolveColumnFreezeSide", () => {
@@ -117,6 +118,93 @@ describe("buildColumnFreezeOffsets", () => {
   })
 })
 
+describe("resolveHeaderFreezeOffset", () => {
+  it("returns the leaf offset for a leaf column", () => {
+    const offsets = buildColumnFreezeOffsets([
+      { id: "a", size: 100, side: "right" },
+      { id: "b", size: 80, side: "right" },
+    ])
+
+    expect(
+      resolveHeaderFreezeOffset({ id: "b" }, offsets),
+    ).toMatchObject({ side: "right", offset: 0 })
+  })
+
+  it("inherits sticky right for a group whose leaves are all right-frozen", () => {
+    const offsets = buildColumnFreezeOffsets([
+      { id: "scrollable", size: 120 },
+      { id: "checkLog", size: 100, side: "right" },
+      { id: "checkLogAt", size: 140, side: "right" },
+      { id: "lotCard", size: 90, side: "right" },
+    ])
+
+    const groupOffset = resolveHeaderFreezeOffset(
+      {
+        id: "actions",
+        getLeafColumns: () => [
+          { id: "checkLog" },
+          { id: "checkLogAt" },
+          { id: "lotCard" },
+        ],
+      },
+      offsets,
+    )
+
+    expect(groupOffset).toMatchObject({
+      side: "right",
+      offset: 0,
+      edgeLeft: true,
+      edgeRight: false,
+      stack: 3,
+    })
+  })
+
+  it("inherits sticky for a single-leaf frozen ColumnGroup", () => {
+    const offsets = buildColumnFreezeOffsets([
+      { id: "name", size: 120 },
+      { id: "only", size: 80, side: "right" },
+    ])
+
+    expect(
+      resolveHeaderFreezeOffset(
+        {
+          id: "actions",
+          getLeafColumns: () => [{ id: "only" }],
+        },
+        offsets,
+      ),
+    ).toMatchObject({
+      side: "right",
+      offset: 0,
+      edgeLeft: true,
+      edgeRight: false,
+      stack: 1,
+    })
+  })
+
+  it("does not inherit freeze when a group mixes frozen and scrollable leaves", () => {
+    const offsets = buildColumnFreezeOffsets([
+      { id: "supplier", size: 100 },
+      { id: "status", size: 80, side: "right" },
+      { id: "note", size: 90, side: "right" },
+    ])
+
+    expect(
+      resolveHeaderFreezeOffset(
+        {
+          id: "details",
+          getLeafColumns: () => [
+            { id: "supplier" },
+            { id: "status" },
+            { id: "note" },
+          ],
+        },
+        offsets,
+      ),
+    ).toBeUndefined()
+  })
+})
+
 describe("getColumnFreezeEdgeAttr", () => {
   it("serializes edge flags for data-freeze-edge", () => {
     expect(
@@ -167,7 +255,24 @@ describe("getColumnFreezeStyle", () => {
       position: "sticky",
       right: 20,
       zIndex: 31,
-      top: 0,
+    })
+
+    expect(
+      getColumnFreezeStyle(
+        {
+          side: "left",
+          offset: 0,
+          isEdge: true,
+          edgeLeft: false,
+          edgeRight: true,
+          stack: 0,
+        },
+        { isHeader: true, headerTop: 40 },
+      ),
+    ).toEqual({
+      position: "sticky",
+      left: 0,
+      zIndex: 30,
     })
 
     expect(

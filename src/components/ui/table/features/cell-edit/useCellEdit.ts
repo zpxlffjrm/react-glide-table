@@ -2,13 +2,13 @@ import type { Row } from "@tanstack/react-table"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
-  applyCellEdit,
   getCellEditDraftValue,
   getColumnEditType,
   isColumnEditable,
   parseCellEditValue,
   type EditingCell,
 } from "@/components/ui/table/features/cell-edit/cellEdit"
+import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue"
 
 type UseCellEditOptions<T extends Record<string, unknown>> = {
   data: T[]
@@ -60,28 +60,27 @@ export function useCellEdit<T extends Record<string, unknown>>({
         return true
       }
 
-      const value = raw ?? draftValueRef.current
-
       if (!isColumnEditable(cell.column.columnDef)) {
         cancelEdit()
 
         return true
       }
 
+      const value = raw ?? draftValueRef.current
       const parsed = parseCellEditValue(value, getColumnEditType(cell.column.columnDef))
       if (!parsed.ok) return false
 
-      if (onCellChange) {
-        onCellChange(row.id, cell.column.id, parsed.value)
-        cancelEdit()
+      const committed = commitCellValue({
+        data,
+        rows,
+        rowId: row.id,
+        columnId: cell.column.id,
+        value: parsed.value,
+        onCellChange,
+        onDataChange,
+      })
+      if (!committed) return false
 
-        return true
-      }
-
-      const next = applyCellEdit(data, rows, current.rowIndex, current.colIndex, value)
-      if (!next) return false
-
-      onDataChange?.(next)
       cancelEdit()
 
       return true

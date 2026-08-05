@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/table/constants";
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
+import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue";
+import { createCellRendererRegistry } from "@/components/ui/table/features/cell-render/registry";
 import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import {
@@ -143,6 +145,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     onDataChange,
     onCellChange,
     onBatchChange,
+    cellRenderers,
     preserveRowSelection = false,
     toggleField,
     childField,
@@ -426,6 +429,25 @@ export function useGlideTable<T extends Record<string, unknown>>(
     commitEdit,
     cancelEdit,
   } = useCellEdit({ data: tableData, rows, onDataChange, onCellChange });
+
+  const cellRendererRegistry = useMemo(
+    () => createCellRendererRegistry(cellRenderers),
+    [cellRenderers],
+  );
+
+  const commitRenderedCellValue = useCallback(
+    (rowId: string, columnId: string, value: unknown) =>
+      commitCellValue({
+        data: tableData,
+        rows,
+        rowId,
+        columnId,
+        value,
+        onCellChange,
+        onDataChange,
+      }),
+    [onCellChange, onDataChange, rows, tableData],
+  );
 
   const handleCellMouseDownWithCommit = useCallback(
     (
@@ -728,6 +750,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
         onCommitEdit: commitEdit,
         onCancelEdit: cancelEdit,
       },
+      cellRender: {
+        registry: cellRendererRegistry,
+        commitValue: commitRenderedCellValue,
+      },
       expand: {
         enableExpand,
         toggleField,
@@ -774,6 +800,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     startEdit,
     commitEdit,
     cancelEdit,
+    cellRendererRegistry,
+    commitRenderedCellValue,
     enableExpand,
     toggleField,
     expandedRows,

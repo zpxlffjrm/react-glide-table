@@ -1,6 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { createTable } from "@/components/ui/Table";
 import type {
+  CellRenderContext,
+  CellRenderer,
+} from "@/components/ui/table/features/cell-render/types";
+import type {
   DataTableCopyActions,
   RowsPastePayload,
 } from "@/components/ui/table/types";
@@ -52,8 +56,166 @@ type BomDraft = {
   assemblyMaterials?: BomDraft[];
 };
 
+type KindDemoRow = {
+  id: string;
+  text: string;
+  number: number;
+  active: boolean;
+  url: string;
+  image: string;
+  tags: string[];
+  markdown: string;
+  drilldown: Array<{ text: string; img?: string }>;
+  secret: string;
+  rowKey: string;
+  action: string;
+};
+
 const ProductTable = createTable<Product>();
 const BomTable = createTable<BomRow>();
+const KindTable = createTable<KindDemoRow>();
+
+const actionRenderer: CellRenderer = {
+  kind: "my-button",
+  render: ({ value, update }: CellRenderContext) => (
+    <button
+      type="button"
+      className="playground-toolbar-btn"
+      onClick={() => update(value === "Done" ? "Open" : "Done")}
+    >
+      {String(value)}
+    </button>
+  ),
+};
+
+function createKindDemoRows(): KindDemoRow[] {
+  return [
+    {
+      id: "1",
+      text: "Plain text",
+      number: 42,
+      active: true,
+      url: "https://example.com",
+      image: "https://picsum.photos/seed/glide1/32/32",
+      tags: ["alpha", "beta"],
+      markdown: "**Bold** and *italic*",
+      drilldown: [
+        { text: "Parent", img: "https://picsum.photos/seed/d1/20/20" },
+        { text: "Child" },
+      ],
+      secret: "hidden-value",
+      rowKey: "row-001",
+      action: "Open",
+    },
+    {
+      id: "2",
+      text: "Another row",
+      number: 7,
+      active: false,
+      url: "https://glideapps.com",
+      image: "https://picsum.photos/seed/glide2/32/32",
+      tags: ["gamma"],
+      markdown: "Use `code` here",
+      drilldown: [{ text: "Only item" }],
+      secret: "top-secret",
+      rowKey: "row-002",
+      action: "Open",
+    },
+  ];
+}
+
+function coerceKindValue(
+  columnId: string,
+  raw: string,
+): KindDemoRow[keyof KindDemoRow] {
+  if (columnId === "number") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (columnId === "active") {
+    const normalized = raw.trim().toLowerCase();
+    return (
+      normalized === "true" ||
+      normalized === "1" ||
+      normalized === "yes" ||
+      normalized === "y"
+    );
+  }
+
+  if (columnId === "tags") {
+    return raw
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (columnId === "drilldown") {
+    return raw
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((text) => ({ text }));
+  }
+
+  return raw;
+}
+
+function applyKindPaste(
+  data: KindDemoRow[],
+  payload: RowsPastePayload,
+): KindDemoRow[] {
+  const { mode, startRow, endRow, columnIds, values } = payload;
+
+  if (mode === "overwrite") {
+    return data.map((row, rowIndex) => {
+      const pasteRow = values[rowIndex - startRow];
+      if (!pasteRow) return row;
+
+      const next = { ...row };
+      columnIds.forEach((columnId, colOffset) => {
+        if (!(columnId in next) || pasteRow[colOffset] === undefined) return;
+        (next as Record<string, unknown>)[columnId] = coerceKindValue(
+          columnId,
+          pasteRow[colOffset]!,
+        );
+      });
+      return next;
+    });
+  }
+
+  const inserted: KindDemoRow[] = values.map((pasteRow, index) => {
+    const base = data[endRow] ?? data[startRow] ?? data[data.length - 1];
+    const row: KindDemoRow = {
+      id: `paste-${Date.now()}-${index}`,
+      text: base?.text ?? "",
+      number: base?.number ?? 0,
+      active: base?.active ?? false,
+      url: base?.url ?? "",
+      image: base?.image ?? "",
+      tags: base?.tags ?? [],
+      markdown: base?.markdown ?? "",
+      drilldown: base?.drilldown ?? [],
+      secret: base?.secret ?? "",
+      rowKey: `row-paste-${index}`,
+      action: base?.action ?? "Open",
+    };
+
+    columnIds.forEach((columnId, colOffset) => {
+      if (!(columnId in row) || pasteRow[colOffset] === undefined) return;
+      (row as Record<string, unknown>)[columnId] = coerceKindValue(
+        columnId,
+        pasteRow[colOffset]!,
+      );
+    });
+
+    return row;
+  });
+
+  const next = [...data];
+  next.splice(endRow + 1, 0, ...inserted);
+  return next;
+}
 
 const REGIONS = ["APAC", "EMEA", "AMER"] as const;
 const CATEGORIES = ["Hardware", "Software", "Accessory", "Service"] as const;
@@ -526,8 +688,10 @@ export function App() {
   const [rowCount, setRowCount] = useState(500);
   const [enableRowSpan, setEnableRowSpan] = useState(false);
   const [enableExpand, setEnableExpand] = useState(false);
+  const [showCellKinds, setShowCellKinds] = useState(false);
   const [productData, setProductData] = useState(() => createProductRows(500));
   const [bomData, setBomData] = useState(() => createBomRows());
+  const [kindData, setKindData] = useState(() => createKindDemoRows());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
     () => new Set(),
   );
@@ -538,6 +702,10 @@ export function App() {
 
   const handleProductPaste = useCallback((payload: RowsPastePayload) => {
     setProductData((prev) => applyProductPaste(prev, payload));
+  }, []);
+
+  const handleKindPaste = useCallback((payload: RowsPastePayload) => {
+    setKindData((prev) => applyKindPaste(prev, payload));
   }, []);
 
   const handleBomPaste = useCallback((payload: RowsPastePayload) => {
@@ -584,6 +752,10 @@ export function App() {
   };
 
   const reset = () => {
+    if (showCellKinds) {
+      setKindData(createKindDemoRows());
+      return;
+    }
     if (enableExpand) {
       setBomData(createBomRows());
       setExpandedRows(new Set());
@@ -622,6 +794,12 @@ export function App() {
         </div>
         <div className="playground-actions">
           <ToggleSwitch
+            label="Cell kinds"
+            checked={showCellKinds}
+            onChange={setShowCellKinds}
+            hint="builtin + custom cellRenderers gallery"
+          />
+          <ToggleSwitch
             label="Cell merge"
             checked={enableRowSpan}
             onChange={setEnableRowSpan}
@@ -637,7 +815,7 @@ export function App() {
             onChange={setEnableExpand}
             hint="toggleField tree / BOM (works with cell merge)"
           />
-          {!enableExpand && (
+          {!enableExpand && !showCellKinds && (
             <label className="playground-field">
               Rows
               <select
@@ -658,7 +836,66 @@ export function App() {
       </header>
 
       <main className="playground-main">
-        {enableExpand ? (
+        {showCellKinds ? (
+          <KindTable
+            data={kindData}
+            getRowId={(row) => row.id}
+            enableVirtualization={false}
+            enableColumnResize
+            cellRenderers={[actionRenderer]}
+            onRowsPaste={handleKindPaste}
+            onCellChange={(rowId, columnId, value) => {
+              setKindData((prev) =>
+                prev.map((row) =>
+                  row.id === rowId ? { ...row, [columnId]: value } : row,
+                ),
+              );
+            }}
+            classNames={{
+              scroll: "playground-table-scroll",
+              cell: "playground-kind-cell",
+            }}
+          >
+            <KindTable.Header>
+              <KindTable.Column field="text" kind="text" width={120}>
+                text
+              </KindTable.Column>
+              <KindTable.Column field="number" kind="number" width={80}>
+                number
+              </KindTable.Column>
+              <KindTable.Column field="active" kind="boolean" width={80}>
+                boolean
+              </KindTable.Column>
+              <KindTable.Column field="url" kind="uri" width={160}>
+                uri
+              </KindTable.Column>
+              <KindTable.Column field="image" kind="image" width={72}>
+                image
+              </KindTable.Column>
+              <KindTable.Column field="tags" kind="bubble" width={140}>
+                bubble
+              </KindTable.Column>
+              <KindTable.Column field="markdown" kind="markdown" width={160}>
+                markdown
+              </KindTable.Column>
+              <KindTable.Column field="drilldown" kind="drilldown" width={160}>
+                drilldown
+              </KindTable.Column>
+              <KindTable.Column field="id" kind="loading" width={72}>
+                loading
+              </KindTable.Column>
+              <KindTable.Column field="secret" kind="protected" width={88}>
+                protected
+              </KindTable.Column>
+              <KindTable.Column field="rowKey" kind="row-id" width={88}>
+                row-id
+              </KindTable.Column>
+              <KindTable.Column field="action" kind="my-button" width={100}>
+                custom
+              </KindTable.Column>
+            </KindTable.Header>
+          </KindTable>
+        ) : enableExpand ? (
           <BomTable
             data={bomData}
             getRowId={(row) => String(row.id)}
@@ -847,7 +1084,7 @@ export function App() {
                   frozen="left"
                   editable
                   editType="number"
-                  render={(value) => `$${Number(value).toLocaleString()}`}
+                  render={({ value }) => `$${Number(value).toLocaleString()}`}
                   width={300}
                 >
                   Price
