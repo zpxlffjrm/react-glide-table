@@ -1,60 +1,60 @@
-import type { CSSProperties } from "react"
+import type { CSSProperties } from "react";
 
 /** Sticky edge for a frozen column. Does not reorder columns. */
-export type ColumnFreezeSide = "left" | "right"
+export type ColumnFreezeSide = "left" | "right";
 
 /**
  * Per-column freeze flag.
  * `true` is sugar for `"left"`.
  */
-export type ColumnFreezeMeta = boolean | ColumnFreezeSide
+export type ColumnFreezeMeta = boolean | ColumnFreezeSide;
 
 export type ColumnFreezeColumnInput = {
-  id: string
-  size: number
-  side?: ColumnFreezeSide
-}
+  id: string;
+  size: number;
+  side?: ColumnFreezeSide;
+};
 
 /** Which outer sides of a freeze island get a divider shadow. */
-export type ColumnFreezeEdgeSide = "left" | "right" | "both"
+export type ColumnFreezeEdgeSide = "left" | "right" | "both";
 
 export type ColumnFreezeOffset = {
-  side: ColumnFreezeSide
+  side: ColumnFreezeSide;
   /** Cumulative sticky inset (`left` or `right` in px). */
-  offset: number
+  offset: number;
   /** True when this cell is on an island boundary (any side). */
-  isEdge: boolean
+  isEdge: boolean;
   /** Shadow toward the previous column (scrollable / other island). */
-  edgeLeft: boolean
+  edgeLeft: boolean;
   /** Shadow toward the next column (scrollable / other island). */
-  edgeRight: boolean
+  edgeRight: boolean;
   /** Relative stack order within the freeze side (higher = closer to the viewport edge). */
-  stack: number
-}
+  stack: number;
+};
 
-const HEADER_Z_BASE = 30
-const BODY_Z_BASE = 5
+const HEADER_Z_BASE = 30;
+const BODY_Z_BASE = 5;
 
 /** Normalize column `frozen` meta into a sticky side. */
 export function resolveColumnFreezeSide(
   frozen?: ColumnFreezeMeta,
 ): ColumnFreezeSide | undefined {
-  if (frozen === true || frozen === "left") return "left"
-  if (frozen === "right") return "right"
+  if (frozen === true || frozen === "left") return "left";
+  if (frozen === "right") return "right";
 
-  return undefined
+  return undefined;
 }
 
 /** Serialize freeze-edge flags for `data-freeze-edge`. */
 export function getColumnFreezeEdgeAttr(
   offset: Pick<ColumnFreezeOffset, "edgeLeft" | "edgeRight"> | undefined,
 ): ColumnFreezeEdgeSide | undefined {
-  if (!offset) return undefined
-  if (offset.edgeLeft && offset.edgeRight) return "both"
-  if (offset.edgeLeft) return "left"
-  if (offset.edgeRight) return "right"
+  if (!offset) return undefined;
+  if (offset.edgeLeft && offset.edgeRight) return "both";
+  if (offset.edgeLeft) return "left";
+  if (offset.edgeRight) return "right";
 
-  return undefined
+  return undefined;
 }
 
 /**
@@ -70,15 +70,15 @@ export function getColumnFreezeEdgeAttr(
 export function buildColumnFreezeOffsets(
   columns: ColumnFreezeColumnInput[],
 ): Map<string, ColumnFreezeOffset> {
-  const result = new Map<string, ColumnFreezeOffset>()
+  const result = new Map<string, ColumnFreezeOffset>();
 
-  let leftOffset = 0
-  const leftIds: string[] = []
+  let leftOffset = 0;
+  const leftIds: string[] = [];
 
   for (const column of columns) {
-    if (column.side !== "left") continue
+    if (column.side !== "left") continue;
 
-    leftIds.push(column.id)
+    leftIds.push(column.id);
     result.set(column.id, {
       side: "left",
       offset: leftOffset,
@@ -86,26 +86,26 @@ export function buildColumnFreezeOffsets(
       edgeLeft: false,
       edgeRight: false,
       stack: 0,
-    })
-    leftOffset += column.size
+    });
+    leftOffset += column.size;
   }
 
   leftIds.forEach((id, index) => {
-    const entry = result.get(id)
-    if (!entry) return
+    const entry = result.get(id);
+    if (!entry) return;
 
     // Leftmost sticky cells sit above later left-sticky cells while scrolling.
-    entry.stack = leftIds.length - index
-  })
+    entry.stack = leftIds.length - index;
+  });
 
-  let rightOffset = 0
-  const rightIds: string[] = []
+  let rightOffset = 0;
+  const rightIds: string[] = [];
 
   for (let index = columns.length - 1; index >= 0; index -= 1) {
-    const column = columns[index]
-    if (!column || column.side !== "right") continue
+    const column = columns[index];
+    if (!column || column.side !== "right") continue;
 
-    rightIds.push(column.id)
+    rightIds.push(column.id);
     result.set(column.id, {
       side: "right",
       offset: rightOffset,
@@ -113,68 +113,70 @@ export function buildColumnFreezeOffsets(
       edgeLeft: false,
       edgeRight: false,
       stack: 0,
-    })
-    rightOffset += column.size
+    });
+    rightOffset += column.size;
   }
 
   rightIds.forEach((id, index) => {
-    const entry = result.get(id)
-    if (!entry) return
+    const entry = result.get(id);
+    if (!entry) return;
 
     // Rightmost sticky cells sit above later right-sticky cells while scrolling.
-    entry.stack = rightIds.length - index
-  })
+    entry.stack = rightIds.length - index;
+  });
 
   // Island boundaries: same-side neighbors share an island; otherwise mark edges.
   columns.forEach((column, index) => {
-    if (!column.side) return
+    if (!column.side) return;
 
-    const entry = result.get(column.id)
-    if (!entry) return
+    const entry = result.get(column.id);
+    if (!entry) return;
 
-    const prevSide = index > 0 ? columns[index - 1]?.side : undefined
+    const prevSide = index > 0 ? columns[index - 1]?.side : undefined;
     const nextSide =
-      index < columns.length - 1 ? columns[index + 1]?.side : undefined
+      index < columns.length - 1 ? columns[index + 1]?.side : undefined;
 
-    entry.edgeLeft = prevSide !== column.side
-    entry.edgeRight = nextSide !== column.side
+    entry.edgeLeft = prevSide !== column.side;
+    entry.edgeRight = nextSide !== column.side;
     // At the table start/end, no shadow toward the missing neighbor.
-    if (index === 0) entry.edgeLeft = false
-    if (index === columns.length - 1) entry.edgeRight = false
-    entry.isEdge = entry.edgeLeft || entry.edgeRight
-  })
+    if (index === 0) entry.edgeLeft = false;
+    if (index === columns.length - 1) entry.edgeRight = false;
+    entry.isEdge = entry.edgeLeft || entry.edgeRight;
+  });
 
-  return result
+  return result;
 }
 
 /** Sticky position styles for a frozen header or body cell. */
 export function getColumnFreezeStyle(
   offset: ColumnFreezeOffset | undefined,
   options?: {
-    isHeader?: boolean
+    isHeader?: boolean;
     /**
      * @deprecated Unused. Vertical sticky belongs on `thead` (`classNames.head`),
      * not on frozen header cells — dual `top` sticky detaches freeze bands.
      */
-    headerTop?: number
+    headerTop?: number;
   },
 ): CSSProperties | undefined {
-  if (!offset) return undefined
+  if (!offset) return undefined;
 
-  const zBase = options?.isHeader ? HEADER_Z_BASE : BODY_Z_BASE
+  const zBase = options?.isHeader ? HEADER_Z_BASE : BODY_Z_BASE;
 
   return {
     position: "sticky",
-    ...(offset.side === "left" ? { left: offset.offset } : { right: offset.offset }),
+    ...(offset.side === "left"
+      ? { left: offset.offset }
+      : { right: offset.offset }),
     zIndex: zBase + offset.stack,
-  }
+  };
 }
 
 type HeaderFreezeColumnLike = {
-  id: string
-  columns?: HeaderFreezeColumnLike[]
-  getLeafColumns?: () => HeaderFreezeColumnLike[]
-}
+  id: string;
+  columns?: HeaderFreezeColumnLike[];
+  getLeafColumns?: () => HeaderFreezeColumnLike[];
+};
 
 /**
  * Resolve freeze offset for a header cell.
@@ -186,36 +188,36 @@ export function resolveHeaderFreezeOffset(
   column: HeaderFreezeColumnLike,
   freezeOffsets: Map<string, ColumnFreezeOffset>,
 ): ColumnFreezeOffset | undefined {
-  const direct = freezeOffsets.get(column.id)
-  if (direct) return direct
+  const direct = freezeOffsets.get(column.id);
+  if (direct) return direct;
 
   const leaves =
     typeof column.getLeafColumns === "function"
       ? column.getLeafColumns()
       : column.columns && column.columns.length > 0
         ? flattenHeaderLeaves(column)
-        : []
+        : [];
 
   // Groups with zero leaves are not sticky. A single-leaf group still inherits
   // so the group label stays aligned with its frozen leaf.
-  if (leaves.length === 0) return undefined
+  if (leaves.length === 0) return undefined;
 
-  const leafOffsets: ColumnFreezeOffset[] = []
+  const leafOffsets: ColumnFreezeOffset[] = [];
   for (const leaf of leaves) {
-    const offset = freezeOffsets.get(leaf.id)
-    if (!offset) return undefined
-    leafOffsets.push(offset)
+    const offset = freezeOffsets.get(leaf.id);
+    if (!offset) return undefined;
+    leafOffsets.push(offset);
   }
 
-  const side = leafOffsets[0]?.side
+  const side = leafOffsets[0]?.side;
   if (!side || leafOffsets.some((offset) => offset.side !== side)) {
-    return undefined
+    return undefined;
   }
 
   // Stick the group band to the same viewport edge as the outermost leaf.
-  const offset = Math.min(...leafOffsets.map((item) => item.offset))
-  const leftmost = leafOffsets[0]!
-  const rightmost = leafOffsets[leafOffsets.length - 1]!
+  const offset = Math.min(...leafOffsets.map((item) => item.offset));
+  const leftmost = leafOffsets[0]!;
+  const rightmost = leafOffsets[leafOffsets.length - 1]!;
 
   return {
     side,
@@ -224,13 +226,13 @@ export function resolveHeaderFreezeOffset(
     edgeRight: rightmost.edgeRight,
     isEdge: leftmost.edgeLeft || rightmost.edgeRight,
     stack: Math.max(...leafOffsets.map((item) => item.stack)),
-  }
+  };
 }
 
 function flattenHeaderLeaves(
   column: HeaderFreezeColumnLike,
 ): HeaderFreezeColumnLike[] {
-  if (!column.columns || column.columns.length === 0) return [column]
+  if (!column.columns || column.columns.length === 0) return [column];
 
-  return column.columns.flatMap((child) => flattenHeaderLeaves(child))
+  return column.columns.flatMap((child) => flattenHeaderLeaves(child));
 }

@@ -1,27 +1,25 @@
-import { flexRender } from "@tanstack/react-table"
-import { useMemo } from "react"
+import { flexRender } from "@tanstack/react-table";
+import { useMemo } from "react";
 
-import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow"
-import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch"
-import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
-import {
-  CELL_ALIGN_CLASS,
-} from "@/components/ui/table/constants"
-import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
+import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow";
+import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch";
+import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar";
+import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants";
+import { DataTableContextProvider } from "@/components/ui/table/DataTableContext";
 import {
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
   resolveHeaderFreezeOffset,
-} from "@/components/ui/table/features/column-freeze/columnFreeze"
-import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups"
-import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
+} from "@/components/ui/table/features/column-freeze/columnFreeze";
+import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups";
+import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
 import type {
   DataTableClassNames,
   DataTableProps,
   DataTableScrollSlotProps,
-} from "@/components/ui/table/types"
-import { useGlideTable } from "@/core/useGlideTable"
-import { cn } from "@/lib/cn"
+} from "@/components/ui/table/types";
+import { useGlideTable } from "@/core/useGlideTable";
+import { cn } from "@/lib/cn";
 
 function DefaultScroll({
   scrollRef,
@@ -32,7 +30,7 @@ function DefaultScroll({
     <div ref={scrollRef} className={cn("data-table-scroll", className)}>
       {children}
     </div>
-  )
+  );
 }
 
 function DefaultPending({
@@ -40,9 +38,9 @@ function DefaultPending({
   className,
   classNames,
 }: {
-  loadingText: string
-  className?: string
-  classNames?: Pick<DataTableClassNames, "pending" | "loadingText" | "root">
+  loadingText: string;
+  className?: string;
+  classNames?: Pick<DataTableClassNames, "pending" | "loadingText" | "root">;
 }) {
   return (
     <div
@@ -52,12 +50,13 @@ function DefaultPending({
         classNames?.root,
         classNames?.pending,
         className,
-      )}>
+      )}
+    >
       <span className={cn("data-table-loading-text", classNames?.loadingText)}>
         {loadingText}
       </span>
     </div>
-  )
+  );
 }
 
 function DefaultEmpty({
@@ -65,19 +64,20 @@ function DefaultEmpty({
   columnCount,
   classNames,
 }: {
-  emptyText: string
-  columnCount: number
-  classNames?: Pick<DataTableClassNames, "emptyCell">
+  emptyText: string;
+  columnCount: number;
+  classNames?: Pick<DataTableClassNames, "emptyCell">;
 }) {
   return (
     <tr>
       <td
         colSpan={columnCount}
-        className={cn("data-table-empty-cell", classNames?.emptyCell)}>
+        className={cn("data-table-empty-cell", classNames?.emptyCell)}
+      >
         {emptyText}
       </td>
     </tr>
-  )
+  );
 }
 
 /**
@@ -123,20 +123,20 @@ function DataTable<T extends Record<string, unknown>>({
     handleToggleSelect,
     clearHover,
     inlineSearch,
-  } = useGlideTable(glideOptions)
+  } = useGlideTable(glideOptions);
 
-  const ToolbarSlot = slots?.Toolbar ?? DataTableToolbar
-  const ScrollSlot = slots?.Scroll ?? DefaultScroll
-  const RowSlot = slots?.Row ?? DataTableRow
-  const PendingSlot = slots?.Pending ?? DefaultPending
-  const EmptySlot = slots?.Empty ?? DefaultEmpty
-  const freezeOffsets = rowContextValue.columnFreeze.offsets
-  const headerGroups = getMergedHeaderGroups(table.getHeaderGroups())
+  const ToolbarSlot = slots?.Toolbar ?? DataTableToolbar;
+  const ScrollSlot = slots?.Scroll ?? DefaultScroll;
+  const RowSlot = slots?.Row ?? DataTableRow;
+  const PendingSlot = slots?.Pending ?? DefaultPending;
+  const EmptySlot = slots?.Empty ?? DefaultEmpty;
+  const freezeOffsets = rowContextValue.columnFreeze.offsets;
+  const headerGroups = getMergedHeaderGroups(table.getHeaderGroups());
 
   const contextValue = useMemo(
     () => ({ ...rowContextValue, classNames }),
     [rowContextValue, classNames],
-  )
+  );
 
   if (isPending) {
     return (
@@ -145,7 +145,7 @@ function DataTable<T extends Record<string, unknown>>({
         className={className}
         classNames={classNames}
       />
-    )
+    );
   }
 
   return (
@@ -159,7 +159,8 @@ function DataTable<T extends Record<string, unknown>>({
         enableInlineSearch && "DataTableJSX--inline-search",
         classNames?.root,
         className,
-      )}>
+      )}
+    >
       <ToolbarSlot
         filteredCount={filteredCount ?? tableData.length}
         totalCount={totalCount}
@@ -195,40 +196,39 @@ function DataTable<T extends Record<string, unknown>>({
         <table
           className={cn("data-table", classNames?.table)}
           style={
-            enableColumnResize
-              ? { width: table.getTotalSize() }
-              : undefined
+            enableColumnResize ? { width: table.getTotalSize() } : undefined
           }
           onDragStart={
             enableCellSelection ? (event) => event.preventDefault() : undefined
-          }>
+          }
+        >
           <thead className={cn("data-table-head", classNames?.head)}>
             {headerGroups.map((headerGroup) => (
               <tr
                 key={headerGroup.id}
-                className={cn("data-table-head-row", classNames?.headRow)}>
+                className={cn("data-table-head-row", classNames?.headRow)}
+              >
                 {headerGroup.headers.map((header) => {
-                  const align = header.column.columnDef.meta?.align ?? "center"
-                  const headerClassName = header.column.columnDef.meta?.headerClassName
+                  const align = header.column.columnDef.meta?.align ?? "center";
+                  const headerClassName =
+                    header.column.columnDef.meta?.headerClassName;
                   const canResize =
-                    enableColumnResize && header.column.getCanResize()
+                    enableColumnResize && header.column.getCanResize();
                   const sizeStyle = getColumnSizeStyle(header.getSize(), {
                     force: enableColumnResize,
                     lockMax: enableColumnResize,
-                  })
+                  });
                   const freezeOffset = enableColumnFreeze
-                    ? resolveHeaderFreezeOffset(
-                        header.column,
-                        freezeOffsets,
-                      )
-                    : undefined
+                    ? resolveHeaderFreezeOffset(header.column, freezeOffsets)
+                    : undefined;
                   const freezeStyle = getColumnFreezeStyle(freezeOffset, {
                     isHeader: true,
-                  })
+                    headerTop: header.depth * DATA_TABLE_HEADER_ROW_HEIGHT,
+                  });
                   const headerStyle = {
                     ...sizeStyle,
                     ...freezeStyle,
-                  }
+                  };
 
                   return (
                     <th
@@ -247,14 +247,19 @@ function DataTable<T extends Record<string, unknown>>({
                       }
                       className={cn(
                         "data-table-head-cell",
-                        freezeOffset && `data-table-head-cell--frozen-${freezeOffset.side}`,
+                        freezeOffset &&
+                          `data-table-head-cell--frozen-${freezeOffset.side}`,
                         CELL_ALIGN_CLASS[align],
                         classNames?.headCell,
                         headerClassName,
-                      )}>
+                      )}
+                    >
                       {header.isPlaceholder
                         ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
                       {canResize ? (
                         <div
                           role="separator"
@@ -268,12 +273,12 @@ function DataTable<T extends Record<string, unknown>>({
                           onMouseDown={header.getResizeHandler()}
                           onTouchStart={header.getResizeHandler()}
                           onDoubleClick={() => {
-                            header.column.resetSize()
+                            header.column.resetSize();
                           }}
                         />
                       ) : null}
                     </th>
-                  )
+                  );
                 })}
               </tr>
             ))}
@@ -281,7 +286,8 @@ function DataTable<T extends Record<string, unknown>>({
           <DataTableContextProvider value={contextValue}>
             <tbody
               onMouseLeave={clearHover}
-              className={cn("data-table-body", classNames?.body)}>
+              className={cn("data-table-body", classNames?.body)}
+            >
               {rows.length === 0 ? (
                 <EmptySlot
                   emptyText={emptyText}
@@ -296,7 +302,8 @@ function DataTable<T extends Record<string, unknown>>({
                       className={cn(
                         "data-table-virtual-spacer",
                         classNames?.virtualSpacer,
-                      )}>
+                      )}
+                    >
                       <td
                         colSpan={columnCount}
                         style={{ height: paddingTop }}
@@ -308,8 +315,8 @@ function DataTable<T extends Record<string, unknown>>({
                     </tr>
                   )}
                   {virtualRows.map((virtualRow) => {
-                    const row = rows[virtualRow.index]
-                    if (!row) return null
+                    const row = rows[virtualRow.index];
+                    if (!row) return null;
 
                     return (
                       <RowSlot
@@ -319,7 +326,7 @@ function DataTable<T extends Record<string, unknown>>({
                         measureElement={rowVirtualizer.measureElement}
                         onToggleSelect={() => handleToggleSelect(row)}
                       />
-                    )
+                    );
                   })}
                   {paddingBottom > 0 && (
                     <tr
@@ -327,7 +334,8 @@ function DataTable<T extends Record<string, unknown>>({
                       className={cn(
                         "data-table-virtual-spacer",
                         classNames?.virtualSpacer,
-                      )}>
+                      )}
+                    >
                       <td
                         colSpan={columnCount}
                         style={{ height: paddingBottom }}
@@ -353,8 +361,8 @@ function DataTable<T extends Record<string, unknown>>({
         </table>
       </ScrollSlot>
     </div>
-  )
+  );
 }
 
-export { DataTable }
-export type { DataTableProps }
+export { DataTable };
+export type { DataTableProps };
