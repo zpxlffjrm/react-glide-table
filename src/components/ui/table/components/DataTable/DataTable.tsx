@@ -4,7 +4,10 @@ import { useMemo } from "react";
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow";
 import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch";
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar";
-import { CELL_ALIGN_CLASS } from "@/components/ui/table/constants";
+import {
+  CELL_ALIGN_CLASS,
+  DATA_TABLE_HEADER_ROW_HEIGHT,
+} from "@/components/ui/table/constants";
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext";
 import {
   getColumnFreezeEdgeAttr,
