@@ -74,7 +74,8 @@ export function Products({ data }: { data: Product[] }) {
 | `slots.Pending` / `slots.Empty`                      | Loading and empty states                                                          |
 | `className` / column `className` / `headerClassName` | Extra class hooks                                                                 |
 | `labels` / `summary` / `toolbar`                     | Copy and slot nodes                                                               |
-| `Column.render`                                      | Cell content custom render                                                        |
+| `Column.render`                                      | Cell content custom render (single context object; prefer `update`)               |
+| `Column.kind` / `cellRenderers`                      | Built-in or custom cell kinds (override / add via registry)                       |
 
 Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
 
@@ -83,10 +84,59 @@ Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
 
 Example: `row: "data-[selected]:bg-blue-600"`.
 
-Row-level UI → `slots.Row`. Cell content → `Column.render`. Header/Cell are not separate slots.
+Row-level UI → `slots.Row`. Cell content → `Column.render` or `Column.kind`. Header/Cell are not separate slots.
 
 `slots.Scroll` receives `{ scrollRef, className, children }`. Attach `scrollRef` to the element that owns overflow scrolling — virtualization depends on it. Styling-only changes can stay on `classNames.scroll`.
 
+### Cell render context (`Column.render`)
+
+**Breaking change (v2.0.0):** `render` receives one context object (not positional args). Destructure only what you need.
+
+```tsx
+<ProductTable.Column
+  field="status"
+  render={({ value, update }) => (
+    <button type="button" onClick={() => update("done")}>
+      {String(value)}
+    </button>
+  )}
+/>
+```
+
+`update` commits through `onCellChange` (preferred) or `onDataChange`. Prefer `update` over calling `setData` inside the render.
+
+Double-click inline editing (`editable` / `editType`) stays separate: use it for overlay text/number edits; use `render` + `update` for always-visible controls.
+
+### Cell kinds (`Column.kind` + `cellRenderers`)
+
+Built-ins (DOM, inspired by [Glide All Cell Kinds](https://glideapps.github.io/glide-data-grid/?path=/story/glide-data-grid-dataeditor-demos--all-cell-kinds)):
+`text`, `number`, `boolean`, `uri`, `image`, `bubble`, `markdown`, `drilldown`, `loading`, `protected`, `row-id`.
+
+Priority: **column `render` > registry `kind` > default text**.
+
+```tsx
+const buttonRenderer = {
+  kind: "my-button",
+  render: ({ value, update }) => (
+    <button type="button" onClick={() => update("done")}>
+      {String(value)}
+    </button>
+  ),
+};
+
+<ProductTable cellRenderers={[buttonRenderer]}>
+  <ProductTable.Header>
+    <ProductTable.Column field="active" kind="boolean">
+      Active
+    </ProductTable.Column>
+    <ProductTable.Column field="action" kind="my-button">
+      Action
+    </ProductTable.Column>
+  </ProductTable.Header>
+</ProductTable>
+```
+
+Same `kind` in `cellRenderers` overrides the builtin. Extra kinds are added by key.
 ## Escape hatch (`useGlideTable`)
 
 ```tsx
@@ -215,6 +265,8 @@ Opt in with `enableColumnResize`. Drag the handle on the right edge of a header 
 ## Column freeze
 
 Opt in with `enableColumnFreeze`. Mark columns with `frozen` — sticky insets are stacked so frozen cells never overlap, and **column order is unchanged** (middle columns may also freeze).
+
+Keep vertical stickiness on the header via `classNames.head` (e.g. `sticky top-0`). Frozen header cells only stick horizontally (`left` / `right`); setting `top` on both `thead` and frozen `th` can detach the freeze band.
 
 ```tsx
 <ProductTable data={data} enableColumnFreeze>

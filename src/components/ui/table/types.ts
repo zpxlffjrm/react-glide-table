@@ -14,6 +14,11 @@ import type {
   Ref,
 } from "react"
 
+import type {
+  CellKind,
+  CellRenderFn,
+  CellRenderer,
+} from "@/components/ui/table/features/cell-render/types"
 import type { ColumnFreezeMeta } from "@/components/ui/table/features/column-freeze/columnFreeze"
 import type { SearchResultItem } from "@/components/ui/table/features/inline-search/inlineSearch"
 import type { DataTableLabels } from "@/core/labels"
@@ -51,6 +56,15 @@ declare module "@tanstack/react-table" {
     editType?: CellEditType
     /** Inline editor input attribute overrides */
     editInputProps?: DataTableEditInputProps
+    /**
+     * Built-in or custom cell kind. Resolved via table `cellRenderers` registry.
+     * Column `render` takes precedence over `kind`.
+     */
+    kind?: CellKind
+    /** Extra props forwarded to the kind / custom renderer as `ctx.cellProps` */
+    cellProps?: Record<string, unknown>
+    /** Compound `Column.render` stored for `ResolvedTableCell` */
+    cellRender?: CellRenderFn<Record<string, unknown>>
     /**
      * Freeze (sticky) this column without reordering.
      * `true` / `"left"` stick to the scrollport left; `"right"` to the right.
@@ -156,6 +170,12 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   onBatchChange?: (
     changes: Array<{ rowId: string; columnId: string; value: unknown }>,
   ) => void
+  /**
+   * Extra / overriding cell kind renderers (same `kind` replaces builtins).
+   * Built-ins: text, number, boolean, uri, image, bubble, markdown, drilldown,
+   * loading, protected, row-id.
+   */
+  cellRenderers?: readonly CellRenderer[]
   /**
    * Root className hook (combined with `DataTableJSX`).
    * The package ships no CSS — style these hooks yourself or leave unstyled.
@@ -405,9 +425,20 @@ export type TableColumnProps<
   editType?: CellEditType
   /** Inline editor input attribute overrides */
   editInputProps?: DataTableEditInputProps
+  /**
+   * Cell kind for the built-in / custom renderer registry.
+   * Ignored when `render` is set (render wins).
+   */
+  kind?: CellKind
+  /** Extra props for the kind renderer (`ctx.cellProps`) */
+  cellProps?: Record<string, unknown>
   className?: string
   headerClassName?: string
-  render?: (value: K extends keyof T ? T[K] : unknown, row: Row<T>, index: number) => ReactNode
+  /**
+   * Custom cell content. Receives a single context object — destructure what you need.
+   * Use `update` to commit via `onCellChange` / `onDataChange`.
+   */
+  render?: CellRenderFn<T, K extends keyof T ? T[K] : unknown>
 }
 
 /** Declares a multi-row header group wrapping leaf `Table.Column`s. */

@@ -5,6 +5,8 @@ import type { ColumnTreeNode } from "@/components/ui/table/components/Table/pars
 import type { TableSortState } from "@/components/ui/table/components/Table/tableDataPipeline"
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@/components/ui/table/components/icons"
 import { DATA_TABLE_COLUMN_SIZE } from "@/components/ui/table/constants"
+import { ResolvedTableCell } from "@/components/ui/table/features/cell-render/ResolvedTableCell"
+import type { CellRenderFn } from "@/components/ui/table/features/cell-render/types"
 import type { TableColumnGroupProps, TableColumnProps } from "@/components/ui/table/types"
 import { cn } from "@/lib/cn"
 
@@ -55,6 +57,8 @@ export function buildColumnDef<T extends Record<string, unknown>>(
     editable,
     editType,
     editInputProps,
+    kind,
+    cellProps,
     className,
     headerClassName,
     render,
@@ -71,17 +75,8 @@ export function buildColumnDef<T extends Record<string, unknown>>(
       ? () => <SortableHeader label={children} field={field} sort={sort} onSort={onSort} />
       : // eslint-disable-next-line @typescript-eslint/promise-function-async
         () => children,
-    ...(render
-      ? {
-          // eslint-disable-next-line @typescript-eslint/promise-function-async
-          cell: ({ row, getValue }) =>
-            render(
-              getValue() as Parameters<NonNullable<TableColumnProps<T>["render"]>>[0],
-              row,
-              row.index,
-            ),
-        }
-      : {}),
+    // eslint-disable-next-line @typescript-eslint/promise-function-async
+    cell: (info) => <ResolvedTableCell info={info} />,
     meta: {
       align,
       rowSpan,
@@ -89,6 +84,9 @@ export function buildColumnDef<T extends Record<string, unknown>>(
       editable,
       editType,
       editInputProps,
+      kind,
+      cellProps,
+      cellRender: render as CellRenderFn<Record<string, unknown>> | undefined,
       frozen,
       className,
       headerClassName,

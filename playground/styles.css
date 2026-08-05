@@ -166,3 +166,72 @@ code {
   min-height: 0;
   height: calc(100vh - 180px);
 }
+
+.playground-table-scroll {
+  height: 100%;
+  overflow: auto;
+}
+
+.playground-kind-cell {
+  vertical-align: middle;
+}
+
+.data-table-cell-bubble {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.data-table-cell-bubble-item {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 12px;
+}
+
+.data-table-cell-image,
+.data-table-cell-drilldown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.data-table-cell-image-item,
+.data-table-cell-drilldown-image {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.data-table-cell-drilldown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.data-table-cell-loading {
+  display: inline-block;
+  width: 48px;
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #e2e8f0, #f8fafc, #e2e8f0);
+  background-size: 200% 100%;
+  animation: playground-shimmer 1.2s ease-in-out infinite;
+}
+
+.data-table-cell-protected {
+  letter-spacing: 0.12em;
+  color: var(--color-neutral-text-muted);
+}
+
+@keyframes playground-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+

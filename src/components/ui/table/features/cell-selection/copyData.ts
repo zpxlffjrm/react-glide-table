@@ -10,10 +10,49 @@ export type CopyRowEntry<T extends Record<string, unknown>> = {
   depth: number
 }
 
-function formatCellValue(value: unknown): string {
+function formatPrimitive(value: unknown): string {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value)
+  }
+
+  return ""
+}
+
+/** Prefer display fields used by drilldown / similar object cell values. */
+function formatObjectValue(value: Record<string, unknown>): string {
+  const text = value.text ?? value.label ?? value.name ?? value.title
+  if (text != null && text !== "") {
+    return formatCellValue(text)
+  }
+
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * Clipboard / Excel paste expects one plain string per cell.
+ * Avoids `String(object)` → `[object Object]` and joins arrays with `, `.
+ */
+export function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return ""
 
-  return String(value)
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => formatCellValue(item))
+      .filter((item) => item.length > 0)
+      .join(", ")
+  }
+
+  if (typeof value === "object") {
+    return formatObjectValue(value as Record<string, unknown>)
+  }
+
+  return formatPrimitive(value)
 }
 
 function getNestedValue(row: Record<string, unknown>, path: string): unknown {

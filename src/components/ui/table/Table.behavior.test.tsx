@@ -5,7 +5,7 @@ import { useState } from "react"
 import { describe, expect, it } from "vitest"
 
 import { createTable, DataTable, Table } from "@/index"
-import type { ColumnDef } from "@/index"
+import type { CellRenderer, ColumnDef } from "@/index"
 
 type SimpleRow = {
   id: string
@@ -863,5 +863,274 @@ describe("DataTable direct usage behavior", () => {
 
     expect(container.querySelector("[data-frozen]")).toBeNull()
     expect(container.querySelector(".DataTableJSX--column-freeze")).toBeNull()
+  })
+
+  it("applies sticky freeze to a ColumnGroup header when all leaves are frozen", () => {
+    type WideRow = {
+      id: string
+      name: string
+      checkLog: string
+      checkLogAt: string
+      lotCard: string
+    }
+    const WideTable = createTable<WideRow>()
+
+    const { container } = render(
+      <WideTable
+        data={[
+          {
+            id: "1",
+            name: "A",
+            checkLog: "log",
+            checkLogAt: "2026-01-01",
+            lotCard: "view",
+          },
+        ]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <WideTable.Header>
+          <WideTable.Column field="name" width={120}>
+            Name
+          </WideTable.Column>
+          <WideTable.ColumnGroup header="Actions">
+            <WideTable.Column field="checkLog" width={100} frozen="right">
+              CheckLog
+            </WideTable.Column>
+            <WideTable.Column field="checkLogAt" width={140} frozen="right">
+              CheckLog일시
+            </WideTable.Column>
+            <WideTable.Column field="lotCard" width={90} frozen="right">
+              Lot Card
+            </WideTable.Column>
+          </WideTable.ColumnGroup>
+        </WideTable.Header>
+      </WideTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    const actionsHeader = Array.from(headers).find((header) =>
+      header.textContent?.includes("Actions"),
+    )
+    expect(actionsHeader).toHaveAttribute("data-frozen", "right")
+    expect(actionsHeader).toHaveStyle({ position: "sticky", right: "0px" })
+  })
+
+  it("commits custom render updates through onCellChange", async () => {
+    const user = userEvent.setup()
+    const changes: Array<{ rowId: string; columnId: string; value: unknown }> =
+      []
+
+    function RenderUpdateHarness() {
+      const [data, setData] = useState<SimpleRow[]>([
+        { id: "1", name: "Alpha", amount: 10 },
+      ])
+
+      return (
+        <SimpleTable
+          data={data}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+          onCellChange={(rowId, columnId, value) => {
+            changes.push({ rowId, columnId, value })
+            setData((prev) =>
+              prev.map((row) =>
+                row.id === rowId ? { ...row, [columnId]: value } : row,
+              ),
+            )
+          }}
+        >
+          <SimpleTable.Header>
+            <SimpleTable.Column
+              field="name"
+              render={({ value, update }) => (
+                <button
+                  type="button"
+                  aria-label="set-done"
+                  onClick={() => update("Done")}
+                >
+                  {String(value)}
+                </button>
+              )}
+            >
+              Name
+            </SimpleTable.Column>
+          </SimpleTable.Header>
+        </SimpleTable>
+      )
+    }
+
+    render(<RenderUpdateHarness />)
+
+    await user.click(screen.getByLabelText("set-done"))
+
+    expect(changes).toEqual([{ rowId: "1", columnId: "name", value: "Done" }])
+    expect(screen.getByLabelText("set-done")).toHaveTextContent("Done")
+  })
+
+  it("renders builtin boolean kind and commits checkbox toggles", async () => {
+    const user = userEvent.setup()
+
+    type FlagRow = { id: string; active: boolean }
+    const FlagTable = createTable<FlagRow>()
+
+    function BooleanKindHarness() {
+      const [data, setData] = useState<FlagRow[]>([{ id: "1", active: false }])
+
+      return (
+        <FlagTable
+          data={data}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+          onCellChange={(rowId, columnId, value) => {
+            setData((prev) =>
+              prev.map((row) =>
+                row.id === rowId ? { ...row, [columnId]: value } : row,
+              ),
+            )
+          }}
+        >
+          <FlagTable.Header>
+            <FlagTable.Column field="active" kind="boolean">
+              Active
+            </FlagTable.Column>
+          </FlagTable.Header>
+        </FlagTable>
+      )
+    }
+
+    render(<BooleanKindHarness />)
+
+    const checkbox = screen.getByRole("checkbox")
+    expect(checkbox).not.toBeChecked()
+
+    await user.click(checkbox)
+
+    expect(screen.getByRole("checkbox")).toBeChecked()
+  })
+
+  it("allows cellRenderers to override a builtin kind", () => {
+    const override: CellRenderer = {
+      kind: "boolean",
+      render: ({ value }) => (
+        <span data-testid="bool-override">{value ? "YES" : "NO"}</span>
+      ),
+    }
+
+    type FlagRow = { id: string; active: boolean }
+    const FlagTable = createTable<FlagRow>()
+
+    render(
+      <FlagTable
+        data={[{ id: "1", active: true }]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        cellRenderers={[override]}
+      >
+        <FlagTable.Header>
+          <FlagTable.Column field="active" kind="boolean">
+            Active
+          </FlagTable.Column>
+        </FlagTable.Header>
+      </FlagTable>,
+    )
+
+    expect(screen.getByTestId("bool-override")).toHaveTextContent("YES")
+  })
+
+  it("renders a custom kind from cellRenderers", () => {
+    const buttonRenderer: CellRenderer = {
+      kind: "my-button",
+      render: ({ value, update }) => (
+        <button type="button" aria-label="custom-kind" onClick={() => update("x")}>
+          {String(value)}
+        </button>
+      ),
+    }
+
+    type ActionRow = { id: string; action: string }
+    const ActionTable = createTable<ActionRow>()
+
+    render(
+      <ActionTable
+        data={[{ id: "1", action: "Open" }]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        cellRenderers={[buttonRenderer]}
+      >
+        <ActionTable.Header>
+          <ActionTable.Column field="action" kind="my-button">
+            Action
+          </ActionTable.Column>
+        </ActionTable.Header>
+      </ActionTable>,
+    )
+
+    expect(screen.getByLabelText("custom-kind")).toHaveTextContent("Open")
+  })
+
+  it("prefers Column.render over kind", () => {
+    type FlagRow = { id: string; active: boolean }
+    const FlagTable = createTable<FlagRow>()
+
+    render(
+      <FlagTable
+        data={[{ id: "1", active: true }]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <FlagTable.Header>
+          <FlagTable.Column
+            field="active"
+            kind="boolean"
+            render={({ value }) => (
+              <span data-testid="render-wins">{value ? "CUSTOM" : "OFF"}</span>
+            )}
+          >
+            Active
+          </FlagTable.Column>
+        </FlagTable.Header>
+      </FlagTable>,
+    )
+
+    expect(screen.getByTestId("render-wins")).toHaveTextContent("CUSTOM")
+    expect(screen.queryByRole("checkbox")).toBeNull()
+  })
+
+  it("renders duplicate bubble and image values without key collisions", () => {
+    type MediaRow = { id: string; tags: string[]; images: string[] }
+    const MediaTable = createTable<MediaRow>()
+
+    const { container } = render(
+      <MediaTable
+        data={[
+          {
+            id: "1",
+            tags: ["alpha", "alpha"],
+            images: [
+              "https://example.com/a.png",
+              "https://example.com/a.png",
+            ],
+          },
+        ]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <MediaTable.Header>
+          <MediaTable.Column field="tags" kind="bubble">
+            Tags
+          </MediaTable.Column>
+          <MediaTable.Column field="images" kind="image">
+            Images
+          </MediaTable.Column>
+        </MediaTable.Header>
+      </MediaTable>,
+    )
+
+    expect(container.querySelectorAll(".data-table-cell-bubble-item")).toHaveLength(
+      2,
+    )
+    expect(container.querySelectorAll(".data-table-cell-image-item")).toHaveLength(2)
   })
 })

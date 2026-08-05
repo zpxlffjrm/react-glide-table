@@ -23,4 +23,9 @@ export type {
   TableColumnGroupProps,
   TableColumnProps,
   TableProps,
+  BuiltinCellKind,
+  CellKind,
+  CellRenderContext,
+  CellRenderFn,
+  CellRenderer,
 } from "@/components/ui/Table"

@@ -32,6 +32,21 @@ export {
 } from "@/components/ui/table/features/cell-edit/cellEdit"
 export { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit"
 
+export {
+  BUILTIN_CELL_RENDERERS,
+  commitCellValue,
+  createCellRendererRegistry,
+  formatDefaultCellValue,
+  resolveCellRenderer,
+  ResolvedTableCell,
+  type BuiltinCellKind,
+  type CellKind,
+  type CellRenderContext,
+  type CellRenderFn,
+  type CellRenderer,
+  type CellRendererRegistry,
+} from "@/components/ui/table/features/cell-render"
+
 export { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
 
 export {
@@ -39,6 +54,7 @@ export {
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
   resolveColumnFreezeSide,
+  resolveHeaderFreezeOffset,
   type ColumnFreezeColumnInput,
   type ColumnFreezeEdgeSide,
   type ColumnFreezeMeta,
@@ -88,6 +104,7 @@ export { useCellSelection } from "@/components/ui/table/features/cell-selection/
 export {
   collectCopyRows,
   flattenSubtreeRows,
+  formatCellValue,
   serializeCopyRowsToTSV,
   serializeSelectionToTSV,
   writeSelectionToClipboard,

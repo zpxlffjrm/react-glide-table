@@ -150,7 +150,14 @@ export function buildColumnFreezeOffsets(
 /** Sticky position styles for a frozen header or body cell. */
 export function getColumnFreezeStyle(
   offset: ColumnFreezeOffset | undefined,
-  options?: { isHeader?: boolean; headerTop?: number },
+  options?: {
+    isHeader?: boolean
+    /**
+     * @deprecated Unused. Vertical sticky belongs on `thead` (`classNames.head`),
+     * not on frozen header cells — dual `top` sticky detaches freeze bands.
+     */
+    headerTop?: number
+  },
 ): CSSProperties | undefined {
   if (!offset) return undefined
 
@@ -160,6 +167,70 @@ export function getColumnFreezeStyle(
     position: "sticky",
     ...(offset.side === "left" ? { left: offset.offset } : { right: offset.offset }),
     zIndex: zBase + offset.stack,
-    ...(options?.isHeader ? { top: options.headerTop ?? 0 } : {}),
   }
+}
+
+type HeaderFreezeColumnLike = {
+  id: string
+  columns?: HeaderFreezeColumnLike[]
+  getLeafColumns?: () => HeaderFreezeColumnLike[]
+}
+
+/**
+ * Resolve freeze offset for a header cell.
+ * Leaf columns use the leaf map directly. Group headers inherit sticky
+ * positioning only when every leaf is frozen on the same side — otherwise a
+ * scrolled-away group label leaves frozen leaves looking like a detached band.
+ */
+export function resolveHeaderFreezeOffset(
+  column: HeaderFreezeColumnLike,
+  freezeOffsets: Map<string, ColumnFreezeOffset>,
+): ColumnFreezeOffset | undefined {
+  const direct = freezeOffsets.get(column.id)
+  if (direct) return direct
+
+  const leaves =
+    typeof column.getLeafColumns === "function"
+      ? column.getLeafColumns()
+      : column.columns && column.columns.length > 0
+        ? flattenHeaderLeaves(column)
+        : []
+
+  // Groups with zero leaves are not sticky. A single-leaf group still inherits
+  // so the group label stays aligned with its frozen leaf.
+  if (leaves.length === 0) return undefined
+
+  const leafOffsets: ColumnFreezeOffset[] = []
+  for (const leaf of leaves) {
+    const offset = freezeOffsets.get(leaf.id)
+    if (!offset) return undefined
+    leafOffsets.push(offset)
+  }
+
+  const side = leafOffsets[0]?.side
+  if (!side || leafOffsets.some((offset) => offset.side !== side)) {
+    return undefined
+  }
+
+  // Stick the group band to the same viewport edge as the outermost leaf.
+  const offset = Math.min(...leafOffsets.map((item) => item.offset))
+  const leftmost = leafOffsets[0]!
+  const rightmost = leafOffsets[leafOffsets.length - 1]!
+
+  return {
+    side,
+    offset,
+    edgeLeft: leftmost.edgeLeft,
+    edgeRight: rightmost.edgeRight,
+    isEdge: leftmost.edgeLeft || rightmost.edgeRight,
+    stack: Math.max(...leafOffsets.map((item) => item.stack)),
+  }
+}
+
+function flattenHeaderLeaves(
+  column: HeaderFreezeColumnLike,
+): HeaderFreezeColumnLike[] {
+  if (!column.columns || column.columns.length === 0) return [column]
+
+  return column.columns.flatMap((child) => flattenHeaderLeaves(child))
 }

@@ -1,6 +1,7 @@
 import { createContext, use, type ReactNode } from "react"
 
 import type { EditingCell } from "@/components/ui/table/features/cell-edit/cellEdit"
+import type { CellRendererRegistry } from "@/components/ui/table/features/cell-render/registry"
 import type {
   CellMouseDownOptions,
   CellSelectionBounds,
@@ -49,6 +50,10 @@ export type DataTableRowContextValue = {
     onStartEdit: (rowIndex: number, colIndex: number) => void
     onCommitEdit: (raw?: string) => boolean
     onCancelEdit: () => void
+  }
+  cellRender: {
+    registry: CellRendererRegistry
+    commitValue: (rowId: string, columnId: string, value: unknown) => boolean
   }
   expand: {
     enableExpand: boolean

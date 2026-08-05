@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 import {
   collectCopyRows,
   flattenSubtreeRows,
+  formatCellValue,
   serializeSelectionToTSV,
   writeSelectionToClipboard,
 } from "@/components/ui/table/features/cell-selection/copyData"
@@ -279,7 +280,66 @@ describe("serializeSelectionToTSV", () => {
       }),
     ).toBe("X-2")
   })
+
+  it("serializes drilldown objects and bubble arrays without [object Object]", () => {
+    type RowData = {
+      id: string
+      tags: string[]
+      drilldown: Array<{ text: string; img?: string }>
+    }
+
+    const data: RowData[] = [
+      {
+        id: "1",
+        tags: ["alpha", "beta"],
+        drilldown: [
+          { text: "Parent", img: "https://example.com/a.png" },
+          { text: "Child" },
+        ],
+      },
+    ]
+
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            columnDef: { accessorKey: "tags", id: "tags" },
+          },
+          getValue: () => original.tags,
+        },
+        {
+          column: {
+            columnDef: { accessorKey: "drilldown", id: "drilldown" },
+          },
+          getValue: () => original.drilldown,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 1,
+      }),
+    ).toBe("alpha, beta\tParent, Child")
+  })
 })
+
+describe("formatCellValue", () => {
+  it("uses text/label fields for plain objects", () => {
+    expect(formatCellValue({ text: "Parent", img: "x.png" })).toBe("Parent")
+    expect(formatCellValue({ label: "Chip" })).toBe("Chip")
+  })
+
+  it("joins arrays into a single cell string", () => {
+    expect(formatCellValue(["alpha", "beta"])).toBe("alpha, beta")
+  })
+})
+
 describe("writeSelectionToClipboard", () => {
   it("returns false when clipboard write fails", async () => {
     const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
