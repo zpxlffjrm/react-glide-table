@@ -159,6 +159,29 @@ describe("resolveHeaderFreezeOffset", () => {
     })
   })
 
+  it("inherits sticky for a single-leaf frozen ColumnGroup", () => {
+    const offsets = buildColumnFreezeOffsets([
+      { id: "name", size: 120 },
+      { id: "only", size: 80, side: "right" },
+    ])
+
+    expect(
+      resolveHeaderFreezeOffset(
+        {
+          id: "actions",
+          getLeafColumns: () => [{ id: "only" }],
+        },
+        offsets,
+      ),
+    ).toMatchObject({
+      side: "right",
+      offset: 0,
+      edgeLeft: true,
+      edgeRight: false,
+      stack: 1,
+    })
+  })
+
   it("does not inherit freeze when a group mixes frozen and scrollable leaves", () => {
     const offsets = buildColumnFreezeOffsets([
       { id: "supplier", size: 100 },

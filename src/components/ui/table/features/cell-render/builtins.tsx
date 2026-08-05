@@ -93,9 +93,43 @@ function BooleanCell({ value, update, cellProps }: CellRenderContext) {
   )
 }
 
-function UriCell({ value }: CellRenderContext) {
-  const href = asString(value)
+/** Allow http(s)/mailto and relative links; reject javascript:/data:/etc. */
+export function sanitizeUriHref(raw: string): string | null {
+  const href = raw.trim()
   if (!href) return null
+
+  if (
+    href.startsWith("/") ||
+    href.startsWith("#") ||
+    href.startsWith("?") ||
+    href.startsWith("./") ||
+    href.startsWith("../")
+  ) {
+    return href
+  }
+
+  try {
+    const parsed = new URL(href)
+    const protocol = parsed.protocol.toLowerCase()
+    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
+      return href
+    }
+    return null
+  } catch {
+    // Bare relative path without a leading slash (e.g. "docs/page")
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return null
+    return href
+  }
+}
+
+function UriCell({ value }: CellRenderContext) {
+  const raw = asString(value)
+  if (!raw) return null
+
+  const href = sanitizeUriHref(raw)
+  if (!href) {
+    return <span className="data-table-cell-uri">{raw}</span>
+  }
 
   return (
     <a
@@ -106,7 +140,7 @@ function UriCell({ value }: CellRenderContext) {
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
     >
-      {href}
+      {raw}
     </a>
   )
 }

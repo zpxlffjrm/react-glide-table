@@ -1069,4 +1069,32 @@ describe("DataTable direct usage behavior", () => {
 
     expect(screen.getByLabelText("custom-kind")).toHaveTextContent("Open")
   })
+
+  it("prefers Column.render over kind", () => {
+    type FlagRow = { id: string; active: boolean }
+    const FlagTable = createTable<FlagRow>()
+
+    render(
+      <FlagTable
+        data={[{ id: "1", active: true }]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <FlagTable.Header>
+          <FlagTable.Column
+            field="active"
+            kind="boolean"
+            render={({ value }) => (
+              <span data-testid="render-wins">{value ? "CUSTOM" : "OFF"}</span>
+            )}
+          >
+            Active
+          </FlagTable.Column>
+        </FlagTable.Header>
+      </FlagTable>,
+    )
+
+    expect(screen.getByTestId("render-wins")).toHaveTextContent("CUSTOM")
+    expect(screen.queryByRole("checkbox")).toBeNull()
+  })
 })

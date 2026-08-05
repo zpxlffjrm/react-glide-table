@@ -90,7 +90,7 @@ Row-level UI → `slots.Row`. Cell content → `Column.render` or `Column.kind`.
 
 ### Cell render context (`Column.render`)
 
-**Breaking (v2):** `render` receives one context object (not positional args). Destructure only what you need.
+**Breaking change (v2.0.0):** `render` receives one context object (not positional args). Destructure only what you need.
 
 ```tsx
 <ProductTable.Column

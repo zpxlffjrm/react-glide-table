@@ -196,7 +196,9 @@ export function resolveHeaderFreezeOffset(
         ? flattenHeaderLeaves(column)
         : []
 
-  if (leaves.length <= 1) return undefined
+  // Groups with zero leaves are not sticky. A single-leaf group still inherits
+  // so the group label stays aligned with its frozen leaf.
+  if (leaves.length === 0) return undefined
 
   const leafOffsets: ColumnFreezeOffset[] = []
   for (const leaf of leaves) {

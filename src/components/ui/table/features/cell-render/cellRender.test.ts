@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { sanitizeUriHref } from "@/components/ui/table/features/cell-render/builtins"
 import {
   createCellRendererRegistry,
   formatDefaultCellValue,
@@ -10,6 +11,23 @@ import type {
   CellRenderer,
 } from "@/components/ui/table/features/cell-render/types"
 import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue"
+
+describe("sanitizeUriHref", () => {
+  it("allows http(s), mailto, and relative links", () => {
+    expect(sanitizeUriHref("https://example.com")).toBe("https://example.com")
+    expect(sanitizeUriHref("http://example.com")).toBe("http://example.com")
+    expect(sanitizeUriHref("mailto:a@b.com")).toBe("mailto:a@b.com")
+    expect(sanitizeUriHref("/docs")).toBe("/docs")
+    expect(sanitizeUriHref("#section")).toBe("#section")
+    expect(sanitizeUriHref("./relative")).toBe("./relative")
+  })
+
+  it("rejects unsafe schemes", () => {
+    expect(sanitizeUriHref("javascript:alert(1)")).toBeNull()
+    expect(sanitizeUriHref("data:text/html,hi")).toBeNull()
+    expect(sanitizeUriHref("vbscript:msg")).toBeNull()
+  })
+})
 
 describe("cell-render registry", () => {
   it("registers builtin kinds", () => {
