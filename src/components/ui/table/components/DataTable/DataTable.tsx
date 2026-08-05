@@ -6,12 +6,12 @@ import { DataTableSearch } from "@/components/ui/table/components/DataTable/Data
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar"
 import {
   CELL_ALIGN_CLASS,
-  DATA_TABLE_HEADER_ROW_HEIGHT,
 } from "@/components/ui/table/constants"
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext"
 import {
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
+  resolveHeaderFreezeOffset,
 } from "@/components/ui/table/features/column-freeze/columnFreeze"
 import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups"
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
@@ -217,11 +217,13 @@ function DataTable<T extends Record<string, unknown>>({
                     lockMax: enableColumnResize,
                   })
                   const freezeOffset = enableColumnFreeze
-                    ? freezeOffsets.get(header.column.id)
+                    ? resolveHeaderFreezeOffset(
+                        header.column,
+                        freezeOffsets,
+                      )
                     : undefined
                   const freezeStyle = getColumnFreezeStyle(freezeOffset, {
                     isHeader: true,
-                    headerTop: header.depth * DATA_TABLE_HEADER_ROW_HEIGHT,
                   })
                   const headerStyle = {
                     ...sizeStyle,

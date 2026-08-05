@@ -19,6 +19,13 @@ export type {
   TableProps,
 } from "@/components/ui/table/types"
 export type {
+  BuiltinCellKind,
+  CellKind,
+  CellRenderContext,
+  CellRenderFn,
+  CellRenderer,
+} from "@/components/ui/table/features/cell-render/types"
+export type {
   ColumnDef,
   ColumnFreezeMeta,
   ColumnFreezeSide,
