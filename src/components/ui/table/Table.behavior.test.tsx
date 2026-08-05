@@ -1097,4 +1097,40 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("render-wins")).toHaveTextContent("CUSTOM")
     expect(screen.queryByRole("checkbox")).toBeNull()
   })
+
+  it("renders duplicate bubble and image values without key collisions", () => {
+    type MediaRow = { id: string; tags: string[]; images: string[] }
+    const MediaTable = createTable<MediaRow>()
+
+    const { container } = render(
+      <MediaTable
+        data={[
+          {
+            id: "1",
+            tags: ["alpha", "alpha"],
+            images: [
+              "https://example.com/a.png",
+              "https://example.com/a.png",
+            ],
+          },
+        ]}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <MediaTable.Header>
+          <MediaTable.Column field="tags" kind="bubble">
+            Tags
+          </MediaTable.Column>
+          <MediaTable.Column field="images" kind="image">
+            Images
+          </MediaTable.Column>
+        </MediaTable.Header>
+      </MediaTable>,
+    )
+
+    expect(container.querySelectorAll(".data-table-cell-bubble-item")).toHaveLength(
+      2,
+    )
+    expect(container.querySelectorAll(".data-table-cell-image-item")).toHaveLength(2)
+  })
 })

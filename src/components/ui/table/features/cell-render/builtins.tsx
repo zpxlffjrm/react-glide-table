@@ -151,8 +151,13 @@ function ImageCell({ value }: CellRenderContext) {
 
   return (
     <span className="data-table-cell-image">
-      {urls.map((url) => (
-        <img key={url} src={url} alt="" className="data-table-cell-image-item" />
+      {urls.map((url, index) => (
+        <img
+          key={`${index}:${url}`}
+          src={url}
+          alt=""
+          className="data-table-cell-image-item"
+        />
       ))}
     </span>
   )
@@ -164,8 +169,8 @@ function BubbleCell({ value }: CellRenderContext) {
 
   return (
     <span className="data-table-cell-bubble">
-      {items.map((item) => (
-        <span key={item} className="data-table-cell-bubble-item">
+      {items.map((item, index) => (
+        <span key={`${index}:${item}`} className="data-table-cell-bubble-item">
           {item}
         </span>
       ))}
@@ -191,8 +196,11 @@ function DrilldownCell({ value }: CellRenderContext) {
 
   return (
     <span className="data-table-cell-drilldown">
-      {items.map((item) => (
-        <span key={`${item.text}:${item.img ?? ""}`} className="data-table-cell-drilldown-item">
+      {items.map((item, index) => (
+        <span
+          key={`${index}:${item.text}:${item.img ?? ""}`}
+          className="data-table-cell-drilldown-item"
+        >
           {item.img ? (
             <img
               src={item.img}
