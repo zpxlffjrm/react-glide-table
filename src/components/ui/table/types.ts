@@ -72,9 +72,11 @@ declare module "@tanstack/react-table" {
   interface CellContext<TData, TValue> {
     /**
      * Commit a cell value through `onCellChange` / `onDataChange`.
-     * Injected by `DataTable` / `withCellUpdate` / `useGlideTable().getCellContext`.
+     * Present at runtime only when the context was wrapped by `DataTable`,
+     * `withCellUpdate`, or `useGlideTable().getCellContext` — not on bare
+     * `cell.getContext()`. Prefer those helpers for a guaranteed `update`.
      */
-    update: (next: TValue) => void;
+    update?: (next: TValue) => void;
   }
 
   interface Row<TData> {

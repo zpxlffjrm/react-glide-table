@@ -178,6 +178,7 @@ describe("withCellUpdate", () => {
       return true
     })
 
+    expect(typeof next.update).toBe("function")
     next.update("new")
     expect(commits).toEqual([
       { rowId: "1", columnId: "remark", value: "new" },

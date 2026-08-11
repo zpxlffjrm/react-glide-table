@@ -41,6 +41,7 @@ export {
   ResolvedTableCell,
   withCellUpdate,
   type BuiltinCellKind,
+  type CellContextWithUpdate,
   type CellKind,
   type CellRenderContext,
   type CellRenderFn,

@@ -105,7 +105,7 @@ Row-level UI → `slots.Row`. Cell content → `Column.render` or `Column.kind`.
 
 `update` commits through `onCellChange` (preferred) or `onDataChange`. Prefer `update` over calling `setData` inside the render.
 
-The same `update` is available on TanStack `ColumnDef.cell` when using `DataTable` directly (or `useGlideTable().getCellContext` with `flexRender`):
+The same `update` is available on TanStack `ColumnDef.cell` when using `DataTable` directly (or `useGlideTable().getCellContext` with `flexRender`). Bare `cell.getContext()` does **not** include `update` at runtime — only the wrapped context does (`CellContextWithUpdate`).
 
 ```tsx
 const columns: ColumnDef<Product, unknown>[] = [
@@ -113,7 +113,7 @@ const columns: ColumnDef<Product, unknown>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ getValue, update }) => (
-      <button type="button" onClick={() => update("done")}>
+      <button type="button" onClick={() => update?.("done")}>
         {String(getValue())}
       </button>
     ),
@@ -170,7 +170,7 @@ const columns: ColumnDef<Product, unknown>[] = [
     accessorKey: "qty",
     header: "Qty",
     cell: ({ getValue, update }) => (
-      <button type="button" onClick={() => update(Number(getValue()) + 1)}>
+      <button type="button" onClick={() => update?.(Number(getValue()) + 1)}>
         {String(getValue())}
       </button>
     ),

@@ -257,6 +257,7 @@ describe("getColumnFreezeStyle", () => {
       zIndex: 31,
     })
 
+    // headerTop is deprecated/unused — vertical sticky lives on thead, not frozen cells
     expect(
       getColumnFreezeStyle(
         {
@@ -273,25 +274,6 @@ describe("getColumnFreezeStyle", () => {
       position: "sticky",
       left: 0,
       zIndex: 30,
-    })
-
-    expect(
-      getColumnFreezeStyle(
-        {
-          side: "left",
-          offset: 0,
-          isEdge: true,
-          edgeLeft: false,
-          edgeRight: true,
-          stack: 0,
-        },
-        { isHeader: true, headerTop: 40 },
-      ),
-    ).toEqual({
-      position: "sticky",
-      left: 0,
-      zIndex: 30,
-      top: 40,
     })
   })
 })

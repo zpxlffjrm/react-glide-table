@@ -522,7 +522,7 @@ describe("DataTable direct usage behavior", () => {
             <button
               type="button"
               aria-label="set-done-columndef"
-              onClick={() => update("Done")}
+              onClick={() => update?.("Done")}
             >
               {String(getValue() ?? "")}
             </button>
