@@ -1,4 +1,5 @@
 import {
+  type Cell,
   type ColumnSizingState,
   type Row,
   type Table,
@@ -30,6 +31,10 @@ import type { DataTableRowContextValue } from "@/components/ui/table/DataTableCo
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
 import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue";
 import { createCellRendererRegistry } from "@/components/ui/table/features/cell-render/registry";
+import {
+  withCellUpdate,
+  type CellContextWithUpdate,
+} from "@/components/ui/table/features/cell-render/withCellUpdate";
 import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import {
@@ -102,6 +107,13 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   paddingTop: number;
   paddingBottom: number;
   rowContextValue: DataTableRowContextValue;
+  /**
+   * TanStack `CellContext` with `update` injected for custom `ColumnDef.cell` renders.
+   * Prefer this over `cell.getContext()` when calling `flexRender` yourself.
+   */
+  getCellContext: <TValue>(
+    cell: Cell<T, TValue>,
+  ) => CellContextWithUpdate<T, TValue>;
   handleToggleSelect: (row: Row<T>) => void;
   clearHover: () => void;
   copySelection: DataTableCopyActions["copySelection"];
@@ -447,6 +459,12 @@ export function useGlideTable<T extends Record<string, unknown>>(
         onDataChange,
       }),
     [onCellChange, onDataChange, rows, tableData],
+  );
+
+  const getCellContext = useCallback(
+    <TValue,>(cell: Cell<T, TValue>) =>
+      withCellUpdate(cell.getContext(), commitRenderedCellValue),
+    [commitRenderedCellValue],
   );
 
   const handleCellMouseDownWithCommit = useCallback(
@@ -852,6 +870,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     paddingTop,
     paddingBottom,
     rowContextValue,
+    getCellContext,
     handleToggleSelect,
     clearHover,
     copySelection: stableCopySelection,
