@@ -7,6 +7,10 @@ export {
   type CellRendererRegistry,
 } from "@/components/ui/table/features/cell-render/registry"
 export { ResolvedTableCell } from "@/components/ui/table/features/cell-render/ResolvedTableCell"
+export {
+  withCellUpdate,
+  type CellContextWithUpdate,
+} from "@/components/ui/table/features/cell-render/withCellUpdate"
 export type {
   BuiltinCellKind,
   CellKind,
