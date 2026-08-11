@@ -11,6 +11,7 @@ import type {
   CellRenderer,
 } from "@/components/ui/table/features/cell-render/types"
 import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue"
+import { withCellUpdate } from "@/components/ui/table/features/cell-render/withCellUpdate"
 
 describe("sanitizeUriHref", () => {
   it("allows http(s), mailto, and relative links", () => {
@@ -158,6 +159,28 @@ describe("commitCellValue", () => {
     expect(next).toEqual([
       { id: "a", name: "A" },
       { id: "b", name: "B2" },
+    ])
+  })
+})
+
+describe("withCellUpdate", () => {
+  it("injects update that forwards to commitValue", () => {
+    const commits: Array<{ rowId: string; columnId: string; value: unknown }> =
+      []
+    const context = {
+      row: { id: "1" },
+      column: { id: "remark" },
+      getValue: () => "old",
+    } as never
+
+    const next = withCellUpdate(context, (rowId, columnId, value) => {
+      commits.push({ rowId, columnId, value })
+      return true
+    })
+
+    next.update("new")
+    expect(commits).toEqual([
+      { rowId: "1", columnId: "remark", value: "new" },
     ])
   })
 })

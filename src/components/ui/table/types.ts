@@ -68,6 +68,15 @@ declare module "@tanstack/react-table" {
     frozen?: ColumnFreezeMeta;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface CellContext<TData, TValue> {
+    /**
+     * Commit a cell value through `onCellChange` / `onDataChange`.
+     * Injected by `DataTable` / `withCellUpdate` / `useGlideTable().getCellContext`.
+     */
+    update: (next: TValue) => void;
+  }
+
   interface Row<TData> {
     /**
      * Returns whether this row's cell is inside the active drag selection.

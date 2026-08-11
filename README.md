@@ -74,7 +74,7 @@ export function Products({ data }: { data: Product[] }) {
 | `slots.Pending` / `slots.Empty`                      | Loading and empty states                                                          |
 | `className` / column `className` / `headerClassName` | Extra class hooks                                                                 |
 | `labels` / `summary` / `toolbar`                     | Copy and slot nodes                                                               |
-| `Column.render`                                      | Cell content custom render (single context object; prefer `update`)               |
+| `Column.render` / `ColumnDef.cell`                   | Cell content custom render (prefer `update` via context)                          |
 | `Column.kind` / `cellRenderers`                      | Built-in or custom cell kinds (override / add via registry)                       |
 
 Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
@@ -105,7 +105,25 @@ Row-level UI → `slots.Row`. Cell content → `Column.render` or `Column.kind`.
 
 `update` commits through `onCellChange` (preferred) or `onDataChange`. Prefer `update` over calling `setData` inside the render.
 
-Double-click inline editing (`editable` / `editType`) stays separate: use it for overlay text/number edits; use `render` + `update` for always-visible controls.
+The same `update` is available on TanStack `ColumnDef.cell` when using `DataTable` directly (or `useGlideTable().getCellContext` with `flexRender`):
+
+```tsx
+const columns: ColumnDef<Product, unknown>[] = [
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ getValue, update }) => (
+      <button type="button" onClick={() => update("done")}>
+        {String(getValue())}
+      </button>
+    ),
+  },
+];
+
+<DataTable data={data} columns={columns} onCellChange={...} />
+```
+
+Double-click inline editing (`editable` / `editType`) stays separate: use it for overlay text/number edits; use `render` / `cell` + `update` for always-visible controls.
 
 ### Cell kinds (`Column.kind` + `cellRenderers`)
 
@@ -148,15 +166,26 @@ type Product = { id: string; name: string; qty: number };
 
 const columns: ColumnDef<Product, unknown>[] = [
   { accessorKey: "name", header: "Name" },
-  { accessorKey: "qty", header: "Qty" },
+  {
+    accessorKey: "qty",
+    header: "Qty",
+    cell: ({ getValue, update }) => (
+      <button type="button" onClick={() => update(Number(getValue()) + 1)}>
+        {String(getValue())}
+      </button>
+    ),
+  },
 ];
 
 export function ProductTable({ data }: { data: Product[] }) {
-  const { table, rows, scrollRef } = useGlideTable({
+  const { table, rows, scrollRef, getCellContext } = useGlideTable({
     data,
     columns,
     getRowId: (row) => row.id,
     rowSelectionMode: "multi",
+    onCellChange: (rowId, columnId, value) => {
+      /* update your data */
+    },
   });
 
   return (
@@ -183,7 +212,7 @@ export function ProductTable({ data }: { data: Product[] }) {
             <tr key={row.id}>
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  {flexRender(cell.column.columnDef.cell, getCellContext(cell))}
                 </td>
               ))}
             </tr>
@@ -195,7 +224,7 @@ export function ProductTable({ data }: { data: Product[] }) {
 }
 ```
 
-Wire `rowContextValue` into your own row/cell components for edit, selection, expand, and row-span behavior.
+Wire `rowContextValue` into your own row/cell components for edit, selection, expand, and row-span behavior. Use `getCellContext(cell)` (not bare `cell.getContext()`) so `ColumnDef.cell` receives `update`.
 
 ## Clipboard copy & paste
 

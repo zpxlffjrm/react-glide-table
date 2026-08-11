@@ -39,6 +39,7 @@ export {
   formatDefaultCellValue,
   resolveCellRenderer,
   ResolvedTableCell,
+  withCellUpdate,
   type BuiltinCellKind,
   type CellKind,
   type CellRenderContext,

@@ -1,4 +1,4 @@
-import { flexRender, type Row } from "@tanstack/react-table";
+import { flexRender, type Cell, type Row } from "@tanstack/react-table";
 import { useEffect, useRef, type CSSProperties } from "react";
 
 import {
@@ -12,6 +12,7 @@ import {
   getColumnEditType,
   isColumnEditable,
 } from "@/components/ui/table/features/cell-edit/cellEdit";
+import { withCellUpdate } from "@/components/ui/table/features/cell-render/withCellUpdate";
 import {
   CELL_SELECTION_EDGES_CLASS,
   getCellSelectionEdgeStyle,
@@ -94,6 +95,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
     selection,
     cellSelection,
     cellEdit,
+    cellRender,
     expand,
     columnResize,
     columnFreeze,
@@ -137,6 +139,12 @@ export function DataTableRow<T extends Record<string, unknown>>({
     onCommitEdit,
     onCancelEdit,
   } = cellEdit;
+
+  const renderCell = (tableCell: Cell<T, unknown>) =>
+    flexRender(
+      tableCell.column.columnDef.cell,
+      withCellUpdate(tableCell.getContext(), cellRender.commitValue),
+    );
 
   const {
     enableExpand,
@@ -555,7 +563,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                       classNames?.expandCellValue,
                     )}
                   >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    {renderCell(cell)}
                   </div>
                 </div>
                 {canExpand && expandKey && (
@@ -591,7 +599,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 )}
               </div>
             ) : (
-              flexRender(cell.column.columnDef.cell, cell.getContext())
+              renderCell(cell)
             )}
 
             {isBottomRightCell && (

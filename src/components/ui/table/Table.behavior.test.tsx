@@ -503,6 +503,59 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByLabelText("name-inline-input-1")).toHaveValue("AlphaUpdated")
   })
 
+  it("commits ColumnDef.cell updates through onCellChange", async () => {
+    const user = userEvent.setup()
+    const changes: Array<{ rowId: string; columnId: string; value: unknown }> =
+      []
+
+    function ColumnDefUpdateHarness() {
+      const [data, setData] = useState<SimpleRow[]>([
+        { id: "1", name: "Alpha", amount: 10 },
+      ])
+
+      const columns: ColumnDef<SimpleRow, unknown>[] = [
+        {
+          id: "name",
+          accessorKey: "name",
+          header: "Name",
+          cell: ({ getValue, update }) => (
+            <button
+              type="button"
+              aria-label="set-done-columndef"
+              onClick={() => update("Done")}
+            >
+              {String(getValue() ?? "")}
+            </button>
+          ),
+        },
+      ]
+
+      return (
+        <DataTable
+          data={data}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+          onCellChange={(rowId, columnId, value) => {
+            changes.push({ rowId, columnId, value })
+            setData((prev) =>
+              prev.map((row) =>
+                row.id === rowId ? { ...row, [columnId]: value } : row,
+              ),
+            )
+          }}
+        />
+      )
+    }
+
+    render(<ColumnDefUpdateHarness />)
+
+    expect(screen.getByLabelText("set-done-columndef")).toHaveTextContent("Alpha")
+    await user.click(screen.getByLabelText("set-done-columndef"))
+    expect(changes).toEqual([{ rowId: "1", columnId: "name", value: "Done" }])
+    expect(screen.getByLabelText("set-done-columndef")).toHaveTextContent("Done")
+  })
+
   it("exposes cell drag-selection state via row.getIsCellDragSelected", () => {
     const columns: ColumnDef<SimpleRow, unknown>[] = [
       {
