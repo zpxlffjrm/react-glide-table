@@ -291,6 +291,41 @@ Opt in with `enableColumnResize`. Drag the handle on the right edge of a header 
 | `Column.resizable={false}`               | Disable resize for one column                |
 | `classNames.resizeHandle`                | Style hook for the drag handle               |
 
+## Column reorder
+
+Opt in with `enableColumnReorder`. Drag a column header to a new position; a drop edge marks the insert point ([demo](https://glideapps.github.io/glide-data-grid/?path=/story/glide-data-grid-dataeditor-demos--rearrange-columns)). Movement below a small threshold still counts as a click, so sortable headers keep working. The resize handle does not start a reorder.
+
+Leaf columns can move across `ColumnGroup`s. Consecutive leaves that still share a group stay wrapped; interleaved leaves split that group (Glide-style). Frozen columns keep their freeze after the move.
+
+```tsx
+<ProductTable
+  data={data}
+  enableColumnReorder
+  // optional controlled order (leaf column ids)
+  // columnOrder={order}
+  // onColumnOrderChange={setOrder}
+>
+  <ProductTable.Header>
+    <ProductTable.Column field="name" width={200}>
+      Name
+    </ProductTable.Column>
+    <ProductTable.Column field="sku" reorderable={false}>
+      SKU
+    </ProductTable.Column>
+  </ProductTable.Header>
+</ProductTable>
+```
+
+| Prop                                    | Role                                              |
+| --------------------------------------- | ------------------------------------------------- |
+| `enableColumnReorder`                   | Turn on header drag reorder (default `false`)     |
+| `columnOrder` / `onColumnOrderChange`   | Controlled leaf id list (`string[]`)              |
+| `Column.reorderable={false}`            | Disable drag for one column (still a drop target) |
+| `data-reorderable` / `data-drop-edge`   | Drag / drop state hooks on header cells           |
+| `classNames.dropEdge`                   | Extra class while a drop edge is shown            |
+
+Helpers (`/core`): `applyLeafColumnOrder`, `moveColumnIds`, `collectLeafColumnIds`, `useColumnReorder`, …
+
 ## Column freeze
 
 Opt in with `enableColumnFreeze`. Mark columns with `frozen` — sticky insets are stacked so frozen cells never overlap, and **column order is unchanged** (middle columns may also freeze).

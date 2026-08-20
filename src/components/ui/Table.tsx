@@ -29,6 +29,7 @@ export type {
   ColumnDef,
   ColumnFreezeMeta,
   ColumnFreezeSide,
+  ColumnOrderState,
   ColumnResizeMode,
   ColumnSizingState,
   RowSelectionState,

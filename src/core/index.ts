@@ -12,6 +12,7 @@ export {
 export { useGlideTable, type UseGlideTableOptions, type UseGlideTableResult } from "@/core/useGlideTable"
 export type {
   ColumnDef,
+  ColumnOrderState,
   ColumnResizeMode,
   ColumnSizingState,
   DataTableCopyActions,
@@ -50,6 +51,16 @@ export {
 } from "@/components/ui/table/features/cell-render"
 
 export { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
+
+export {
+  applyLeafColumnOrder,
+  collectLeafColumnIds,
+  moveColumnIds,
+  resolveDropEdge,
+  resolveLeafColumnOrder,
+  type ColumnDropEdge,
+} from "@/components/ui/table/features/column-reorder/columnReorder"
+export { useColumnReorder } from "@/components/ui/table/features/column-reorder/useColumnReorder"
 
 export {
   buildColumnFreezeOffsets,

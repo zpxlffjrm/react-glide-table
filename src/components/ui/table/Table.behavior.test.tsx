@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps } from "react"
 import { useState } from "react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { createTable, DataTable, Table } from "@/index"
 import type { CellRenderer, ColumnDef } from "@/index"
@@ -62,6 +62,79 @@ function getBodyRowTexts(container: HTMLElement, columnIndex = 0) {
     const cell = row.querySelectorAll("td")[columnIndex]
 
     return cell?.textContent?.trim() ?? ""
+  })
+}
+
+function mockHeaderRects(container: HTMLElement, width = 100, height = 40) {
+  const headers = container.querySelectorAll<HTMLElement>("thead th")
+
+  headers.forEach((header, index) => {
+    const left = index * width
+    vi.spyOn(header, "getBoundingClientRect").mockReturnValue({
+      x: left,
+      y: 0,
+      top: 0,
+      left,
+      right: left + width,
+      bottom: height,
+      width,
+      height,
+      toJSON: () => ({}),
+    })
+  })
+}
+
+function dragHeaderTo(
+  source: Element,
+  targetX: number,
+  targetY = 20,
+) {
+  const start = source.getBoundingClientRect()
+  const startX = start.left + start.width / 2
+  const startY = start.top + start.height / 2
+
+  fireEvent.pointerDown(source, {
+    button: 0,
+    pointerId: 1,
+    clientX: startX,
+    clientY: startY,
+  })
+  fireEvent.pointerMove(document, {
+    pointerId: 1,
+    clientX: targetX,
+    clientY: targetY,
+  })
+  fireEvent.pointerUp(document, {
+    pointerId: 1,
+    clientX: targetX,
+    clientY: targetY,
+  })
+}
+
+function dragHeaderAndCancel(
+  source: Element,
+  targetX: number,
+  targetY = 20,
+) {
+  const start = source.getBoundingClientRect()
+  const startX = start.left + start.width / 2
+  const startY = start.top + start.height / 2
+
+  fireEvent.pointerDown(source, {
+    button: 0,
+    pointerId: 1,
+    clientX: startX,
+    clientY: startY,
+  })
+  fireEvent.pointerMove(document, {
+    pointerId: 1,
+    clientX: targetX,
+    clientY: targetY,
+  })
+  fireEvent.pointerCancel(document, {
+    pointerId: 1,
+    clientX: targetX,
+    clientY: targetY,
   })
 }
 
@@ -751,6 +824,234 @@ describe("DataTable direct usage behavior", () => {
 
     expect(nameHeader).toHaveStyle({ width: "240px", minWidth: "240px" })
     expect(nameCell).toHaveStyle({ width: "240px", minWidth: "240px" })
+  })
+
+  it("does not mark headers as reorderable when enableColumnReorder is off", () => {
+    const { container } = renderSimpleTable()
+
+    expect(container.querySelector(".DataTableJSX--column-reorder")).toBeNull()
+    expect(container.querySelector("[data-reorderable]")).toBeNull()
+  })
+
+  it("reorders leaf columns when a header is dragged past another", () => {
+    const { container } = renderSimpleTable({ enableColumnReorder: true })
+
+    expect(container.querySelector(".DataTableJSX--column-reorder")).not.toBeNull()
+    expect(getBodyRowTexts(container, 0)[0]).toBe("Charlie")
+
+    mockHeaderRects(container)
+    const headers = container.querySelectorAll("thead th")
+    dragHeaderTo(headers[0]!, 160)
+
+    const nextHeaders = container.querySelectorAll("thead th")
+    expect(nextHeaders[0]?.textContent).toContain("Qty")
+    expect(nextHeaders[1]?.textContent).toContain("Name")
+    expect(getBodyRowTexts(container, 0)[0]).toBe("30")
+  })
+
+  it("still sorts when enableColumnReorder is on and the header is only clicked", async () => {
+    const user = userEvent.setup()
+    const { container } = renderSimpleTable({ enableColumnReorder: true })
+
+    await user.click(screen.getByRole("button", { name: /Name/ }))
+    expect(getBodyRowTexts(container, 0)).toEqual(["Alpha", "Bravo", "Charlie"])
+  })
+
+  it("skips drag from a column with reorderable={false}", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnReorder
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" reorderable={false}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount">Qty</SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).not.toHaveAttribute("data-reorderable")
+    expect(headers[1]).toHaveAttribute("data-reorderable")
+
+    mockHeaderRects(container)
+    dragHeaderTo(headers[0]!, 160)
+
+    const nextHeaders = container.querySelectorAll("thead th")
+    expect(nextHeaders[0]?.textContent).toContain("Name")
+    expect(nextHeaders[1]?.textContent).toContain("Qty")
+  })
+
+  it("does not start a reorder from the resize handle", () => {
+    const { container } = renderSimpleTable({
+      enableColumnReorder: true,
+      enableColumnResize: true,
+    })
+
+    mockHeaderRects(container)
+    const handle = container.querySelector(".data-table-resize-handle")
+    expect(handle).not.toBeNull()
+
+    fireEvent.pointerDown(handle!, {
+      button: 0,
+      pointerId: 1,
+      clientX: 96,
+      clientY: 20,
+    })
+    fireEvent.pointerMove(document, {
+      pointerId: 1,
+      clientX: 160,
+      clientY: 20,
+    })
+    fireEvent.pointerUp(document, {
+      pointerId: 1,
+      clientX: 160,
+      clientY: 20,
+    })
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]?.textContent).toContain("Name")
+    expect(headers[1]?.textContent).toContain("Qty")
+  })
+
+  it("moves a grouped column block when the group header is dragged", () => {
+    type GroupedRow = SimpleRow & { note: string }
+    const GroupedTable = createTable<GroupedRow>()
+    const rows: GroupedRow[] = SIMPLE_ROWS.map((row) => ({
+      ...row,
+      note: `n-${row.id}`,
+    }))
+
+    const { container } = render(
+      <GroupedTable
+        data={rows}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnReorder
+      >
+        <GroupedTable.Header>
+          <GroupedTable.ColumnGroup header="Identity">
+            <GroupedTable.Column field="name">Name</GroupedTable.Column>
+            <GroupedTable.Column field="amount">Amount</GroupedTable.Column>
+          </GroupedTable.ColumnGroup>
+          <GroupedTable.Column field="note">Note</GroupedTable.Column>
+        </GroupedTable.Header>
+      </GroupedTable>,
+    )
+
+    const identity = screen.getByText("Identity").closest("th")
+    const note = screen.getByText("Note").closest("th")
+    expect(identity).not.toBeNull()
+    expect(note).not.toBeNull()
+
+    vi.spyOn(identity!, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 200,
+      bottom: 40,
+      width: 200,
+      height: 40,
+      toJSON: () => ({}),
+    })
+    vi.spyOn(note!, "getBoundingClientRect").mockReturnValue({
+      x: 200,
+      y: 0,
+      top: 0,
+      left: 200,
+      right: 300,
+      bottom: 40,
+      width: 100,
+      height: 40,
+      toJSON: () => ({}),
+    })
+
+    dragHeaderTo(identity!, 260)
+
+    const firstBodyCell = container.querySelector("tbody tr td")
+    expect(firstBodyCell).toHaveTextContent("n-1")
+    expect(screen.getByText("Note").closest("th")).not.toBeNull()
+  })
+
+  it("commits group drag when dropped on after-edge of another group header", () => {
+    type GroupedRow = SimpleRow & { note: string; status: string }
+    const GroupedTable = createTable<GroupedRow>()
+    const rows: GroupedRow[] = SIMPLE_ROWS.map((row) => ({
+      ...row,
+      note: `n-${row.id}`,
+      status: `s-${row.id}`,
+    }))
+
+    const { container } = render(
+      <GroupedTable
+        data={rows}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnReorder
+      >
+        <GroupedTable.Header>
+          <GroupedTable.ColumnGroup header="Identity">
+            <GroupedTable.Column field="name">Name</GroupedTable.Column>
+            <GroupedTable.Column field="amount">Amount</GroupedTable.Column>
+          </GroupedTable.ColumnGroup>
+          <GroupedTable.ColumnGroup header="Details">
+            <GroupedTable.Column field="note">Note</GroupedTable.Column>
+            <GroupedTable.Column field="status">Status</GroupedTable.Column>
+          </GroupedTable.ColumnGroup>
+        </GroupedTable.Header>
+      </GroupedTable>,
+    )
+
+    const identity = screen.getByText("Identity").closest("th")
+    const details = screen.getByText("Details").closest("th")
+    expect(identity).not.toBeNull()
+    expect(details).not.toBeNull()
+
+    vi.spyOn(identity!, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 200,
+      bottom: 40,
+      width: 200,
+      height: 40,
+      toJSON: () => ({}),
+    })
+    vi.spyOn(details!, "getBoundingClientRect").mockReturnValue({
+      x: 200,
+      y: 0,
+      top: 0,
+      left: 200,
+      right: 400,
+      bottom: 40,
+      width: 200,
+      height: 40,
+      toJSON: () => ({}),
+    })
+
+    dragHeaderTo(identity!, 360)
+
+    const firstBodyCell = container.querySelector("tbody tr td")
+    expect(firstBodyCell).toHaveTextContent("n-1")
+  })
+
+  it("does not commit reorder on pointercancel", () => {
+    const { container } = renderSimpleTable({ enableColumnReorder: true })
+
+    mockHeaderRects(container)
+    const headers = container.querySelectorAll("thead th")
+    dragHeaderAndCancel(headers[0]!, 160)
+
+    const nextHeaders = container.querySelectorAll("thead th")
+    expect(nextHeaders[0]?.textContent).toContain("Name")
+    expect(nextHeaders[1]?.textContent).toContain("Qty")
+    expect(getBodyRowTexts(container, 0)[0]).toBe("Charlie")
   })
 
   it("applies sticky left/right freeze without reordering columns", () => {
