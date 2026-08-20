@@ -20,3 +20,5 @@ export const DATA_TABLE_COLUMN_SIZE = 150
 export const DATA_TABLE_COLUMN_MIN_SIZE = 40
 /** Maximum column width when column resize is enabled */
 export const DATA_TABLE_COLUMN_MAX_SIZE = 800
+/** Pointer movement (px) before a header press becomes a column reorder drag */
+export const DATA_TABLE_COLUMN_REORDER_THRESHOLD = 4

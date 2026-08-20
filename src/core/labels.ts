@@ -8,6 +8,8 @@ export type DataTableLabels = {
   collapseRow: string
   /** Accessible label for the column resize handle */
   resizeColumn: string
+  /** Accessible label for a draggable column header */
+  reorderColumn: string
   /** Built-in find-in-page search overlay */
   searchPlaceholder: string
   searchResultHint: string
@@ -25,6 +27,7 @@ export const DEFAULT_DATA_TABLE_LABELS: DataTableLabels = {
   expandRow: "Expand row",
   collapseRow: "Collapse row",
   resizeColumn: "Resize column",
+  reorderColumn: "Reorder column",
   searchPlaceholder: "Search…",
   searchResultHint: "Type to search",
   searchPrevious: "Previous result",

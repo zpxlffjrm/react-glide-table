@@ -15,6 +15,11 @@ import {
   resolveHeaderFreezeOffset,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups";
+import {
+  isColumnReorderable,
+  serializeReorderIds,
+} from "@/components/ui/table/features/column-reorder/columnReorder";
+import { useColumnReorder } from "@/components/ui/table/features/column-reorder/useColumnReorder";
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
 import type {
   DataTableClassNames,
@@ -113,6 +118,7 @@ function DataTable<T extends Record<string, unknown>>({
     selectionLabel,
     enableCellSelection,
     enableColumnResize,
+    enableColumnReorder,
     enableColumnFreeze,
     enableInlineSearch,
     shouldVirtualize,
@@ -125,6 +131,7 @@ function DataTable<T extends Record<string, unknown>>({
     rowContextValue,
     handleToggleSelect,
     clearHover,
+    setColumnOrder,
     inlineSearch,
   } = useGlideTable(glideOptions);
 
@@ -135,6 +142,13 @@ function DataTable<T extends Record<string, unknown>>({
   const EmptySlot = slots?.Empty ?? DefaultEmpty;
   const freezeOffsets = rowContextValue.columnFreeze.offsets;
   const headerGroups = getMergedHeaderGroups(table.getHeaderGroups());
+  const leafColumnIds = table.getVisibleLeafColumns().map((column) => column.id);
+  const { isReordering, draggingColumnId, dropTarget, onHeaderPointerDown } =
+    useColumnReorder({
+      enabled: enableColumnReorder,
+      columnOrder: leafColumnIds,
+      onColumnOrderChange: setColumnOrder,
+    });
 
   const contextValue = useMemo(
     () => ({ ...rowContextValue, classNames }),
@@ -158,6 +172,8 @@ function DataTable<T extends Record<string, unknown>>({
         "DataTableJSX",
         !enableCellSelection && "DataTableJSX--no-cell-selection",
         enableColumnResize && "DataTableJSX--column-resize",
+        enableColumnReorder && "DataTableJSX--column-reorder",
+        isReordering && "DataTableJSX--column-reordering",
         enableColumnFreeze && "DataTableJSX--column-freeze",
         enableInlineSearch && "DataTableJSX--inline-search",
         classNames?.root,
@@ -232,17 +248,59 @@ function DataTable<T extends Record<string, unknown>>({
                     ...sizeStyle,
                     ...freezeStyle,
                   };
+                  const leafHeaders = header.getLeafHeaders();
+                  const leafIds = leafHeaders.map(
+                    (leafHeader) => leafHeader.column.id,
+                  );
+                  const isLeafHeader = header.subHeaders.length === 0;
+                  const canDrag =
+                    enableColumnReorder &&
+                    leafIds.length > 0 &&
+                    leafHeaders.every((leafHeader) =>
+                      isColumnReorderable(leafHeader.column.columnDef.meta),
+                    );
+                  const isDragging = draggingColumnId === header.column.id;
+                  const dropEdge =
+                    dropTarget?.columnId === header.column.id
+                      ? dropTarget.edge
+                      : undefined;
 
                   return (
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
                       rowSpan={header.mergedRowSpan}
+                      data-column-id={
+                        enableColumnReorder ? header.column.id : undefined
+                      }
+                      data-reorder-ids={
+                        enableColumnReorder
+                          ? serializeReorderIds(leafIds)
+                          : undefined
+                      }
+                      data-reorder-leaf={
+                        enableColumnReorder && isLeafHeader ? "" : undefined
+                      }
+                      data-reorderable={canDrag ? "" : undefined}
+                      data-reordering={isDragging ? "" : undefined}
+                      data-drop-edge={dropEdge}
                       data-resizing={
                         header.column.getIsResizing() ? "" : undefined
                       }
                       data-frozen={freezeOffset?.side}
                       data-freeze-edge={getColumnFreezeEdgeAttr(freezeOffset)}
+                      aria-grabbed={isDragging ? true : undefined}
+                      title={canDrag ? labels.reorderColumn : undefined}
+                      onPointerDown={
+                        enableColumnReorder
+                          ? (event) =>
+                              onHeaderPointerDown(event, {
+                                columnId: header.column.id,
+                                leafIds,
+                                canDrag,
+                              })
+                          : undefined
+                      }
                       style={
                         Object.keys(headerStyle).length > 0
                           ? headerStyle
@@ -254,6 +312,7 @@ function DataTable<T extends Record<string, unknown>>({
                           `data-table-head-cell--frozen-${freezeOffset.side}`,
                         CELL_ALIGN_CLASS[align],
                         classNames?.headCell,
+                        dropEdge && classNames?.dropEdge,
                         headerClassName,
                       )}
                     >
