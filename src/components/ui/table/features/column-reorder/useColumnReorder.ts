@@ -110,6 +110,10 @@ export function useColumnReorder(options: {
     null,
   )
   const dropTargetRef = useRef(dropTarget)
+  const previousUserSelectRef = useRef<{
+    value: string
+    priority: string
+  } | null>(null)
 
   columnOrderRef.current = columnOrder
   onColumnOrderChangeRef.current = onColumnOrderChange
@@ -119,6 +123,20 @@ export function useColumnReorder(options: {
     sessionRef.current = null
     setDraggingColumnId(null)
     setDropTarget(null)
+
+    const backup = previousUserSelectRef.current
+    previousUserSelectRef.current = null
+
+    // Restore the host application's inline style.
+    if (backup) {
+      if (backup.value) {
+        document.body.style.setProperty("user-select", backup.value, backup.priority)
+      } else {
+        document.body.style.removeProperty("user-select")
+      }
+      return
+    }
+
     document.body.style.removeProperty("user-select")
   }, [])
 
@@ -128,9 +146,9 @@ export function useColumnReorder(options: {
 
   useEffect(() => {
     return () => {
-      document.body.style.removeProperty("user-select")
+      resetDrag()
     }
-  }, [])
+  }, [resetDrag])
 
   const onHeaderPointerDown = useCallback(
     (
@@ -179,7 +197,13 @@ export function useColumnReorder(options: {
       if (!session.active) {
         if (distance < DATA_TABLE_COLUMN_REORDER_THRESHOLD) return
         session.active = true
-        document.body.style.userSelect = "none"
+        if (!previousUserSelectRef.current) {
+          previousUserSelectRef.current = {
+            value: document.body.style.getPropertyValue("user-select"),
+            priority: document.body.style.getPropertyPriority("user-select"),
+          }
+        }
+        document.body.style.setProperty("user-select", "none")
         setDraggingColumnId(session.columnId)
       }
 
@@ -248,14 +272,28 @@ export function useColumnReorder(options: {
       resetDrag()
     }
 
+    const onPointerCancel = (event: PointerEvent) => {
+      const session = sessionRef.current
+      if (!session || event.pointerId !== session.pointerId) {
+        return
+      }
+
+      // Cancel must never commit the reorder; just restore UI state.
+      if (session.active) {
+        event.preventDefault()
+      }
+
+      resetDrag()
+    }
+
     document.addEventListener("pointermove", onPointerMove)
     document.addEventListener("pointerup", onPointerUp)
-    document.addEventListener("pointercancel", onPointerUp)
+    document.addEventListener("pointercancel", onPointerCancel)
 
     return () => {
       document.removeEventListener("pointermove", onPointerMove)
       document.removeEventListener("pointerup", onPointerUp)
-      document.removeEventListener("pointercancel", onPointerUp)
+      document.removeEventListener("pointercancel", onPointerCancel)
     }
   }, [enabled, resetDrag])
 

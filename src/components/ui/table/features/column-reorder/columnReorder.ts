@@ -70,8 +70,12 @@ export function resolveLeafColumnOrder<T>(
   if (!order?.length) return leafIds
 
   const leafSet = new Set(leafIds)
-  const next = order.filter((id) => leafSet.has(id))
-  const seen = new Set(next)
+  const seen = new Set<string>()
+  const next = order.filter((id) => {
+    if (!leafSet.has(id) || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
 
   for (const id of leafIds) {
     if (!seen.has(id)) next.push(id)

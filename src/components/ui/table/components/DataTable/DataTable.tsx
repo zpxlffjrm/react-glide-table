@@ -248,20 +248,20 @@ function DataTable<T extends Record<string, unknown>>({
                     ...sizeStyle,
                     ...freezeStyle,
                   };
-                  const leafHeaders = header.getLeafHeaders();
-                  const leafIds = leafHeaders.map(
-                    (leafHeader) => leafHeader.column.id,
-                  );
-                  const isLeafHeader = header.subHeaders.length === 0;
+                  const isPlaceholder = header.isPlaceholder;
+                  const leafColumns = header.column.getLeafColumns();
+                  const leafIds = leafColumns.map((leafColumn) => leafColumn.id);
+                  const isLeafHeader = !isPlaceholder && header.subHeaders.length === 0;
                   const canDrag =
                     enableColumnReorder &&
+                    !isPlaceholder &&
                     leafIds.length > 0 &&
-                    leafHeaders.every((leafHeader) =>
-                      isColumnReorderable(leafHeader.column.columnDef.meta),
+                    leafColumns.every((leafColumn) =>
+                      isColumnReorderable(leafColumn.columnDef.meta),
                     );
                   const isDragging = draggingColumnId === header.column.id;
                   const dropEdge =
-                    dropTarget?.columnId === header.column.id
+                    !isPlaceholder && dropTarget?.columnId === header.column.id
                       ? dropTarget.edge
                       : undefined;
 
@@ -271,10 +271,12 @@ function DataTable<T extends Record<string, unknown>>({
                       colSpan={header.colSpan}
                       rowSpan={header.mergedRowSpan}
                       data-column-id={
-                        enableColumnReorder ? header.column.id : undefined
+                        enableColumnReorder && !isPlaceholder
+                          ? header.column.id
+                          : undefined
                       }
                       data-reorder-ids={
-                        enableColumnReorder
+                        enableColumnReorder && !isPlaceholder
                           ? serializeReorderIds(leafIds)
                           : undefined
                       }

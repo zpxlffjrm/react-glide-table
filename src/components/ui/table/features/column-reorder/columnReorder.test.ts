@@ -59,6 +59,12 @@ describe("resolveLeafColumnOrder", () => {
       resolveLeafColumnOrder(groupedColumns, ["note", "missing", "name"]),
     ).toEqual(["note", "name", "amount"])
   })
+
+  it("deduplicates repeated ids in controlled order", () => {
+    expect(
+      resolveLeafColumnOrder(groupedColumns, ["note", "name", "name", "amount"]),
+    ).toEqual(["note", "name", "amount"])
+  })
 })
 
 describe("moveColumnIds", () => {
