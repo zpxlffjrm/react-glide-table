@@ -1,5 +1,6 @@
 import type {
   ColumnDef,
+  ColumnOrderState,
   ColumnResizeMode,
   ColumnSizingState,
   OnChangeFn,
@@ -66,6 +67,11 @@ declare module "@tanstack/react-table" {
      * Middle columns are allowed; multiple frozen columns stack via cumulative offsets.
      */
     frozen?: ColumnFreezeMeta;
+    /**
+     * When false, this column cannot be dragged even if `enableColumnReorder` is on.
+     * Defaults to true.
+     */
+    reorderable?: boolean;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -253,6 +259,16 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   columnResizeMode?: ColumnResizeMode;
 
   /**
+   * Enable drag-to-reorder on column headers. Defaults to false.
+   * Opt out per column with `Column.reorderable={false}` / `meta.reorderable: false`.
+   * Leaf columns can move across groups; consecutive same-group leaves stay wrapped.
+   */
+  enableColumnReorder?: boolean;
+  /** Controlled leaf column id order */
+  columnOrder?: ColumnOrderState;
+  onColumnOrderChange?: OnChangeFn<ColumnOrderState>;
+
+  /**
    * Enable sticky freeze columns. Defaults to false.
    * Mark columns with `Column.frozen` / `meta.frozen` (`true` | `"left"` | `"right"`).
    * Does not reorder columns; offsets stack so frozen cells do not overlap.
@@ -310,6 +326,8 @@ export type DataTableClassNames = {
   headCell?: string;
   /** Column resize drag handle inside a header cell */
   resizeHandle?: string;
+  /** Drop-edge indicator while reordering columns */
+  dropEdge?: string;
   body?: string;
   emptyCell?: string;
   virtualSpacer?: string;
@@ -421,6 +439,11 @@ export type TableColumnProps<
    */
   resizable?: boolean;
   /**
+   * When false, this column cannot be dragged even if `enableColumnReorder` is on.
+   * Defaults to true. Still accepts drops next to it.
+   */
+  reorderable?: boolean;
+  /**
    * Freeze (sticky) without changing column order.
    * `true` / `"left"` → left edge; `"right"` → right edge.
    * Requires `enableColumnFreeze`. Middle columns are allowed.
@@ -469,6 +492,7 @@ export type TableProps<T extends Record<string, unknown>> = Omit<
 
 export type {
   ColumnDef,
+  ColumnOrderState,
   ColumnResizeMode,
   ColumnSizingState,
   RowSelectionState,

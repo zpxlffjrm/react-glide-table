@@ -1,5 +1,6 @@
 import {
   type Cell,
+  type ColumnOrderState,
   type ColumnSizingState,
   type Row,
   type Table,
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/table/features/cell-render/withCellUpdate";
 import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
+import { applyLeafColumnOrder } from "@/components/ui/table/features/column-reorder/columnReorder";
 import {
   buildColumnFreezeOffsets,
   resolveColumnFreezeSide,
@@ -97,6 +99,7 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   selectionLabel: DataTableLabels["selection"];
   enableCellSelection: boolean;
   enableColumnResize: boolean;
+  enableColumnReorder: boolean;
   enableColumnFreeze: boolean;
   enableInlineSearch: boolean;
   shouldVirtualize: boolean;
@@ -116,6 +119,7 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   ) => CellContextWithUpdate<T, TValue>;
   handleToggleSelect: (row: Row<T>) => void;
   clearHover: () => void;
+  setColumnOrder: (next: ColumnOrderState) => void;
   copySelection: DataTableCopyActions["copySelection"];
   inlineSearch: {
     showSearch: boolean;
@@ -177,6 +181,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     columnSizing: controlledColumnSizing,
     onColumnSizingChange,
     columnResizeMode = "onChange",
+    enableColumnReorder = false,
+    columnOrder: controlledColumnOrder,
+    onColumnOrderChange,
     enableColumnFreeze = false,
     enableInlineSearch = false,
     showSearch,
@@ -204,6 +211,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     useState<RowSelectionState>({});
   const [internalColumnSizing, setInternalColumnSizing] =
     useState<ColumnSizingState>({});
+  const [internalColumnOrder, setInternalColumnOrder] =
+    useState<ColumnOrderState>([]);
   const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(
     () => new Set(),
   );
@@ -228,6 +237,25 @@ export function useGlideTable<T extends Record<string, unknown>>(
   );
 
   const columnSizing = controlledColumnSizing ?? internalColumnSizing;
+  const columnOrder = controlledColumnOrder ?? internalColumnOrder;
+
+  const tableColumns = useMemo(() => {
+    if (!enableColumnReorder) return columns;
+
+    return applyLeafColumnOrder(columns, columnOrder);
+  }, [columnOrder, columns, enableColumnReorder]);
+
+  const setColumnOrder = useCallback(
+    (next: ColumnOrderState) => {
+      if (onColumnOrderChange) {
+        onColumnOrderChange(next);
+        return;
+      }
+
+      setInternalColumnOrder(next);
+    },
+    [onColumnOrderChange],
+  );
 
   const expandedRows = controlledExpandedRows ?? internalExpandedRows;
 
@@ -258,7 +286,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
 
   const table = useReactTable({
     data: tableData,
-    columns,
+    columns: tableColumns,
     ...(enableColumnResize
       ? {
           defaultColumn: {
@@ -860,6 +888,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     selectionLabel: labels.selection,
     enableCellSelection,
     enableColumnResize,
+    enableColumnReorder,
     enableColumnFreeze,
     enableInlineSearch,
     shouldVirtualize,
@@ -873,6 +902,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     getCellContext,
     handleToggleSelect,
     clearHover,
+    setColumnOrder,
     copySelection: stableCopySelection,
     inlineSearch: {
       showSearch: inlineSearch.showSearch,

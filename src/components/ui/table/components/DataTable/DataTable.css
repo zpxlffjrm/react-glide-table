@@ -143,6 +143,45 @@
   background: var(--color-brand-primary, #2563eb);
 }
 
+.DataTableJSX--column-reorder .data-table-head-cell[data-reorderable] {
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.DataTableJSX--column-reorder .data-table-head-cell[data-reorderable] .SortableHeaderJSX {
+  cursor: grab;
+}
+
+.DataTableJSX--column-reordering,
+.DataTableJSX--column-reordering .data-table-head-cell {
+  cursor: grabbing;
+}
+
+.DataTableJSX .data-table-head-cell[data-reordering] {
+  opacity: 0.55;
+}
+
+.DataTableJSX .data-table-head-cell[data-drop-edge="before"]::before,
+.DataTableJSX .data-table-head-cell[data-drop-edge="after"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-brand-primary, #2563eb);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.DataTableJSX .data-table-head-cell[data-drop-edge="before"]::before {
+  left: 0;
+}
+
+.DataTableJSX .data-table-head-cell[data-drop-edge="after"]::before {
+  right: 0;
+}
+
 .DataTableJSX .data-table-body {
   user-select: none;
 }

@@ -773,7 +773,8 @@ export function App() {
           <p className="playground-lead">
             Points at the local <code>src</code> package. Use the toggles for
             cell merge and tree expand (they can run together), and change the
-            row count to try virtualized scrolling. Select cells, then
+            row count to try virtualized scrolling. Drag a column header to
+            rearrange columns. Select cells, then
             Ctrl/Cmd+V to overwrite or Ctrl/Cmd+Shift+V to insert rows from the
             clipboard. Press Ctrl/Cmd+F for built-in find-in-page search.
             {enableRowSpan && (
@@ -842,6 +843,7 @@ export function App() {
             getRowId={(row) => row.id}
             enableVirtualization={false}
             enableColumnResize
+            enableColumnReorder
             cellRenderers={[actionRenderer]}
             onRowsPaste={handleKindPaste}
             onCellChange={(rowId, columnId, value) => {
@@ -912,6 +914,7 @@ export function App() {
             }}
             enableRowSpan={enableRowSpan}
             enableColumnResize
+            enableColumnReorder
             enableColumnFreeze
             enableInlineSearch
             rowSelectionMode="multi"
@@ -998,6 +1001,7 @@ export function App() {
             onRowsPaste={handleProductPaste}
             enableRowSpan={enableRowSpan}
             enableColumnResize
+            enableColumnReorder
             enableColumnFreeze
             enableInlineSearch
             rowSelectionMode="none"
