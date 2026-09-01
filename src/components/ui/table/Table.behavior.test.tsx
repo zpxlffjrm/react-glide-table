@@ -717,6 +717,167 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-3")).toHaveTextContent("Three:region-idle")
   })
 
+  it("nests a rowSpan column inside the parent named by rowSpanParent", () => {
+    type LotRow = {
+      id: string
+      date: string
+      dateId: string
+      partNo: string
+      partId: string
+      lot: string
+    }
+
+    const lotRows: LotRow[] = [
+      { id: "1", date: "2026-07-01", dateId: "d1", partNo: "TR253023A", partId: "p-a", lot: "21" },
+      { id: "2", date: "2026-07-01", dateId: "d1", partNo: "TR253023A", partId: "p-a", lot: "22" },
+      { id: "3", date: "2026-07-02", dateId: "d2", partNo: "TR253023A", partId: "p-a", lot: "11" },
+    ]
+
+    const columns: ColumnDef<LotRow, unknown>[] = [
+      {
+        id: "date",
+        accessorKey: "date",
+        header: "Date",
+        meta: { rowSpan: true, rowSpanKey: "dateId" },
+      },
+      {
+        id: "partNo",
+        accessorKey: "partNo",
+        header: "Part No",
+        meta: { rowSpan: true, rowSpanKey: "partId", rowSpanParent: "date" },
+      },
+      {
+        id: "lot",
+        accessorKey: "lot",
+        header: "Lot",
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={lotRows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableRowSpan
+        enableVirtualization={false}
+      />,
+    )
+
+    const rows = container.querySelectorAll("tbody tr")
+    expect(rows).toHaveLength(3)
+
+    const firstCells = rows[0]!.querySelectorAll("td")
+    expect(firstCells[0]).toHaveAttribute("rowspan", "2")
+    expect(firstCells[1]).toHaveAttribute("rowspan", "2")
+    expect(firstCells[2]).not.toHaveAttribute("rowspan")
+
+    // Covered rows omit the merged date/part cells.
+    expect(rows[1]!.querySelectorAll("td")).toHaveLength(1)
+    expect(rows[1]!.querySelector("td")).toHaveTextContent("22")
+
+    const thirdCells = rows[2]!.querySelectorAll("td")
+    expect(thirdCells).toHaveLength(3)
+    expect(thirdCells[0]).not.toHaveAttribute("rowspan")
+    expect(thirdCells[1]).not.toHaveAttribute("rowspan")
+    expect(thirdCells[1]).toHaveTextContent("TR253023A")
+    expect(thirdCells[2]).toHaveTextContent("11")
+  })
+
+  it("merges rowSpan columns independently when rowSpanParent is omitted", () => {
+    type LotRow = {
+      id: string
+      date: string
+      dateId: string
+      partNo: string
+      partId: string
+      lot: string
+    }
+
+    const lotRows: LotRow[] = [
+      { id: "1", date: "2026-07-01", dateId: "d1", partNo: "TR253023A", partId: "p-a", lot: "21" },
+      { id: "2", date: "2026-07-01", dateId: "d1", partNo: "TR253023A", partId: "p-a", lot: "22" },
+      { id: "3", date: "2026-07-02", dateId: "d2", partNo: "TR253023A", partId: "p-a", lot: "11" },
+    ]
+
+    const columns: ColumnDef<LotRow, unknown>[] = [
+      {
+        id: "date",
+        accessorKey: "date",
+        header: "Date",
+        meta: { rowSpan: true, rowSpanKey: "dateId" },
+      },
+      {
+        id: "partNo",
+        accessorKey: "partNo",
+        header: "Part No",
+        meta: { rowSpan: true, rowSpanKey: "partId" },
+      },
+      {
+        id: "lot",
+        accessorKey: "lot",
+        header: "Lot",
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={lotRows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableRowSpan
+        enableVirtualization={false}
+      />,
+    )
+
+    const rows = container.querySelectorAll("tbody tr")
+    const firstCells = rows[0]!.querySelectorAll("td")
+    expect(firstCells[0]).toHaveAttribute("rowspan", "2")
+    expect(firstCells[1]).toHaveAttribute("rowspan", "3")
+    expect(rows[1]!.querySelectorAll("td")).toHaveLength(1)
+    expect(rows[2]!.querySelectorAll("td")).toHaveLength(2)
+  })
+
+  it("honors Table.Column rowSpanParent through the compound API", () => {
+    type LotRow = {
+      id: string
+      date: string
+      dateId: string
+      partNo: string
+      partId: string
+      lot: string
+    }
+
+    const LotTable = createTable<LotRow>()
+    const lotRows: LotRow[] = [
+      { id: "1", date: "2026-07-01", dateId: "d1", partNo: "TR253023A", partId: "p-a", lot: "21" },
+      { id: "2", date: "2026-07-01", dateId: "d1", partNo: "TR253023A", partId: "p-a", lot: "22" },
+      { id: "3", date: "2026-07-02", dateId: "d2", partNo: "TR253023A", partId: "p-a", lot: "11" },
+    ]
+
+    const { container } = render(
+      <LotTable
+        data={lotRows}
+        getRowId={(row) => row.id}
+        enableRowSpan
+        enableVirtualization={false}
+      >
+        <LotTable.Header>
+          <LotTable.Column field="date" rowSpan rowSpanKey="dateId">
+            Date
+          </LotTable.Column>
+          <LotTable.Column field="partNo" rowSpan rowSpanKey="partId" rowSpanParent="date">
+            Part No
+          </LotTable.Column>
+          <LotTable.Column field="lot">Lot</LotTable.Column>
+        </LotTable.Header>
+      </LotTable>,
+    )
+
+    const firstCells = container.querySelector("tbody tr")?.querySelectorAll("td")
+    expect(firstCells?.[0]).toHaveAttribute("rowspan", "2")
+    expect(firstCells?.[1]).toHaveAttribute("rowspan", "2")
+  })
+
   it("renders resize handles when enableColumnResize is on", () => {
     const { container } = renderSimpleTable({ enableColumnResize: true })
 
