@@ -152,5 +152,6 @@ export {
   collectRowSpanColumns,
   resolveRowSpanAt,
   type ColumnRowSpanMap,
+  type RowSpanColumnSpec,
   type RowSpanInfo,
 } from "@/components/ui/table/features/row-span/rowSpan"

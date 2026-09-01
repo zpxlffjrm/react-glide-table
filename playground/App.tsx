@@ -807,7 +807,7 @@ export function App() {
             hint={
               enableExpand
                 ? "enableRowSpan + plant/line rowSpan on BOM"
-                : "enableRowSpan + region/category rowSpan"
+                : "enableRowSpan + region/category rowSpanParent"
             }
           />
           <ToggleSwitch
@@ -964,6 +964,7 @@ export function App() {
                 field="line"
                 rowSpan={enableRowSpan}
                 rowSpanKey="lineId"
+                rowSpanParent="plant"
               >
                 Line
               </BomTable.Column>
@@ -1016,10 +1017,21 @@ export function App() {
             <ProductTable.Header>
               {enableRowSpan && (
                 <ProductTable.Column
+                  field="region"
+                  rowSpan
+                  rowSpanKey="regionId"
+                  width={140}
+                >
+                  Region
+                </ProductTable.Column>
+              )}
+              {enableRowSpan && (
+                <ProductTable.Column
                   field="category"
                   rowSpan
                   rowSpanKey="groupId"
-                  width={300}
+                  rowSpanParent="region"
+                  width={180}
                 >
                   Category
                 </ProductTable.Column>
@@ -1042,16 +1054,6 @@ export function App() {
                 </ProductTable.Column>
                 {!enableRowSpan && (
                   <ProductTable.Column field="region" sortable>
-                    Region
-                  </ProductTable.Column>
-                )}
-                {enableRowSpan && (
-                  <ProductTable.Column
-                    field="region"
-                    rowSpan
-                    rowSpanKey="regionId"
-                    sortable
-                  >
                     Region
                   </ProductTable.Column>
                 )}
