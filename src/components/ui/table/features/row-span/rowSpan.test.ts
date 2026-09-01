@@ -239,6 +239,30 @@ describe("buildColumnRowSpanMap", () => {
     expect(map.get("date")?.map((info) => info.rowSpan)).toEqual([2, 0, 1])
     expect(map.get("part")?.map((info) => info.rowSpan)).toEqual([3, 0, 0])
   })
+
+  it("accepts a readonly rowSpanParent array", () => {
+    const rows = [
+      { id: "1", dateId: "d1", partId: "same" },
+      { id: "2", dateId: "d1", partId: "same" },
+      { id: "3", dateId: "d2", partId: "same" },
+    ]
+
+    const parents = ["dateId"] as const
+
+    const map = buildColumnRowSpanMap(rows, [
+      { columnId: "part", rowSpanKey: "partId", rowSpanParent: parents },
+    ])
+
+    expect(map.get("part")?.map((info) => info.rowSpan)).toEqual([2, 0, 1])
+  })
+
+  it("caches empty span arrays for empty data instead of recomputing", () => {
+    const map = buildColumnRowSpanMap([] as Array<Record<string, unknown>>, [
+      { columnId: "part", rowSpanKey: "partId", rowSpanParent: ["dateId"] },
+    ])
+
+    expect(map.get("part")).toEqual([])
+  })
 })
 
 describe("collectRowSpanColumns", () => {
