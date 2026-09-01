@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import type { ColumnDef } from "@tanstack/react-table"
 
@@ -208,6 +208,8 @@ describe("buildColumnRowSpanMap", () => {
       { id: "2", a: "x", b: "y" },
     ]
 
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+
     const map = buildColumnRowSpanMap(rows, [
       { columnId: "a", rowSpanKey: "a", rowSpanParent: ["b"] },
       { columnId: "b", rowSpanKey: "b", rowSpanParent: ["a"] },
@@ -215,6 +217,27 @@ describe("buildColumnRowSpanMap", () => {
 
     expect(map.get("a")?.map((info) => info.rowSpan)).toEqual([2, 0])
     expect(map.get("b")?.map((info) => info.rowSpan)).toEqual([2, 0])
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("cycle detected"))
+
+    warn.mockRestore()
+  })
+
+  it("accepts a legacy spec with no rowSpanParent (backwards compatible)", () => {
+    const rows = [
+      { id: "1", dateId: "d1", partId: "same" },
+      { id: "2", dateId: "d1", partId: "same" },
+      { id: "3", dateId: "d2", partId: "same" },
+    ]
+
+    // Callers of the exported headless API used `{ columnId, rowSpanKey }`
+    // before `rowSpanParent` existed. That shape must still merge independently.
+    const map = buildColumnRowSpanMap(rows, [
+      { columnId: "date", rowSpanKey: "dateId" },
+      { columnId: "part", rowSpanKey: "partId" },
+    ])
+
+    expect(map.get("date")?.map((info) => info.rowSpan)).toEqual([2, 0, 1])
+    expect(map.get("part")?.map((info) => info.rowSpan)).toEqual([3, 0, 0])
   })
 })
 

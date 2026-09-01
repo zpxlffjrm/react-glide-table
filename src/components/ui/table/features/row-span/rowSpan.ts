@@ -9,8 +9,11 @@ export type RowSpanInfo = {
 export type RowSpanColumnSpec = {
   columnId: string
   rowSpanKey: string
-  /** Column ids, rowSpanKeys, or row fields this merge cannot cross. */
-  rowSpanParent: string[]
+  /**
+   * Column ids, rowSpanKeys, or row fields this merge cannot cross.
+   * Omit (or leave undefined) to merge independently of other rowSpan columns.
+   */
+  rowSpanParent?: string[]
 }
 
 function getRowFieldValue<T extends Record<string, unknown>>(row: T, key: string): unknown {
@@ -30,11 +33,22 @@ function toParentSpanList(
   if (!parentSpans?.length) return []
 
   const first = parentSpans[0]
-  if (first && typeof first === "object" && "rowSpan" in first) {
+  if (!Array.isArray(first)) {
     return [parentSpans as RowSpanInfo[]]
   }
 
   return parentSpans as RowSpanInfo[][]
+}
+
+/** Pre-computes the merge-origin row index for every row in O(n). */
+function buildStartRowLookup(spans: RowSpanInfo[]): number[] {
+  const startRows = new Array<number>(spans.length)
+  let origin = 0
+  for (let i = 0; i < spans.length; i++) {
+    if ((spans[i]?.rowSpan ?? 1) > 0) origin = i
+    startRows[i] = origin
+  }
+  return startRows
 }
 
 /**
@@ -42,16 +56,14 @@ function toParentSpanList(
  * The first row, or a column with no parent spans, is always a valid group start.
  */
 function sharesParentGroup(
-  parentSpans: RowSpanInfo[][],
+  parentStartRows: number[][],
   rowIndex: number,
 ): boolean {
-  if (parentSpans.length === 0 || rowIndex <= 0) return true
+  if (parentStartRows.length === 0 || rowIndex <= 0) return true
 
-  return parentSpans.every((spans) => {
-    const previous = resolveRowSpanAt(spans, rowIndex - 1)
-    const current = resolveRowSpanAt(spans, rowIndex)
-    return previous.startRow === current.startRow
-  })
+  return parentStartRows.every(
+    (startRows) => startRows[rowIndex - 1] === startRows[rowIndex],
+  )
 }
 
 /**
@@ -65,7 +77,7 @@ export function computeRowSpans<T extends Record<string, unknown>>(
 ): RowSpanInfo[] {
   if (data.length === 0) return []
 
-  const parents = toParentSpanList(parentSpans)
+  const parentStartRows = toParentSpanList(parentSpans).map(buildStartRowLookup)
   const result: RowSpanInfo[] = []
 
   for (let index = 0; index < data.length; index++) {
@@ -75,7 +87,7 @@ export function computeRowSpans<T extends Record<string, unknown>>(
     if (
       index > 0 &&
       currentValue === previousValue &&
-      sharesParentGroup(parents, index)
+      sharesParentGroup(parentStartRows, index)
     ) {
       result.push({ rowSpan: 0, isFirstInGroup: false })
       continue
@@ -84,7 +96,7 @@ export function computeRowSpans<T extends Record<string, unknown>>(
     let span = 1
     for (let nextIndex = index + 1; nextIndex < data.length; nextIndex++) {
       if (getRowFieldValue(data[nextIndex], rowSpanKey) !== currentValue) break
-      if (!sharesParentGroup(parents, nextIndex)) break
+      if (!sharesParentGroup(parentStartRows, nextIndex)) break
       span++
     }
 
@@ -144,6 +156,7 @@ export function buildColumnRowSpanMap<T extends Record<string, unknown>>(
 ): ColumnRowSpanMap {
   const map: ColumnRowSpanMap = new Map()
   const visiting = new Set<string>()
+  const warnedCycles = new Set<string>()
   const virtualParents = new Map<string, RowSpanInfo[]>()
 
   const spansForColumn = (columnId: string): RowSpanInfo[] | undefined => {
@@ -154,11 +167,18 @@ export function buildColumnRowSpanMap<T extends Record<string, unknown>>(
     if (!column) return undefined
 
     if (visiting.has(columnId)) {
+      if (!warnedCycles.has(columnId)) {
+        warnedCycles.add(columnId)
+        console.warn(
+          `[rowSpan] rowSpanParent cycle detected at column "${columnId}"; ` +
+            "computing it without the cyclic parent.",
+        )
+      }
       return computeRowSpans(data, column.rowSpanKey)
     }
 
     visiting.add(columnId)
-    const parentSpans = column.rowSpanParent
+    const parentSpans = (column.rowSpanParent ?? [])
       .map((ref) => spansForParentRef(ref))
       .filter((spans): spans is RowSpanInfo[] => Boolean(spans))
     visiting.delete(columnId)
