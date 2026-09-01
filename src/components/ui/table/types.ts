@@ -39,10 +39,17 @@ export type {
 declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData, TValue> {
-    /** Whether this column participates in vertical row spanning */
+    /**
+     * Whether this column participates in vertical row spanning.
+     */
     rowSpan?: boolean;
     /** Merge key field. Falls back to the column id when omitted */
     rowSpanKey?: string;
+    /**
+     * Parent column id, rowSpanKey, or row field(s) that bound this merge.
+     * The column only groups consecutive rows that stay inside those parent groups.
+     */
+    rowSpanParent?: string | readonly string[];
     align?: "left" | "center" | "right";
     className?: string;
     headerClassName?: string;
@@ -450,8 +457,14 @@ export type TableColumnProps<
    */
   frozen?: ColumnFreezeMeta;
   align?: "left" | "center" | "right";
+  /** Vertical cell merge for consecutive identical `rowSpanKey` values. */
   rowSpan?: boolean;
   rowSpanKey?: string;
+  /**
+   * Parent field(s) this merge is nested under — a column `field`, `rowSpanKey`,
+   * or row data key. Omit to merge independently of other rowSpan columns.
+   */
+  rowSpanParent?: string | readonly string[];
   editable?: boolean;
   editType?: CellEditType;
   /** Inline editor input attribute overrides */
