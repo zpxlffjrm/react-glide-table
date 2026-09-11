@@ -174,9 +174,25 @@ export function getColumnSizeStyle(
     };
   }
 
-  const resolvedSize = layoutWidth ?? size;
-  const hasExplicitSize =
-    force || layoutWidth != null || size !== DATA_TABLE_COLUMN_SIZE;
+  // `layoutWidth` is a `resolveColumnLayoutWidths` result: the exact px
+  // budget assigned to this column so the row totals fit the container
+  // (already clamped into `minWidth`/`maxWidth` by the resolver, including
+  // any shrink toward `minWidth` under a tight viewport). Under the default
+  // `table-layout: auto`, a *range* style (`min-width`/`max-width` set to
+  // the original bounds) lets wide content re-grow the cell past that
+  // budget, silently breaking the "fixed columns stay fixed, bounded
+  // columns shrink to fit" contract. Lock all three to the resolved value
+  // so the layout is actually enforced.
+  if (layoutWidth != null) {
+    return {
+      width: layoutWidth,
+      minWidth: layoutWidth,
+      maxWidth: layoutWidth,
+    };
+  }
+
+  const resolvedSize = size;
+  const hasExplicitSize = force || size !== DATA_TABLE_COLUMN_SIZE;
   if (!hasExplicitSize && minWidth == null && maxWidth == null) {
     return undefined;
   }

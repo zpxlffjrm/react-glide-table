@@ -68,6 +68,31 @@ describe("getColumnSizeStyle", () => {
       minWidth: 200,
     });
   });
+
+  it("hard-locks width/min/max to a resolved layoutWidth, ignoring the original min/max bounds", () => {
+    // Without the lock, `min-width`/`max-width` stay at the original 80/240
+    // range and `table-layout: auto` can re-grow the cell past the 150px
+    // the layout resolver actually budgeted for it.
+    expect(
+      getColumnSizeStyle(DATA_TABLE_COLUMN_SIZE, {
+        minWidth: 80,
+        maxWidth: 240,
+        layoutWidth: 150,
+      }),
+    ).toEqual({
+      width: 150,
+      minWidth: 150,
+      maxWidth: 150,
+    });
+  });
+
+  it("prefers a resolved layoutWidth over the raw tanstack size", () => {
+    expect(getColumnSizeStyle(150, { layoutWidth: 90 })).toEqual({
+      width: 90,
+      minWidth: 90,
+      maxWidth: 90,
+    });
+  });
 });
 
 describe("resolveColumnLayoutWidths", () => {

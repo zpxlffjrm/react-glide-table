@@ -1071,26 +1071,29 @@ describe("DataTable direct usage behavior", () => {
     const nameCell = container.querySelector("tbody tr td")
     const amountCell = container.querySelectorAll("tbody tr td")[1]
 
+    // The resolved layout width is locked on all three CSS properties (not
+    // just the original min/max bounds) so `table-layout: auto` can't grow
+    // the cell back out when content is wider than the resolved size.
     expect(headers[0]).toHaveStyle({
       width: "240px",
-      minWidth: "80px",
+      minWidth: "240px",
       maxWidth: "240px",
     })
     expect(nameCell).toHaveStyle({
       width: "240px",
-      minWidth: "80px",
+      minWidth: "240px",
       maxWidth: "240px",
     })
 
     expect(headers[1]).toHaveStyle({
       width: "200px",
-      minWidth: "120px",
-      maxWidth: "280px",
+      minWidth: "200px",
+      maxWidth: "200px",
     })
     expect(amountCell).toHaveStyle({
       width: "200px",
-      minWidth: "120px",
-      maxWidth: "280px",
+      minWidth: "200px",
+      maxWidth: "200px",
     })
   })
 
@@ -1114,9 +1117,48 @@ describe("DataTable direct usage behavior", () => {
     expect(headers[0]).not.toHaveStyle({ width: "150px" })
     expect(headers[1]).toHaveStyle({
       width: "160px",
-      minWidth: "110px",
+      minWidth: "160px",
       maxWidth: "160px",
     })
+  })
+
+  it("re-resolves layout widths when a controlled column's meta.width changes (same column id)", () => {
+    // The tanstack `table` instance from `useReactTable` stays referentially
+    // stable across renders, so a `useMemo` keyed only on `table`/column ids
+    // would miss a controlled `meta.width` update that keeps the same id.
+    const { container, rerender } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={120}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount">Qty</SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelectorAll("thead th")[0]).toHaveStyle({ width: "120px" })
+
+    rerender(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={260}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount">Qty</SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelectorAll("thead th")[0]).toHaveStyle({ width: "260px" })
   })
 
   it("does not use cell minWidth/maxWidth as drag-resize clamps", () => {
@@ -1487,6 +1529,46 @@ describe("DataTable direct usage behavior", () => {
     expect(headers[0]).not.toHaveAttribute("data-freeze-edge")
     expect(headers[1]).toHaveStyle({ left: "200px" })
     expect(headers[1]).toHaveAttribute("data-freeze-edge", "right")
+  })
+
+  it("bases freeze offsets on the resolved layout width, not the tanstack default size", () => {
+    // "name" has no `width`, only min/max — without `enableColumnResize` its
+    // rendered width comes from `resolveColumnLayoutWidths` (140px here,
+    // JSDOM's unmeasured container keeps bounded columns at their
+    // preferred/max size), not tanstack's 150px default column size.
+    type WideRow = SimpleRow & { note: string }
+    const WideTable = createTable<WideRow>()
+    const rows: WideRow[] = SIMPLE_ROWS.map((row) => ({ ...row, note: "n" }))
+
+    const { container } = render(
+      <WideTable
+        data={rows}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <WideTable.Header>
+          <WideTable.Column field="name" minWidth={80} maxWidth={140} frozen>
+            Name
+          </WideTable.Column>
+          <WideTable.Column field="amount" width={120} frozen="left">
+            Qty
+          </WideTable.Column>
+          <WideTable.Column field="note" width={140}>
+            Note
+          </WideTable.Column>
+        </WideTable.Header>
+      </WideTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ width: "140px", left: "0px" })
+    expect(headers[1]).toHaveStyle({ left: "140px" })
+
+    const firstCell = container.querySelector("tbody tr td")
+    const secondCell = container.querySelectorAll("tbody tr td")[1]
+    expect(firstCell).toHaveStyle({ left: "0px" })
+    expect(secondCell).toHaveStyle({ left: "140px" })
   })
 
   it("allows freezing a middle column while keeping neighbors scrollable", () => {

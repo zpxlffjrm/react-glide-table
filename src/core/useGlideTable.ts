@@ -220,6 +220,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
+  const cellRendererRegistry = useMemo(
+    () => createCellRendererRegistry(cellRenderers),
+    [cellRenderers],
+  );
+
   const shouldVirtualize = enableVirtualization && !enableRowSpan;
 
   useEffect(() => {
@@ -459,6 +464,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     onBatchChange,
     onRowsPaste,
     onCellNavigate: handleCellNavigate,
+    cellRendererRegistry,
+    rootRef,
   });
 
   const {
@@ -469,11 +476,6 @@ export function useGlideTable<T extends Record<string, unknown>>(
     commitEdit,
     cancelEdit,
   } = useCellEdit({ data: tableData, rows, onDataChange, onCellChange });
-
-  const cellRendererRegistry = useMemo(
-    () => createCellRendererRegistry(cellRenderers),
-    [cellRenderers],
-  );
 
   const commitRenderedCellValue = useCallback(
     (rowId: string, columnId: string, value: unknown) =>

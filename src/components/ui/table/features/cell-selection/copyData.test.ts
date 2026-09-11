@@ -2,6 +2,7 @@ import type { Row } from "@tanstack/react-table"
 import { createElement, Fragment, type ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 
+import { createCellRendererRegistry } from "@/components/ui/table/features/cell-render/registry"
 import {
   collectCopyRows,
   flattenSubtreeRows,
@@ -697,6 +698,207 @@ describe("serializeSelectionToTSV with cellRender", () => {
         endCol: 0,
       }),
     ).toBe("Ada")
+  })
+})
+
+describe("serializeSelectionToTSV with a cell renderer registry", () => {
+  const registry = createCellRendererRegistry()
+
+  it("copies the masked '****' text for a protected column, not the raw secret", () => {
+    type RowData = { id: string; secret: string }
+
+    const data: RowData[] = [{ id: "1", secret: "hidden-value" }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      index,
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            id: "secret",
+            columnDef: { accessorKey: "secret", id: "secret", meta: { kind: "protected" } },
+          },
+          getValue: () => original.secret,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 0 },
+        "visible",
+        { registry },
+      ),
+    ).toBe("****")
+  })
+
+  it("still copies the raw value for a protected column without a registry", () => {
+    type RowData = { id: string; secret: string }
+
+    const data: RowData[] = [{ id: "1", secret: "hidden-value" }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      index,
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            id: "secret",
+            columnDef: { accessorKey: "secret", id: "secret", meta: { kind: "protected" } },
+          },
+          getValue: () => original.secret,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).toBe("hidden-value")
+  })
+
+  it("keeps array values ', '-joined for bubble/drilldown-style kinds", () => {
+    type RowData = { id: string; tags: string[] }
+
+    const data: RowData[] = [{ id: "1", tags: ["alpha", "beta"] }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      index,
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            id: "tags",
+            columnDef: { accessorKey: "tags", id: "tags", meta: { kind: "bubble" } },
+          },
+          getValue: () => original.tags,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 0 },
+        "visible",
+        { registry },
+      ),
+    ).toBe("alpha, beta")
+  })
+
+  it("falls back to the raw value for kinds with no extractable text (boolean checkbox)", () => {
+    type RowData = { id: string; active: boolean }
+
+    const data: RowData[] = [{ id: "1", active: true }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      index,
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            id: "active",
+            columnDef: { accessorKey: "active", id: "active", meta: { kind: "boolean" } },
+          },
+          getValue: () => original.active,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 0 },
+        "visible",
+        { registry },
+      ),
+    ).toBe("true")
+  })
+
+  it("resolves a custom cellRenderers kind the same way as a built-in one", () => {
+    type RowData = { id: string; status: string }
+
+    const customRegistry = createCellRendererRegistry([
+      {
+        kind: "status-pill",
+        render: ({ value }) => `[${String(value).toUpperCase()}]`,
+      },
+    ])
+
+    const data: RowData[] = [{ id: "1", status: "active" }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      index,
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            id: "status",
+            columnDef: {
+              accessorKey: "status",
+              id: "status",
+              meta: { kind: "status-pill" },
+            },
+          },
+          getValue: () => original.status,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 0 },
+        "visible",
+        { registry: customRegistry },
+      ),
+    ).toBe("[ACTIVE]")
+  })
+
+  it("scopes the DOM image lookup to root so a same-index cell in another table isn't used", () => {
+    type RowData = { id: string; image: string }
+
+    const data: RowData[] = [{ id: "1", image: "https://a.example/table-a.png" }]
+    const visibleRows = data.map((original, index) => ({
+      id: String(index),
+      index,
+      original,
+      getVisibleCells: () => [
+        {
+          column: {
+            id: "image",
+            columnDef: { accessorKey: "image", id: "image", meta: { kind: "image" } },
+          },
+          getValue: () => original.image,
+        },
+      ],
+    })) as unknown as Row<RowData>[]
+
+    document.body.innerHTML = `
+      <table id="other-table"><tbody><tr>
+        <td data-row-index="0" data-col-index="0"><img src="https://b.example/other-table.png" alt=""></td>
+      </tr></tbody></table>
+      <table id="scoped-table"><tbody><tr>
+        <td data-row-index="0" data-col-index="0"><img src="https://a.example/table-a.png" alt=""></td>
+      </tr></tbody></table>
+    `
+    const scopedRoot = document.getElementById("scoped-table")!
+
+    expect(
+      serializeSelectionToTSV(
+        visibleRows,
+        { startRow: 0, endRow: 0, startCol: 0, endCol: 0 },
+        "visible",
+        { registry, root: scopedRoot },
+      ),
+    ).toBe("https://a.example/table-a.png")
+
+    document.body.innerHTML = ""
   })
 })
 

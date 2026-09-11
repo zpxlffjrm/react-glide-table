@@ -1,6 +1,7 @@
 import type { Row } from "@tanstack/react-table"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
+import type { CellRendererRegistry } from "@/components/ui/table/features/cell-render/registry"
 import {
   clampCellPosition,
   getActiveSelectionBounds,
@@ -49,6 +50,10 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   onRowsPaste?: (payload: RowsPastePayload) => void
   /** Called after keyboard navigation moves the active (end) cell. */
   onCellNavigate?: (position: CellPosition) => void
+  /** Resolves `meta.kind` renderers so copied text matches the visible cell. */
+  cellRendererRegistry?: CellRendererRegistry
+  /** Scopes copy's DOM image-url lookup to this table when several are mounted at once. */
+  rootRef?: RefObject<HTMLElement | null>
 }
 
 export function useCellSelection<T extends Record<string, unknown>>({
@@ -62,6 +67,8 @@ export function useCellSelection<T extends Record<string, unknown>>({
   onBatchChange,
   onRowsPaste,
   onCellNavigate,
+  cellRendererRegistry,
+  rootRef,
 }: UseCellSelectionOptions<T>) {
   const [dragState, setDragState] = useState<DragState>(INITIAL_DRAG_STATE)
   const pendingPasteModeRef = useRef<PasteMode | null>(null)
@@ -225,9 +232,19 @@ export function useCellSelection<T extends Record<string, unknown>>({
       const mode: CopySelectionMode =
         options?.includeDescendants && enableSubtreeCopy ? "subtree" : "visible"
 
-      return writeSelectionToClipboard(rows, activeSelectionBounds, mode)
+      return writeSelectionToClipboard(rows, activeSelectionBounds, mode, {
+        registry: cellRendererRegistry,
+        root: rootRef?.current,
+      })
     },
-    [activeSelectionBounds, enableSubtreeCopy, enabled, rows],
+    [
+      activeSelectionBounds,
+      cellRendererRegistry,
+      enableSubtreeCopy,
+      enabled,
+      rootRef,
+      rows,
+    ],
   )
 
   useEffect(() => {

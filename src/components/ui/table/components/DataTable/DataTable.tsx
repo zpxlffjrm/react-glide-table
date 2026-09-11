@@ -10,9 +10,12 @@ import {
 } from "@/components/ui/table/constants";
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext";
 import {
+  buildColumnFreezeOffsets,
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
+  resolveColumnFreezeSide,
   resolveHeaderFreezeOffset,
+  type ColumnFreezeColumnInput,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups";
 import {
@@ -144,11 +147,22 @@ function DataTable<T extends Record<string, unknown>>({
   const RowSlot = slots?.Row ?? DataTableRow;
   const PendingSlot = slots?.Pending ?? DefaultPending;
   const EmptySlot = slots?.Empty ?? DefaultEmpty;
-  const freezeOffsets = rowContextValue.columnFreeze.offsets;
   const headerGroups = getMergedHeaderGroups(table.getHeaderGroups());
   const leafColumnIds = table
     .getVisibleLeafColumns()
     .map((column) => column.id);
+  // Recomputed every render (cheap) so it reflects the current
+  // `meta.width`/`minWidth`/`maxWidth` even when a controlled column-def
+  // update leaves the column ids (and the tanstack `table` instance, which
+  // stays referentially stable across renders) unchanged — a `useMemo`
+  // keyed only on `table`/ids would otherwise miss the update.
+  const columnLayoutMetaSignature = table
+    .getVisibleLeafColumns()
+    .map((column) => {
+      const meta = column.columnDef.meta;
+      return `${column.id}:${meta?.width ?? ""}:${meta?.minWidth ?? ""}:${meta?.maxWidth ?? ""}`;
+    })
+    .join("|");
   const { isReordering, draggingColumnId, dropTarget, onHeaderPointerDown } =
     useColumnReorder({
       enabled: enableColumnReorder,
@@ -193,18 +207,49 @@ function DataTable<T extends Record<string, unknown>>({
       }));
 
     return resolveColumnLayoutWidths(containerWidth, columns);
-  }, [enableColumnResize, containerWidth, table, leafColumnIds.join("|")]);
+  }, [enableColumnResize, containerWidth, table, columnLayoutMetaSignature]);
+
+  // `useGlideTable`'s own freeze offsets are built from `column.getSize()`,
+  // which only matches `layoutWidths` for fixed-width columns — a
+  // min/max-only column can resolve to e.g. 160px while `getSize()` stays at
+  // the 150px tanstack default, so frozen columns after it would get the
+  // wrong sticky inset. Rebuild offsets from the same resolved widths.
+  const freezeOffsets = useMemo(() => {
+    if (!enableColumnFreeze || enableColumnResize || !layoutWidths) {
+      return rowContextValue.columnFreeze.offsets;
+    }
+
+    const columns: ColumnFreezeColumnInput[] = table
+      .getVisibleLeafColumns()
+      .map((column) => ({
+        id: column.id,
+        size: layoutWidths.get(column.id) ?? column.getSize(),
+        side: resolveColumnFreezeSide(column.columnDef.meta?.frozen),
+      }));
+
+    return buildColumnFreezeOffsets(columns);
+  }, [
+    enableColumnFreeze,
+    enableColumnResize,
+    layoutWidths,
+    rowContextValue.columnFreeze.offsets,
+    table,
+  ]);
 
   const contextValue = useMemo(
     () => ({
       ...rowContextValue,
       classNames,
+      columnFreeze: {
+        ...rowContextValue.columnFreeze,
+        offsets: freezeOffsets,
+      },
       columnResize: {
         ...rowContextValue.columnResize,
         layoutWidths,
       },
     }),
-    [rowContextValue, classNames, layoutWidths],
+    [rowContextValue, classNames, freezeOffsets, layoutWidths],
   );
 
   if (isPending) {

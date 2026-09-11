@@ -1,7 +1,13 @@
 import type { ColumnDef, Row } from "@tanstack/react-table"
 import { isValidElement, type ReactElement, type ReactNode } from "react"
 
-import type { CellRenderFn } from "@/components/ui/table/features/cell-render/types"
+import { resolveCellRenderer } from "@/components/ui/table/features/cell-render/registry"
+import type { CellRendererRegistry } from "@/components/ui/table/features/cell-render/registry"
+import type {
+  CellKind,
+  CellRenderContext,
+  CellRenderFn,
+} from "@/components/ui/table/features/cell-render/types"
 import type { CellSelectionBounds } from "@/components/ui/table/features/cell-selection/cellSelection"
 
 export type CopySelectionMode = "visible" | "subtree"
@@ -12,9 +18,21 @@ export type CopyRowEntry<T extends Record<string, unknown>> = {
   depth: number
 }
 
+/**
+ * `registry` resolves `meta.kind` renderers (built-ins like `protected`, plus
+ * custom `cellRenderers`) so copy text matches the visible cell instead of the
+ * raw value. `root` scopes the DOM image-url lookup to one table when several
+ * are mounted at once.
+ */
+export type CopyRenderOptions = {
+  registry?: CellRendererRegistry
+  root?: ParentNode | null
+}
+
 type ColumnCopyMeta = {
   cellRender?: CellRenderFn<Record<string, unknown>>
   cellProps?: Record<string, unknown>
+  kind?: CellKind
 }
 
 function isReactNodeIterable(node: ReactNode): node is Iterable<ReactNode> {
@@ -139,10 +157,21 @@ function readImgUrl(img: Element): string {
   return ""
 }
 
-function readDomImageUrls(rowIndex: number, colIndex: number): string {
-  if (typeof document === "undefined") return ""
+/**
+ * `root` scopes the lookup to one table's DOM subtree. Without it, a
+ * row/col-index match on another table mounted on the same page can return
+ * that table's image instead (index pairs aren't globally unique).
+ */
+function readDomImageUrls(
+  rowIndex: number,
+  colIndex: number,
+  root?: ParentNode | null,
+): string {
+  const scope: ParentNode | null =
+    root ?? (typeof document === "undefined" ? null : document)
+  if (!scope) return ""
 
-  const cells = document.querySelectorAll(
+  const cells = scope.querySelectorAll(
     `[data-row-index="${rowIndex}"][data-col-index="${colIndex}"]`,
   )
 
@@ -239,6 +268,37 @@ function resolveCopyColumnId(cell: {
   return ""
 }
 
+/** Array/object values (bubble tags, drilldown chips, …) keep `formatCellValue`'s
+ * `, `-joined text — rendering them would lose that separator (each item
+ * becomes its own sibling element with no delimiter between them). */
+function isPrimitiveCopyValue(value: unknown): boolean {
+  return value == null || typeof value !== "object"
+}
+
+/** Shared by both render sources: extract clipboard text from a rendered node,
+ * preferring a DOM/rendered image URL when the node contains one. */
+function extractRenderedCopyText(
+  node: ReactNode,
+  value: unknown,
+  cellPosition: { rowIndex: number; colIndex: number } | undefined,
+  root: ParentNode | null | undefined,
+): string {
+  const rendered = sanitizeClipboardCell(reactNodeToText(node))
+  if (reactNodeContainsImage(node)) {
+    const fromDom =
+      cellPosition != null
+        ? sanitizeClipboardCell(
+            readDomImageUrls(cellPosition.rowIndex, cellPosition.colIndex, root),
+          )
+        : ""
+    if (fromDom) return fromDom
+    if (rendered && isLikelyUrl(rendered)) return rendered
+    return sanitizeClipboardCell(pickUrlFromUnknown(value))
+  }
+
+  return rendered
+}
+
 function formatCopyCellText<T extends Record<string, unknown>>(
   rowData: T,
   columnDef: ColumnDef<unknown, unknown>,
@@ -247,6 +307,7 @@ function formatCopyCellText<T extends Record<string, unknown>>(
   fallbackIndex: number,
   sourceCell?: { getValue: () => unknown },
   cellPosition?: { rowIndex: number; colIndex: number },
+  options?: CopyRenderOptions,
 ): string {
   const meta = columnDef.meta as ColumnCopyMeta | undefined
   const value = sourceCell
@@ -254,38 +315,53 @@ function formatCopyCellText<T extends Record<string, unknown>>(
     : readRowColumnValue(rowData, columnDef)
 
   const cellRender = meta?.cellRender
-  if (typeof cellRender !== "function") {
-    return formatCellValue(value)
-  }
+  if (typeof cellRender === "function") {
+    try {
+      const row = visibleRow ?? createCopyRenderRow(rowData, fallbackIndex)
+      const node = cellRender({
+        value,
+        row: row as Row<Record<string, unknown>>,
+        index: row.index,
+        columnId,
+        cellProps: meta?.cellProps,
+        update: () => {},
+      })
 
-  try {
-    const row = visibleRow ?? createCopyRenderRow(rowData, fallbackIndex)
-    const node = cellRender({
-      value,
-      row: row as Row<Record<string, unknown>>,
-      index: row.index,
-      columnId,
-      cellProps: meta?.cellProps,
-      update: () => {},
-    })
-
-    const rendered = sanitizeClipboardCell(reactNodeToText(node))
-    if (reactNodeContainsImage(node)) {
-      const fromDom =
-        cellPosition != null
-          ? sanitizeClipboardCell(
-              readDomImageUrls(cellPosition.rowIndex, cellPosition.colIndex),
-            )
-          : ""
-      if (fromDom) return fromDom
-      if (rendered && isLikelyUrl(rendered)) return rendered
-      return sanitizeClipboardCell(pickUrlFromUnknown(value))
+      return extractRenderedCopyText(node, value, cellPosition, options?.root)
+    } catch {
+      return formatCellValue(value)
     }
-
-    return rendered
-  } catch {
-    return formatCellValue(value)
   }
+
+  // No explicit `cellRender`: resolve the same `meta.kind` renderer registry
+  // `ResolvedTableCell` uses (built-ins like `protected`, plus custom
+  // `cellRenderers`), so copy text matches what the cell actually shows
+  // instead of the raw underlying value (e.g. a masked secret).
+  if (options?.registry && meta?.kind && isPrimitiveCopyValue(value)) {
+    try {
+      const row = visibleRow ?? createCopyRenderRow(rowData, fallbackIndex)
+      const ctx: CellRenderContext = {
+        value,
+        row: row as Row<Record<string, unknown>>,
+        index: row.index,
+        columnId,
+        cellProps: meta.cellProps,
+        update: () => {},
+      }
+      const renderer = resolveCellRenderer(options.registry, meta.kind, ctx)
+      if (renderer) {
+        const node = renderer.render(ctx)
+        const rendered = extractRenderedCopyText(node, value, cellPosition, options.root)
+        // Kinds with no extractable text (a bare checkbox, a loading
+        // spinner) fall back to the raw value rather than copying "".
+        if (rendered) return rendered
+      }
+    } catch {
+      return formatCellValue(value)
+    }
+  }
+
+  return formatCellValue(value)
 }
 
 function formatPrimitive(value: unknown): string {
@@ -456,6 +532,7 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
   depths?: number[],
+  options?: CopyRenderOptions,
 ): string {
   if (copyRows.length === 0) return ""
 
@@ -492,6 +569,7 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
             visibleRow != null
               ? { rowIndex: visibleRow.index, colIndex: startCol + colOffset }
               : undefined,
+            options,
           )
         })
         .join("\t")
@@ -505,6 +583,7 @@ export function serializeSelectionToTSV<T extends Record<string, unknown>>(
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
   mode: CopySelectionMode = "visible",
+  options?: CopyRenderOptions,
 ): string {
   const entries = collectCopyRowEntries(visibleRows, bounds, mode)
 
@@ -513,6 +592,7 @@ export function serializeSelectionToTSV<T extends Record<string, unknown>>(
     visibleRows,
     bounds,
     entries.map((entry) => entry.depth),
+    options,
   )
 }
 
@@ -520,8 +600,9 @@ export async function writeSelectionToClipboard<T extends Record<string, unknown
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
   mode: CopySelectionMode = "visible",
+  options?: CopyRenderOptions,
 ): Promise<boolean> {
-  const text = serializeSelectionToTSV(visibleRows, bounds, mode)
+  const text = serializeSelectionToTSV(visibleRows, bounds, mode, options)
   if (!text) return false
 
   try {
