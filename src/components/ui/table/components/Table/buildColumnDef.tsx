@@ -63,6 +63,8 @@ export function buildColumnDef<T extends Record<string, unknown>>(
     width,
     minWidth,
     maxWidth,
+    minResizeWidth,
+    maxResizeWidth,
     resizable,
     reorderable,
     frozen,
@@ -84,8 +86,8 @@ export function buildColumnDef<T extends Record<string, unknown>>(
     id: field,
     ...(!virtual ? { accessorKey: field as keyof T & string } : {}),
     size: width ?? DATA_TABLE_COLUMN_SIZE,
-    ...(minWidth != null ? { minSize: minWidth } : {}),
-    ...(maxWidth != null ? { maxSize: maxWidth } : {}),
+    ...(minResizeWidth != null ? { minSize: minResizeWidth } : {}),
+    ...(maxResizeWidth != null ? { maxSize: maxResizeWidth } : {}),
     ...(resizable === false ? { enableResizing: false } : {}),
     header: sortable
       ? () => (
@@ -113,6 +115,8 @@ export function buildColumnDef<T extends Record<string, unknown>>(
       cellRender: render as CellRenderFn<Record<string, unknown>> | undefined,
       frozen,
       reorderable,
+      minWidth,
+      maxWidth,
       className,
       headerClassName,
     },
