@@ -50,7 +50,11 @@ export {
   type CellRendererRegistry,
 } from "@/components/ui/table/features/cell-render"
 
-export { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize"
+export {
+  getColumnSizeStyle,
+  resolveColumnLayoutWidths,
+  type ColumnLayoutInput,
+} from "@/components/ui/table/features/column-resize/columnResize";
 
 export {
   applyLeafColumnOrder,

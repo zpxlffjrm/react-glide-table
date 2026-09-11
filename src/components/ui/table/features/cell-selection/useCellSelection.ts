@@ -236,6 +236,9 @@ export function useCellSelection<T extends Record<string, unknown>>({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!activeSelectionBounds) return
       if (!(e.ctrlKey || e.metaKey)) return
+      if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
+        return
+      }
 
       const isSubtreeShortcut =
         enableSubtreeCopy && e.shiftKey && e.key.toLowerCase() === "c"

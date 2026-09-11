@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps } from "react"
 import { useState } from "react"
@@ -665,6 +665,93 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
   })
 
+  it("blurs an external input when a cell is clicked so copy uses the selection", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    })
+
+    const { container } = render(
+      <div>
+        <input aria-label="external-search" defaultValue="typed-in-search" />
+        <DataTable
+          data={SIMPLE_ROWS}
+          columns={[
+            {
+              id: "name",
+              accessorKey: "name",
+              header: "Name",
+            },
+          ]}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const input = screen.getByLabelText("external-search")
+    input.focus()
+    expect(input).toHaveFocus()
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    expect(input).not.toHaveFocus()
+
+    fireEvent.keyDown(window, { key: "c", metaKey: true })
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("Charlie")
+    })
+  })
+
+  it("does not intercept copy while an external input is focused", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    })
+
+    const { container } = render(
+      <div>
+        <input aria-label="external-search" defaultValue="typed-in-search" />
+        <DataTable
+          data={SIMPLE_ROWS}
+          columns={[
+            {
+              id: "name",
+              accessorKey: "name",
+              header: "Name",
+            },
+          ]}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    const input = screen.getByLabelText("external-search")
+    input.focus()
+    expect(input).toHaveFocus()
+
+    fireEvent.keyDown(window, { key: "c", metaKey: true })
+
+    await Promise.resolve()
+    expect(writeText).not.toHaveBeenCalled()
+  })
+
   it("reports getIsCellDragSelected for covered rows inside a row-span merge", () => {
     type MergeRow = { id: string; region: string; regionId: string; name: string }
 
@@ -984,9 +1071,16 @@ describe("DataTable direct usage behavior", () => {
     const nameCell = container.querySelector("tbody tr td")
     const amountCell = container.querySelectorAll("tbody tr td")[1]
 
-    expect(headers[0]).toHaveStyle({ minWidth: "80px", maxWidth: "240px" })
-    expect(headers[0]).not.toHaveStyle({ width: "150px" })
-    expect(nameCell).toHaveStyle({ minWidth: "80px", maxWidth: "240px" })
+    expect(headers[0]).toHaveStyle({
+      width: "240px",
+      minWidth: "80px",
+      maxWidth: "240px",
+    })
+    expect(nameCell).toHaveStyle({
+      width: "240px",
+      minWidth: "80px",
+      maxWidth: "240px",
+    })
 
     expect(headers[1]).toHaveStyle({
       width: "200px",
@@ -997,6 +1091,31 @@ describe("DataTable direct usage behavior", () => {
       width: "200px",
       minWidth: "120px",
       maxWidth: "280px",
+    })
+  })
+
+  it("keeps min/max columns at maxWidth when another column has no width and space allows", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name">Name</SimpleTable.Column>
+          <SimpleTable.Column field="amount" minWidth={110} maxWidth={160}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).not.toHaveStyle({ width: "150px" })
+    expect(headers[1]).toHaveStyle({
+      width: "160px",
+      minWidth: "110px",
+      maxWidth: "160px",
     })
   })
 

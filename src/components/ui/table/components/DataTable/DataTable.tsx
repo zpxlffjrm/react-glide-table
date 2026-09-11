@@ -1,5 +1,5 @@
 import { flexRender } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow";
 import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch";
@@ -20,7 +20,11 @@ import {
   serializeReorderIds,
 } from "@/components/ui/table/features/column-reorder/columnReorder";
 import { useColumnReorder } from "@/components/ui/table/features/column-reorder/useColumnReorder";
-import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
+import {
+  getColumnSizeStyle,
+  resolveColumnLayoutWidths,
+  type ColumnLayoutInput,
+} from "@/components/ui/table/features/column-resize/columnResize";
 import type {
   DataTableClassNames,
   DataTableProps,
@@ -142,7 +146,9 @@ function DataTable<T extends Record<string, unknown>>({
   const EmptySlot = slots?.Empty ?? DefaultEmpty;
   const freezeOffsets = rowContextValue.columnFreeze.offsets;
   const headerGroups = getMergedHeaderGroups(table.getHeaderGroups());
-  const leafColumnIds = table.getVisibleLeafColumns().map((column) => column.id);
+  const leafColumnIds = table
+    .getVisibleLeafColumns()
+    .map((column) => column.id);
   const { isReordering, draggingColumnId, dropTarget, onHeaderPointerDown } =
     useColumnReorder({
       enabled: enableColumnReorder,
@@ -150,9 +156,55 @@ function DataTable<T extends Record<string, unknown>>({
       onColumnOrderChange: setColumnOrder,
     });
 
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (enableColumnResize || isPending) return;
+
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const updateWidth = () => {
+      setContainerWidth(Math.floor(element.clientWidth));
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [enableColumnResize, isPending, scrollRef, rows.length, leafColumnIds.join("|")]);
+
+  const layoutWidths = useMemo(() => {
+    if (enableColumnResize) return undefined;
+
+    const columns: ColumnLayoutInput[] = table
+      .getVisibleLeafColumns()
+      .map((column) => ({
+        id: column.id,
+        width: column.columnDef.meta?.width,
+        minWidth: column.columnDef.meta?.minWidth,
+        maxWidth: column.columnDef.meta?.maxWidth,
+      }));
+
+    return resolveColumnLayoutWidths(containerWidth, columns);
+  }, [enableColumnResize, containerWidth, table, leafColumnIds.join("|")]);
+
   const contextValue = useMemo(
-    () => ({ ...rowContextValue, classNames }),
-    [rowContextValue, classNames],
+    () => ({
+      ...rowContextValue,
+      classNames,
+      columnResize: {
+        ...rowContextValue.columnResize,
+        layoutWidths,
+      },
+    }),
+    [rowContextValue, classNames, layoutWidths],
   );
 
   if (isPending) {
@@ -238,6 +290,7 @@ function DataTable<T extends Record<string, unknown>>({
                     lockMax: enableColumnResize,
                     minWidth: header.column.columnDef.meta?.minWidth,
                     maxWidth: header.column.columnDef.meta?.maxWidth,
+                    layoutWidth: layoutWidths?.get(header.column.id),
                   });
                   const freezeOffset = enableColumnFreeze
                     ? resolveHeaderFreezeOffset(header.column, freezeOffsets)
@@ -252,8 +305,11 @@ function DataTable<T extends Record<string, unknown>>({
                   };
                   const isPlaceholder = header.isPlaceholder;
                   const leafColumns = header.column.getLeafColumns();
-                  const leafIds = leafColumns.map((leafColumn) => leafColumn.id);
-                  const isLeafHeader = !isPlaceholder && header.subHeaders.length === 0;
+                  const leafIds = leafColumns.map(
+                    (leafColumn) => leafColumn.id,
+                  );
+                  const isLeafHeader =
+                    !isPlaceholder && header.subHeaders.length === 0;
                   const canDrag =
                     enableColumnReorder &&
                     !isPlaceholder &&
