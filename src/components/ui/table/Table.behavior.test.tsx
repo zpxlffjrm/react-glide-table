@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps } from "react"
 import { useState } from "react"
@@ -665,6 +665,93 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
   })
 
+  it("blurs an external input when a cell is clicked so copy uses the selection", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    })
+
+    const { container } = render(
+      <div>
+        <input aria-label="external-search" defaultValue="typed-in-search" />
+        <DataTable
+          data={SIMPLE_ROWS}
+          columns={[
+            {
+              id: "name",
+              accessorKey: "name",
+              header: "Name",
+            },
+          ]}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const input = screen.getByLabelText("external-search")
+    input.focus()
+    expect(input).toHaveFocus()
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    expect(input).not.toHaveFocus()
+
+    fireEvent.keyDown(window, { key: "c", metaKey: true })
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("Charlie")
+    })
+  })
+
+  it("does not intercept copy while an external input is focused", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    })
+
+    const { container } = render(
+      <div>
+        <input aria-label="external-search" defaultValue="typed-in-search" />
+        <DataTable
+          data={SIMPLE_ROWS}
+          columns={[
+            {
+              id: "name",
+              accessorKey: "name",
+              header: "Name",
+            },
+          ]}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    const input = screen.getByLabelText("external-search")
+    input.focus()
+    expect(input).toHaveFocus()
+
+    fireEvent.keyDown(window, { key: "c", metaKey: true })
+
+    await Promise.resolve()
+    expect(writeText).not.toHaveBeenCalled()
+  })
+
   it("reports getIsCellDragSelected for covered rows inside a row-span merge", () => {
     type MergeRow = { id: string; region: string; regionId: string; name: string }
 
@@ -984,20 +1071,94 @@ describe("DataTable direct usage behavior", () => {
     const nameCell = container.querySelector("tbody tr td")
     const amountCell = container.querySelectorAll("tbody tr td")[1]
 
-    expect(headers[0]).toHaveStyle({ minWidth: "80px", maxWidth: "240px" })
-    expect(headers[0]).not.toHaveStyle({ width: "150px" })
-    expect(nameCell).toHaveStyle({ minWidth: "80px", maxWidth: "240px" })
+    // The resolved layout width is locked on all three CSS properties (not
+    // just the original min/max bounds) so `table-layout: auto` can't grow
+    // the cell back out when content is wider than the resolved size.
+    expect(headers[0]).toHaveStyle({
+      width: "240px",
+      minWidth: "240px",
+      maxWidth: "240px",
+    })
+    expect(nameCell).toHaveStyle({
+      width: "240px",
+      minWidth: "240px",
+      maxWidth: "240px",
+    })
 
     expect(headers[1]).toHaveStyle({
       width: "200px",
-      minWidth: "120px",
-      maxWidth: "280px",
+      minWidth: "200px",
+      maxWidth: "200px",
     })
     expect(amountCell).toHaveStyle({
       width: "200px",
-      minWidth: "120px",
-      maxWidth: "280px",
+      minWidth: "200px",
+      maxWidth: "200px",
     })
+  })
+
+  it("keeps min/max columns at maxWidth when another column has no width and space allows", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name">Name</SimpleTable.Column>
+          <SimpleTable.Column field="amount" minWidth={110} maxWidth={160}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).not.toHaveStyle({ width: "150px" })
+    expect(headers[1]).toHaveStyle({
+      width: "160px",
+      minWidth: "160px",
+      maxWidth: "160px",
+    })
+  })
+
+  it("re-resolves layout widths when a controlled column's meta.width changes (same column id)", () => {
+    // The tanstack `table` instance from `useReactTable` stays referentially
+    // stable across renders, so a `useMemo` keyed only on `table`/column ids
+    // would miss a controlled `meta.width` update that keeps the same id.
+    const { container, rerender } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={120}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount">Qty</SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelectorAll("thead th")[0]).toHaveStyle({ width: "120px" })
+
+    rerender(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={260}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount">Qty</SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    expect(container.querySelectorAll("thead th")[0]).toHaveStyle({ width: "260px" })
   })
 
   it("does not use cell minWidth/maxWidth as drag-resize clamps", () => {
@@ -1368,6 +1529,46 @@ describe("DataTable direct usage behavior", () => {
     expect(headers[0]).not.toHaveAttribute("data-freeze-edge")
     expect(headers[1]).toHaveStyle({ left: "200px" })
     expect(headers[1]).toHaveAttribute("data-freeze-edge", "right")
+  })
+
+  it("bases freeze offsets on the resolved layout width, not the tanstack default size", () => {
+    // "name" has no `width`, only min/max — without `enableColumnResize` its
+    // rendered width comes from `resolveColumnLayoutWidths` (140px here,
+    // JSDOM's unmeasured container keeps bounded columns at their
+    // preferred/max size), not tanstack's 150px default column size.
+    type WideRow = SimpleRow & { note: string }
+    const WideTable = createTable<WideRow>()
+    const rows: WideRow[] = SIMPLE_ROWS.map((row) => ({ ...row, note: "n" }))
+
+    const { container } = render(
+      <WideTable
+        data={rows}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnFreeze
+      >
+        <WideTable.Header>
+          <WideTable.Column field="name" minWidth={80} maxWidth={140} frozen>
+            Name
+          </WideTable.Column>
+          <WideTable.Column field="amount" width={120} frozen="left">
+            Qty
+          </WideTable.Column>
+          <WideTable.Column field="note" width={140}>
+            Note
+          </WideTable.Column>
+        </WideTable.Header>
+      </WideTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ width: "140px", left: "0px" })
+    expect(headers[1]).toHaveStyle({ left: "140px" })
+
+    const firstCell = container.querySelector("tbody tr td")
+    const secondCell = container.querySelectorAll("tbody tr td")[1]
+    expect(firstCell).toHaveStyle({ left: "0px" })
+    expect(secondCell).toHaveStyle({ left: "140px" })
   })
 
   it("allows freezing a middle column while keeping neighbors scrollable", () => {

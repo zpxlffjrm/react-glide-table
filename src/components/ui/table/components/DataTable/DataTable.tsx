@@ -1,5 +1,5 @@
 import { flexRender } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow";
 import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch";
@@ -10,9 +10,12 @@ import {
 } from "@/components/ui/table/constants";
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext";
 import {
+  buildColumnFreezeOffsets,
   getColumnFreezeEdgeAttr,
   getColumnFreezeStyle,
+  resolveColumnFreezeSide,
   resolveHeaderFreezeOffset,
+  type ColumnFreezeColumnInput,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getMergedHeaderGroups } from "@/components/ui/table/features/column-groups/mergeHeaderGroups";
 import {
@@ -20,7 +23,11 @@ import {
   serializeReorderIds,
 } from "@/components/ui/table/features/column-reorder/columnReorder";
 import { useColumnReorder } from "@/components/ui/table/features/column-reorder/useColumnReorder";
-import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
+import {
+  getColumnSizeStyle,
+  resolveColumnLayoutWidths,
+  type ColumnLayoutInput,
+} from "@/components/ui/table/features/column-resize/columnResize";
 import type {
   DataTableClassNames,
   DataTableProps,
@@ -140,9 +147,22 @@ function DataTable<T extends Record<string, unknown>>({
   const RowSlot = slots?.Row ?? DataTableRow;
   const PendingSlot = slots?.Pending ?? DefaultPending;
   const EmptySlot = slots?.Empty ?? DefaultEmpty;
-  const freezeOffsets = rowContextValue.columnFreeze.offsets;
   const headerGroups = getMergedHeaderGroups(table.getHeaderGroups());
-  const leafColumnIds = table.getVisibleLeafColumns().map((column) => column.id);
+  const leafColumnIds = table
+    .getVisibleLeafColumns()
+    .map((column) => column.id);
+  // Recomputed every render (cheap) so it reflects the current
+  // `meta.width`/`minWidth`/`maxWidth` even when a controlled column-def
+  // update leaves the column ids (and the tanstack `table` instance, which
+  // stays referentially stable across renders) unchanged — a `useMemo`
+  // keyed only on `table`/ids would otherwise miss the update.
+  const columnLayoutMetaSignature = table
+    .getVisibleLeafColumns()
+    .map((column) => {
+      const meta = column.columnDef.meta;
+      return `${column.id}:${meta?.width ?? ""}:${meta?.minWidth ?? ""}:${meta?.maxWidth ?? ""}`;
+    })
+    .join("|");
   const { isReordering, draggingColumnId, dropTarget, onHeaderPointerDown } =
     useColumnReorder({
       enabled: enableColumnReorder,
@@ -150,9 +170,86 @@ function DataTable<T extends Record<string, unknown>>({
       onColumnOrderChange: setColumnOrder,
     });
 
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (enableColumnResize || isPending) return;
+
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const updateWidth = () => {
+      setContainerWidth(Math.floor(element.clientWidth));
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [enableColumnResize, isPending, scrollRef, rows.length, leafColumnIds.join("|")]);
+
+  const layoutWidths = useMemo(() => {
+    if (enableColumnResize) return undefined;
+
+    const columns: ColumnLayoutInput[] = table
+      .getVisibleLeafColumns()
+      .map((column) => ({
+        id: column.id,
+        width: column.columnDef.meta?.width,
+        minWidth: column.columnDef.meta?.minWidth,
+        maxWidth: column.columnDef.meta?.maxWidth,
+      }));
+
+    return resolveColumnLayoutWidths(containerWidth, columns);
+  }, [enableColumnResize, containerWidth, table, columnLayoutMetaSignature]);
+
+  // `useGlideTable`'s own freeze offsets are built from `column.getSize()`,
+  // which only matches `layoutWidths` for fixed-width columns — a
+  // min/max-only column can resolve to e.g. 160px while `getSize()` stays at
+  // the 150px tanstack default, so frozen columns after it would get the
+  // wrong sticky inset. Rebuild offsets from the same resolved widths.
+  const freezeOffsets = useMemo(() => {
+    if (!enableColumnFreeze || enableColumnResize || !layoutWidths) {
+      return rowContextValue.columnFreeze.offsets;
+    }
+
+    const columns: ColumnFreezeColumnInput[] = table
+      .getVisibleLeafColumns()
+      .map((column) => ({
+        id: column.id,
+        size: layoutWidths.get(column.id) ?? column.getSize(),
+        side: resolveColumnFreezeSide(column.columnDef.meta?.frozen),
+      }));
+
+    return buildColumnFreezeOffsets(columns);
+  }, [
+    enableColumnFreeze,
+    enableColumnResize,
+    layoutWidths,
+    rowContextValue.columnFreeze.offsets,
+    table,
+  ]);
+
   const contextValue = useMemo(
-    () => ({ ...rowContextValue, classNames }),
-    [rowContextValue, classNames],
+    () => ({
+      ...rowContextValue,
+      classNames,
+      columnFreeze: {
+        ...rowContextValue.columnFreeze,
+        offsets: freezeOffsets,
+      },
+      columnResize: {
+        ...rowContextValue.columnResize,
+        layoutWidths,
+      },
+    }),
+    [rowContextValue, classNames, freezeOffsets, layoutWidths],
   );
 
   if (isPending) {
@@ -238,6 +335,7 @@ function DataTable<T extends Record<string, unknown>>({
                     lockMax: enableColumnResize,
                     minWidth: header.column.columnDef.meta?.minWidth,
                     maxWidth: header.column.columnDef.meta?.maxWidth,
+                    layoutWidth: layoutWidths?.get(header.column.id),
                   });
                   const freezeOffset = enableColumnFreeze
                     ? resolveHeaderFreezeOffset(header.column, freezeOffsets)
@@ -252,8 +350,11 @@ function DataTable<T extends Record<string, unknown>>({
                   };
                   const isPlaceholder = header.isPlaceholder;
                   const leafColumns = header.column.getLeafColumns();
-                  const leafIds = leafColumns.map((leafColumn) => leafColumn.id);
-                  const isLeafHeader = !isPlaceholder && header.subHeaders.length === 0;
+                  const leafIds = leafColumns.map(
+                    (leafColumn) => leafColumn.id,
+                  );
+                  const isLeafHeader =
+                    !isPlaceholder && header.subHeaders.length === 0;
                   const canDrag =
                     enableColumnReorder &&
                     !isPlaceholder &&

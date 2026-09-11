@@ -62,6 +62,18 @@ function isInteractiveMouseTarget(target: EventTarget | null): boolean {
   return target.closest(interactiveSelector) !== null;
 }
 
+/**
+ * Cell mousedown calls preventDefault to avoid native text selection, which
+ * also keeps an external input focused. Blur it so copy/paste/nav bind to the
+ * selected cells instead of the leftover toolbar/search field.
+ */
+function blurActiveElementOutside(container: EventTarget | null) {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || active === document.body) return;
+  if (container instanceof Node && container.contains(active)) return;
+  active.blur();
+}
+
 function resolveExpandCellIndex<T extends Record<string, unknown>>(
   cells: ReturnType<Row<T>["getVisibleCells"]>,
   toggleField?: string,
@@ -102,7 +114,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
     inlineSearch,
   } = useDataTableRowContext();
 
-  const { enableColumnResize } = columnResize;
+  const { enableColumnResize, layoutWidths } = columnResize;
   const { enableColumnFreeze, offsets: freezeOffsets } = columnFreeze;
   const {
     enabled: enableInlineSearch,
@@ -377,6 +389,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
           lockMax: enableColumnResize,
           minWidth: meta?.minWidth,
           maxWidth: meta?.maxWidth,
+          layoutWidth: layoutWidths?.get(columnId),
         });
         const freezeOffset = enableColumnFreeze
           ? freezeOffsets.get(columnId)
@@ -442,6 +455,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
               if (isInteractiveMouseTarget(event.target)) return;
 
               event.preventDefault();
+              blurActiveElementOutside(event.currentTarget);
               onCellMouseDown(
                 resolveCellRowIndex(event.clientY, event.currentTarget),
                 cellIndex,
@@ -611,6 +625,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 onMouseDown={(event) => {
                   event.stopPropagation();
                   event.preventDefault();
+                  blurActiveElementOutside(event.currentTarget);
                   onFillHandleMouseDown(rowIndex, cellIndex);
                 }}
               />
