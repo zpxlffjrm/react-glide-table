@@ -79,9 +79,23 @@ declare module "@tanstack/react-table" {
      * Defaults to true.
      */
     reorderable?: boolean;
-    /** CSS min-width for header/body cells. Independent of column resize. */
+    /**
+     * Explicit `Column.width` when provided. Used to distinguish fixed columns
+     * from flexible / min-max bounded columns during layout.
+     */
+    width?: number;
+    /**
+     * Minimum column width in px. Independent of column resize.
+     * With `maxWidth` and no `width`, layout picks a size in this range
+     * (preferring `maxWidth` when space allows) and leaves leftover space
+     * to unconstrained columns.
+     */
     minWidth?: number;
-    /** CSS max-width for header/body cells. Independent of column resize. */
+    /**
+     * Maximum column width in px. Independent of column resize.
+     * With `minWidth` and no `width`, layout prefers this size when space
+     * allows, then shrinks toward `minWidth` if the viewport is tight.
+     */
     maxWidth?: number;
   }
 
@@ -441,13 +455,16 @@ export type TableColumnProps<
   /** Initial / default column width in px (TanStack `size`) */
   width?: number;
   /**
-   * CSS min-width for this column's cells.
-   * Independent of `enableColumnResize` / `minResizeWidth`.
+   * Minimum column width in px. Independent of `enableColumnResize` / `minResizeWidth`.
+   * With `maxWidth` and no `width`, layout resolves a size in `[minWidth, maxWidth]`,
+   * preferring `maxWidth` when space allows, and leaves leftover space to columns
+   * without `width`.
    */
   minWidth?: number;
   /**
-   * CSS max-width for this column's cells.
-   * Independent of `enableColumnResize` / `maxResizeWidth`.
+   * Maximum column width in px. Independent of `enableColumnResize` / `maxResizeWidth`.
+   * With `minWidth` and no `width`, layout prefers this size when space allows,
+   * then shrinks toward `minWidth` if the viewport is tight.
    */
   maxWidth?: number;
   /** Minimum drag-resize width in px. Defaults to the table min when omitted */

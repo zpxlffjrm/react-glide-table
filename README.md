@@ -151,10 +151,11 @@ const buttonRenderer = {
       Action
     </ProductTable.Column>
   </ProductTable.Header>
-</ProductTable>
+</ProductTable>;
 ```
 
 Same `kind` in `cellRenderers` overrides the builtin. Extra kinds are added by key.
+
 ## Escape hatch (`useGlideTable`)
 
 ```tsx
@@ -261,7 +262,9 @@ Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboard
 
 ## Column width
 
-`Column.width` sets the default size. `minWidth` / `maxWidth` are CSS constraints on header and body cells — they do not clamp drag-resize.
+`Column.width` sets a fixed size. Columns without `width` keep leftover space.
+
+`minWidth` / `maxWidth` (without `width`) resolve to a size inside that range, preferring `maxWidth` when space allows so content can stay on one line. Unconstrained columns (no `width`, no min/max) still receive leftover space after that. When the viewport is tight, bounded columns shrink toward `minWidth` first. They do not clamp drag-resize.
 
 ```tsx
 <ProductTable.Column field="note" minWidth={80} maxWidth={240}>
@@ -269,7 +272,7 @@ Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboard
 </ProductTable.Column>
 ```
 
-With `ColumnDef` (non-compound), put the same values on `meta.minWidth` / `meta.maxWidth`.
+With `ColumnDef` (non-compound), put the same values on `meta.width` / `meta.minWidth` / `meta.maxWidth`.
 
 ## Column resize
 
@@ -334,13 +337,13 @@ Leaf columns can move across `ColumnGroup`s. Consecutive leaves that still share
 </ProductTable>
 ```
 
-| Prop                                    | Role                                              |
-| --------------------------------------- | ------------------------------------------------- |
-| `enableColumnReorder`                   | Turn on header drag reorder (default `false`)     |
-| `columnOrder` / `onColumnOrderChange`   | Controlled leaf id list (`string[]`)              |
-| `Column.reorderable={false}`            | Disable drag for one column (still a drop target) |
-| `data-reorderable` / `data-drop-edge`   | Drag / drop state hooks on header cells           |
-| `classNames.dropEdge`                   | Extra class while a drop edge is shown            |
+| Prop                                  | Role                                              |
+| ------------------------------------- | ------------------------------------------------- |
+| `enableColumnReorder`                 | Turn on header drag reorder (default `false`)     |
+| `columnOrder` / `onColumnOrderChange` | Controlled leaf id list (`string[]`)              |
+| `Column.reorderable={false}`          | Disable drag for one column (still a drop target) |
+| `data-reorderable` / `data-drop-edge` | Drag / drop state hooks on header cells           |
+| `classNames.dropEdge`                 | Extra class while a drop edge is shown            |
 
 Helpers (`/core`): `applyLeafColumnOrder`, `moveColumnIds`, `collectLeafColumnIds`, `useColumnReorder`, …
 
@@ -367,12 +370,12 @@ Keep vertical stickiness on the header via `classNames.head` (e.g. `sticky top-0
 </ProductTable>
 ```
 
-| Prop                               | Role                                    |
-| ---------------------------------- | --------------------------------------- |
-| `enableColumnFreeze`               | Turn on sticky freeze (default `false`) |
-| `Column.frozen` / `meta.frozen`    | `true` / `"left"` or `"right"`          |
-| `data-frozen`                      | `"left"` / `"right"` on frozen cells    |
-| `data-freeze-edge`                 | `"left"` / `"right"` / `"both"` on island boundaries |
+| Prop                            | Role                                                 |
+| ------------------------------- | ---------------------------------------------------- |
+| `enableColumnFreeze`            | Turn on sticky freeze (default `false`)              |
+| `Column.frozen` / `meta.frozen` | `true` / `"left"` or `"right"`                       |
+| `data-frozen`                   | `"left"` / `"right"` on frozen cells                 |
+| `data-freeze-edge`              | `"left"` / `"right"` / `"both"` on island boundaries |
 
 Helpers (`/core`): `buildColumnFreezeOffsets`, `getColumnFreezeEdgeAttr`, `getColumnFreezeStyle`, `resolveColumnFreezeSide`.
 
@@ -390,21 +393,21 @@ On tree tables (`toggleField`), search also scans **collapsed** descendants. Nav
 </ProductTable>
 ```
 
-| Shortcut / control | Behavior |
-| ------------------ | -------- |
-| Ctrl/Cmd+F | Open (or focus) the search box |
-| Enter / ↓ | Next match |
-| Shift+Enter / ↑ | Previous match |
-| Escape / Ctrl+F (in box) / ✕ | Close |
+| Shortcut / control           | Behavior                       |
+| ---------------------------- | ------------------------------ |
+| Ctrl/Cmd+F                   | Open (or focus) the search box |
+| Enter / ↓                    | Next match                     |
+| Shift+Enter / ↑              | Previous match                 |
+| Escape / Ctrl+F (in box) / ✕ | Close                          |
 
-| Prop | Role |
-| ---- | ---- |
-| `enableInlineSearch` | Turn on search (default `false`) |
-| `showSearch` / `onSearchClose` | Controlled overlay visibility |
-| `searchValue` / `onSearchValueChange` | Controlled query |
+| Prop                                       | Role                                                |
+| ------------------------------------------ | --------------------------------------------------- |
+| `enableInlineSearch`                       | Turn on search (default `false`)                    |
+| `showSearch` / `onSearchClose`             | Controlled overlay visibility                       |
+| `searchValue` / `onSearchValueChange`      | Controlled query                                    |
 | `searchResults` / `onSearchResultsChanged` | Override / observe matches (`[colIndex, rowIndex]`) |
-| `data-search-match` / `data-search-active` | Match highlight hooks on cells |
-| `classNames.search*` | Style the overlay |
+| `data-search-match` / `data-search-active` | Match highlight hooks on cells                      |
+| `classNames.search*`                       | Style the overlay                                   |
 
 Helpers (`/core`): `useInlineSearch`, `collectSearchMatchesInRange`, `formatSearchResultLabel`, …
 

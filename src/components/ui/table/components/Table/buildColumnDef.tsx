@@ -115,6 +115,7 @@ export function buildColumnDef<T extends Record<string, unknown>>(
       cellRender: render as CellRenderFn<Record<string, unknown>> | undefined,
       frozen,
       reorderable,
+      width,
       minWidth,
       maxWidth,
       className,
