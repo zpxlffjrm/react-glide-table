@@ -79,6 +79,10 @@ declare module "@tanstack/react-table" {
      * Defaults to true.
      */
     reorderable?: boolean;
+    /** CSS min-width for header/body cells. Independent of column resize. */
+    minWidth?: number;
+    /** CSS max-width for header/body cells. Independent of column resize. */
+    maxWidth?: number;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -436,10 +440,20 @@ export type TableColumnProps<
   sortable?: boolean;
   /** Initial / default column width in px (TanStack `size`) */
   width?: number;
-  /** Minimum resize width in px. Defaults to the table min when omitted */
+  /**
+   * CSS min-width for this column's cells.
+   * Independent of `enableColumnResize` / `minResizeWidth`.
+   */
   minWidth?: number;
-  /** Maximum resize width in px. Defaults to the table max when omitted */
+  /**
+   * CSS max-width for this column's cells.
+   * Independent of `enableColumnResize` / `maxResizeWidth`.
+   */
   maxWidth?: number;
+  /** Minimum drag-resize width in px. Defaults to the table min when omitted */
+  minResizeWidth?: number;
+  /** Maximum drag-resize width in px. Defaults to the table max when omitted */
+  maxResizeWidth?: number;
   /**
    * When false, this column cannot be resized even if `enableColumnResize` is on.
    * Defaults to true.

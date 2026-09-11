@@ -938,6 +938,92 @@ describe("DataTable direct usage behavior", () => {
     expect(headers[1]).toHaveStyle({ width: "800px" })
   })
 
+  it("clamps drag resize with minResizeWidth and maxResizeWidth", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnResize
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={20} minResizeWidth={60}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={900} maxResizeWidth={220}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ width: "60px" })
+    expect(headers[1]).toHaveStyle({ width: "220px" })
+  })
+
+  it("applies cell minWidth and maxWidth without enableColumnResize", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" minWidth={80} maxWidth={240}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={200} minWidth={120} maxWidth={280}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    const nameCell = container.querySelector("tbody tr td")
+    const amountCell = container.querySelectorAll("tbody tr td")[1]
+
+    expect(headers[0]).toHaveStyle({ minWidth: "80px", maxWidth: "240px" })
+    expect(headers[0]).not.toHaveStyle({ width: "150px" })
+    expect(nameCell).toHaveStyle({ minWidth: "80px", maxWidth: "240px" })
+
+    expect(headers[1]).toHaveStyle({
+      width: "200px",
+      minWidth: "120px",
+      maxWidth: "280px",
+    })
+    expect(amountCell).toHaveStyle({
+      width: "200px",
+      minWidth: "120px",
+      maxWidth: "280px",
+    })
+  })
+
+  it("does not use cell minWidth/maxWidth as drag-resize clamps", () => {
+    const { container } = render(
+      <SimpleTable
+        data={SIMPLE_ROWS}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+        enableColumnResize
+      >
+        <SimpleTable.Header>
+          <SimpleTable.Column field="name" width={20} minWidth={80} maxWidth={120}>
+            Name
+          </SimpleTable.Column>
+          <SimpleTable.Column field="amount" width={900} minWidth={80} maxWidth={120}>
+            Qty
+          </SimpleTable.Column>
+        </SimpleTable.Header>
+      </SimpleTable>,
+    )
+
+    const headers = container.querySelectorAll("thead th")
+    expect(headers[0]).toHaveStyle({ width: "40px" })
+    expect(headers[1]).toHaveStyle({ width: "800px" })
+  })
+
   it("skips resize handle for columns with resizable={false}", () => {
     const { container } = render(
       <SimpleTable
