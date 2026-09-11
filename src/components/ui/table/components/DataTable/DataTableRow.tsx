@@ -375,6 +375,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
         const sizeStyle = getColumnSizeStyle(cell.column.getSize(), {
           force: enableColumnResize,
           lockMax: enableColumnResize,
+          minWidth: meta?.minWidth,
+          maxWidth: meta?.maxWidth,
         });
         const freezeOffset = enableColumnFreeze
           ? freezeOffsets.get(columnId)

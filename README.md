@@ -259,6 +259,18 @@ import type { RowsPastePayload } from "react-glide-table/compound";
 Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `onCopyActionsReady`.  
 Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboardTSVWithDepths`, `serializeSelectionToTSV`, …
 
+## Column width
+
+`Column.width` sets the default size. `minWidth` / `maxWidth` are CSS constraints on header and body cells — they do not clamp drag-resize.
+
+```tsx
+<ProductTable.Column field="note" minWidth={80} maxWidth={240}>
+  Note
+</ProductTable.Column>
+```
+
+With `ColumnDef` (non-compound), put the same values on `meta.minWidth` / `meta.maxWidth`.
+
 ## Column resize
 
 Opt in with `enableColumnResize`. Drag the handle on the right edge of a header cell; double-click resets to the column’s default `width` / `size`.
@@ -272,7 +284,12 @@ Opt in with `enableColumnResize`. Drag the handle on the right edge of a header 
   // onColumnSizingChange={setSizing}
 >
   <ProductTable.Header>
-    <ProductTable.Column field="name" width={200} minWidth={80} maxWidth={480}>
+    <ProductTable.Column
+      field="name"
+      width={200}
+      minResizeWidth={80}
+      maxResizeWidth={480}
+    >
       Name
     </ProductTable.Column>
     <ProductTable.Column field="sku" resizable={false}>
@@ -282,14 +299,15 @@ Opt in with `enableColumnResize`. Drag the handle on the right edge of a header 
 </ProductTable>
 ```
 
-| Prop                                     | Role                                         |
-| ---------------------------------------- | -------------------------------------------- |
-| `enableColumnResize`                     | Turn on header drag resize (default `false`) |
-| `columnSizing` / `onColumnSizingChange`  | Controlled width map `{ [columnId]: px }`    |
-| `columnResizeMode`                       | `"onChange"` (live) or `"onEnd"`             |
-| `Column.width` / `minWidth` / `maxWidth` | Default / clamp sizes                        |
-| `Column.resizable={false}`               | Disable resize for one column                |
-| `classNames.resizeHandle`                | Style hook for the drag handle               |
+| Prop                                       | Role                                         |
+| ------------------------------------------ | -------------------------------------------- |
+| `enableColumnResize`                       | Turn on header drag resize (default `false`) |
+| `columnSizing` / `onColumnSizingChange`    | Controlled width map `{ [columnId]: px }`    |
+| `columnResizeMode`                         | `"onChange"` (live) or `"onEnd"`             |
+| `Column.width`                             | Default column size                          |
+| `Column.minResizeWidth` / `maxResizeWidth` | Drag-resize clamp sizes                      |
+| `Column.resizable={false}`                 | Disable resize for one column                |
+| `classNames.resizeHandle`                  | Style hook for the drag handle               |
 
 ## Column reorder
 

@@ -236,6 +236,8 @@ function DataTable<T extends Record<string, unknown>>({
                   const sizeStyle = getColumnSizeStyle(header.getSize(), {
                     force: enableColumnResize,
                     lockMax: enableColumnResize,
+                    minWidth: header.column.columnDef.meta?.minWidth,
+                    maxWidth: header.column.columnDef.meta?.maxWidth,
                   });
                   const freezeOffset = enableColumnFreeze
                     ? resolveHeaderFreezeOffset(header.column, freezeOffsets)
