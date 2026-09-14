@@ -5,6 +5,7 @@ export {
   type TableCompoundComponent,
 } from "@/components/ui/Table"
 export type {
+  ColumnCopyValue,
   ColumnDef,
   ColumnFreezeMeta,
   ColumnFreezeSide,

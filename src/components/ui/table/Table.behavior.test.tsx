@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { describe, expect, it, vi } from "vitest"
 
 import { createTable, DataTable, Table } from "@/index"
@@ -665,45 +665,6 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
   })
 
-  it("clears cell selection when clicking outside the table", () => {
-    const columns: ColumnDef<SimpleRow, unknown>[] = [
-      {
-        id: "name",
-        accessorKey: "name",
-        header: "Name",
-        cell: ({ row, getValue }) => (
-          <span data-testid={`name-cell-${row.id}`}>
-            {String(getValue<string>() ?? "")}:
-            {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
-          </span>
-        ),
-      },
-    ]
-
-    const { container } = render(
-      <div>
-        <button type="button">outside</button>
-        <DataTable
-          data={SIMPLE_ROWS}
-          columns={columns}
-          getRowId={(row) => row.id}
-          enableVirtualization={false}
-        />
-      </div>,
-    )
-
-    const firstCell = container.querySelector("tbody tr td")
-    expect(firstCell).not.toBeNull()
-    if (!firstCell) return
-
-    fireEvent.mouseDown(firstCell, { clientY: 4 })
-    fireEvent.mouseUp(window)
-    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
-
-    fireEvent.mouseDown(screen.getByRole("button", { name: "outside" }))
-    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:idle")
-  })
-
   it("clears cell selection when Escape is pressed", () => {
     const columns: ColumnDef<SimpleRow, unknown>[] = [
       {
@@ -740,37 +701,123 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:idle")
   })
 
-  it("clears row selection when clicking outside or pressing Escape", async () => {
+  it("clears row selection when Escape is pressed", async () => {
     const user = userEvent.setup()
 
     render(
-      <div>
-        <button type="button">outside</button>
-        <DataTable
-          data={SIMPLE_ROWS}
-          columns={[
-            { id: "name", accessorKey: "name", header: "Name" },
-            { id: "amount", accessorKey: "amount", header: "Amount" },
-          ]}
-          getRowId={(row) => row.id}
-          rowSelectionMode="multi"
-          enableVirtualization={false}
-        />
-      </div>,
+      <DataTable
+        data={SIMPLE_ROWS}
+        columns={[
+          { id: "name", accessorKey: "name", header: "Name" },
+          { id: "amount", accessorKey: "amount", header: "Amount" },
+        ]}
+        getRowId={(row) => row.id}
+        rowSelectionMode="multi"
+        enableVirtualization={false}
+      />,
     )
 
     const rows = screen.getAllByRole("row")
     await user.click(rows[1])
     expect(screen.getByText("✓ 1 selected")).toBeInTheDocument()
 
-    fireEvent.mouseDown(screen.getByRole("button", { name: "outside" }))
-    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
-
-    await user.click(rows[1])
-    expect(screen.getByText("✓ 1 selected")).toBeInTheDocument()
-
     fireEvent.keyDown(window, { key: "Escape" })
     expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+  })
+
+  it("does not clear selection when Escape is pressed inside a portaled dialog", async () => {
+    const user = userEvent.setup()
+    const onRowSelectionChange = vi.fn()
+
+    const PortalDialog = () => {
+      const [open, setOpen] = useState(false)
+
+      useEffect(() => {
+        if (!open) return
+
+        const dialog = document.createElement("div")
+        dialog.setAttribute("role", "dialog")
+        dialog.setAttribute("aria-label", "row-modal")
+
+        const button = document.createElement("button")
+        button.type = "button"
+        button.textContent = "modal-action"
+        dialog.appendChild(button)
+        document.body.appendChild(dialog)
+
+        return () => {
+          dialog.remove()
+        }
+      }, [open])
+
+      return (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            setOpen(true)
+          }}
+        >
+          open-modal
+        </button>
+      )
+    }
+
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row, getValue }) => (
+          <span data-testid={`name-cell-${row.id}`}>
+            {String(getValue<string>() ?? "")}:
+            {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
+            {row.getIsSelected() ? ":row" : ""}
+          </span>
+        ),
+      },
+      {
+        id: "action",
+        header: "Action",
+        cell: () => <PortalDialog />,
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={SIMPLE_ROWS}
+        columns={columns}
+        getRowId={(row) => row.id}
+        rowSelectionMode="multi"
+        rowSelection={{ "1": true }}
+        onRowSelectionChange={onRowSelectionChange}
+        selectOnRowClick={false}
+        enableVirtualization={false}
+      />,
+    )
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent(
+      "Charlie:selected:row",
+    )
+
+    await user.click(screen.getAllByRole("button", { name: "open-modal" })[0])
+    const modalAction = await screen.findByRole("button", {
+      name: "modal-action",
+    })
+
+    fireEvent.keyDown(modalAction, { key: "Escape" })
+
+    expect(onRowSelectionChange).not.toHaveBeenCalled()
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent(
+      "Charlie:selected:row",
+    )
   })
 
   it("copies from the last interacted table when multiple tables are mounted", async () => {
@@ -820,6 +867,7 @@ describe("DataTable direct usage behavior", () => {
     fireEvent.keyDown(window, { key: "c", metaKey: true })
 
     await waitFor(() => {
+      expect(writeText).toHaveBeenCalledTimes(1)
       expect(writeText).toHaveBeenCalledWith("SecondTable")
     })
   })

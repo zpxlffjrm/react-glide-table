@@ -5,6 +5,7 @@ export {
   type TableCompoundComponent,
 } from "@/components/ui/table/components/Table/Table"
 export type {
+  ColumnCopyValue,
   DataTableLabels,
   DataTableClassNames,
   DataTableEditInputProps,

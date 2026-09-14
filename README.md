@@ -75,6 +75,7 @@ export function Products({ data }: { data: Product[] }) {
 | `className` / column `className` / `headerClassName` | Extra class hooks                                                                 |
 | `labels` / `summary` / `toolbar`                     | Copy and slot nodes                                                               |
 | `Column.render` / `ColumnDef.cell`                   | Cell content custom render (prefer `update` via context)                          |
+| `Column.copyValue`                                   | Clipboard: `"display"` (default) / `"value"` / `"omit"` / `(ctx) => string`       |
 | `Column.kind` / `cellRenderers`                      | Built-in or custom cell kinds (override / add via registry)                       |
 
 Row/cell **state** is exposed as `data-*` attributes for Tailwind variants:
@@ -239,6 +240,32 @@ Cell selection ships with clipboard shortcuts. The table parses TSV and emits st
 | Ctrl/Cmd+Shift+V | Paste **insert** rows after the selection (`mode: "insert"`, when `enableInsertPaste`) |
 
 Subtree copy encodes relative tree depth as leading tabs in the TSV so paste can rebuild parent/child nesting via `payload.depths`. Depth is only inferred when the clipboard looks like subtree indentation (first row unindented, at least one later row indented). Otherwise leading empty cells are kept as real values (e.g. Excel/Sheets blank first column) and `depths` stay `0`.
+
+Per-column `copyValue` controls what lands on the clipboard when a custom `render` / `kind` is present:
+
+- (default) / `"display"` — text from the rendered cell (buttons stay empty)
+- `"value"` — raw accessor / field value (e.g. a count behind a button)
+- `"omit"` — drop the column from the TSV entirely (neighbors shift left; same-table paste may misalign)
+- `(ctx) => string` — fully custom clipboard string
+
+```tsx
+<ProductTable.Column
+  field="partCount"
+  copyValue="value"
+  render={({ value }) => <button type="button">{value}개 보기</button>}
+>
+  Part No
+</ProductTable.Column>
+
+<ProductTable.Column
+  field="actions"
+  virtual
+  copyValue="omit"
+  render={() => <button type="button">Edit</button>}
+>
+  Actions
+</ProductTable.Column>
+```
 
 ```tsx
 import type { RowsPastePayload } from "react-glide-table/compound";

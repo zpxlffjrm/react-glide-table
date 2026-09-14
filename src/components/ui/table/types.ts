@@ -12,6 +12,7 @@ import type { ComponentType, InputHTMLAttributes, ReactNode, Ref } from "react";
 
 import type {
   CellKind,
+  CellRenderContext,
   CellRenderFn,
   CellRenderer,
 } from "@/components/ui/table/features/cell-render/types";
@@ -28,6 +29,18 @@ export type DataTableEditInputProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
   "type" | "value" | "defaultValue"
 >;
+
+/**
+ * Per-column clipboard serialization.
+ * - `"display"`: text extracted from the rendered cell
+ * - `"value"`: raw accessor / field value
+ * - `"omit"`: exclude this column from clipboard TSV entirely
+ * - function: custom clipboard string
+ */
+export type ColumnCopyValue<
+  T extends Record<string, unknown> = Record<string, unknown>,
+  V = unknown,
+> = "display" | "value" | "omit" | ((ctx: CellRenderContext<T, V>) => string);
 
 export type { DataTableLabels };
 
@@ -68,6 +81,14 @@ declare module "@tanstack/react-table" {
     cellProps?: Record<string, unknown>;
     /** Compound `Column.render` stored for `ResolvedTableCell` */
     cellRender?: CellRenderFn<Record<string, unknown>>;
+    /**
+     * Clipboard serialization for this column.
+     * - `"display"`: rendered cell text (default when `render` / `kind` is set)
+     * - `"value"`: raw accessor / field value
+     * - `"omit"`: exclude this column from clipboard TSV entirely
+     * - function: custom string for the clipboard
+     */
+    copyValue?: ColumnCopyValue;
     /**
      * Freeze (sticky) this column without reordering.
      * `true` / `"left"` stick to the scrollport left; `"right"` to the right.
@@ -514,6 +535,14 @@ export type TableColumnProps<
    * Use `update` to commit via `onCellChange` / `onDataChange`.
    */
   render?: CellRenderFn<T, K extends keyof T ? T[K] : unknown>;
+  /**
+   * Clipboard serialization for this column.
+   * - `"display"`: rendered cell text (default when `render` / `kind` is set)
+   * - `"value"`: raw accessor / field value (useful for button cells that still wrap real data)
+   * - `"omit"`: exclude this column from clipboard TSV (shifts neighbors; prefer empty string for in-table paste)
+   * - function: custom string for the clipboard
+   */
+  copyValue?: ColumnCopyValue<T, K extends keyof T ? T[K] : unknown>;
 };
 
 /** Declares a multi-row header group wrapping leaf `Table.Column`s. */
