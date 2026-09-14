@@ -665,6 +665,165 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
   })
 
+  it("clears cell selection when clicking outside the table", () => {
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row, getValue }) => (
+          <span data-testid={`name-cell-${row.id}`}>
+            {String(getValue<string>() ?? "")}:
+            {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
+          </span>
+        ),
+      },
+    ]
+
+    const { container } = render(
+      <div>
+        <button type="button">outside</button>
+        <DataTable
+          data={SIMPLE_ROWS}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
+
+    fireEvent.mouseDown(screen.getByRole("button", { name: "outside" }))
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:idle")
+  })
+
+  it("clears cell selection when Escape is pressed", () => {
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row, getValue }) => (
+          <span data-testid={`name-cell-${row.id}`}>
+            {String(getValue<string>() ?? "")}:
+            {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
+          </span>
+        ),
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={SIMPLE_ROWS}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableVirtualization={false}
+      />,
+    )
+
+    const firstCell = container.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    if (!firstCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:selected")
+
+    fireEvent.keyDown(window, { key: "Escape" })
+    expect(screen.getByTestId("name-cell-1")).toHaveTextContent("Charlie:idle")
+  })
+
+  it("clears row selection when clicking outside or pressing Escape", async () => {
+    const user = userEvent.setup()
+
+    render(
+      <div>
+        <button type="button">outside</button>
+        <DataTable
+          data={SIMPLE_ROWS}
+          columns={[
+            { id: "name", accessorKey: "name", header: "Name" },
+            { id: "amount", accessorKey: "amount", header: "Amount" },
+          ]}
+          getRowId={(row) => row.id}
+          rowSelectionMode="multi"
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const rows = screen.getAllByRole("row")
+    await user.click(rows[1])
+    expect(screen.getByText("✓ 1 selected")).toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByRole("button", { name: "outside" }))
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+
+    await user.click(rows[1])
+    expect(screen.getByText("✓ 1 selected")).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: "Escape" })
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+  })
+
+  it("copies from the last interacted table when multiple tables are mounted", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    })
+
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+      },
+    ]
+
+    const { container } = render(
+      <div>
+        <DataTable
+          data={[{ id: "a1", name: "FirstTable", amount: 1 }]}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+        <DataTable
+          data={[{ id: "b1", name: "SecondTable", amount: 2 }]}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+        />
+      </div>,
+    )
+
+    const tables = container.querySelectorAll(".DataTableJSX")
+    const firstCell = tables[0]?.querySelector("tbody tr td")
+    const secondCell = tables[1]?.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    expect(secondCell).not.toBeNull()
+    if (!firstCell || !secondCell) return
+
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+    fireEvent.mouseDown(secondCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    fireEvent.keyDown(window, { key: "c", metaKey: true })
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("SecondTable")
+    })
+  })
+
   it("blurs an external input when a cell is clicked so copy uses the selection", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, "clipboard", {
