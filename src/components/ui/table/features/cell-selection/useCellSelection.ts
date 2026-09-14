@@ -3,6 +3,13 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
 import type { CellRendererRegistry } from "@/components/ui/table/features/cell-render/registry"
 import {
+  claimCellSelectionOwner,
+  createCellSelectionOwner,
+  isActiveCellSelectionOwner,
+  registerCellSelectionOwner,
+  releaseCellSelectionOwner,
+} from "@/components/ui/table/features/cell-selection/activeCellSelectionOwner"
+import {
   clampCellPosition,
   getActiveSelectionBounds,
   getCellNavigationDelta,
@@ -70,6 +77,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
   cellRendererRegistry,
   rootRef,
 }: UseCellSelectionOptions<T>) {
+  const ownerRef = useRef(createCellSelectionOwner())
   const [dragState, setDragState] = useState<DragState>(INITIAL_DRAG_STATE)
   const pendingPasteModeRef = useRef<PasteMode | null>(null)
   const dragStateRef = useRef(dragState)
@@ -86,6 +94,8 @@ export function useCellSelection<T extends Record<string, unknown>>({
   const handleCellMouseDown = useCallback(
     (rowIndex: number, colIndex: number, options?: CellMouseDownOptions) => {
       if (!enabled) return
+
+      claimCellSelectionOwner(ownerRef.current)
 
       setDragState((prev) => {
         if (options?.shiftKey && prev.start) {
@@ -135,6 +145,8 @@ export function useCellSelection<T extends Record<string, unknown>>({
     (rowIndex: number, colIndex: number) => {
       if (!enabled) return
 
+      claimCellSelectionOwner(ownerRef.current)
+
       setDragState((prev) => {
         const bounds = getCellSelectionBounds(prev.start, prev.end)
         if (!bounds) return prev
@@ -162,6 +174,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       return
     }
 
+    releaseCellSelectionOwner(ownerRef.current)
     dragStateRef.current = INITIAL_DRAG_STATE
     setDragState(INITIAL_DRAG_STATE)
   }, [])
@@ -173,9 +186,14 @@ export function useCellSelection<T extends Record<string, unknown>>({
   }, [clearSelection, enabled])
 
   useEffect(() => {
+    return registerCellSelectionOwner(ownerRef.current, clearSelection)
+  }, [clearSelection])
+
+  useEffect(() => {
     if (!enabled) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActiveCellSelectionOwner(ownerRef.current)) return
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
         return
@@ -266,6 +284,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
     if (!enabled) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActiveCellSelectionOwner(ownerRef.current)) return
       if (!activeSelectionBounds) return
       if (!(e.ctrlKey || e.metaKey)) return
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
@@ -314,6 +333,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
     const ignoreNextPasteRef = { current: false }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActiveCellSelectionOwner(ownerRef.current)) return
       if (!activeSelectionBounds) return
       if (!(e.ctrlKey || e.metaKey)) return
       if (e.key.toLowerCase() !== "v") return
@@ -337,6 +357,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
           const text = await navigator.clipboard.readText()
           if (pasteHandledRef.current) return
           if (pendingPasteModeRef.current !== mode) return
+          if (!isActiveCellSelectionOwner(ownerRef.current)) return
           if (!text) return
 
           pasteHandledRef.current = true
@@ -349,6 +370,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
     }
 
     const handlePaste = (e: ClipboardEvent) => {
+      if (!isActiveCellSelectionOwner(ownerRef.current)) return
       if (!activeSelectionBounds) return
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
         return

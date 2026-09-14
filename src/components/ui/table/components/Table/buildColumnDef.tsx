@@ -12,6 +12,7 @@ import { DATA_TABLE_COLUMN_SIZE } from "@/components/ui/table/constants";
 import { ResolvedTableCell } from "@/components/ui/table/features/cell-render/ResolvedTableCell";
 import type { CellRenderFn } from "@/components/ui/table/features/cell-render/types";
 import type {
+  ColumnCopyValue,
   TableColumnGroupProps,
   TableColumnProps,
 } from "@/components/ui/table/types";
@@ -80,6 +81,7 @@ export function buildColumnDef<T extends Record<string, unknown>>(
     className,
     headerClassName,
     render,
+    copyValue,
   } = props;
 
   return {
@@ -113,6 +115,7 @@ export function buildColumnDef<T extends Record<string, unknown>>(
       kind,
       cellProps,
       cellRender: render as CellRenderFn<Record<string, unknown>> | undefined,
+      copyValue: copyValue as ColumnCopyValue | undefined,
       frozen,
       reorderable,
       width,

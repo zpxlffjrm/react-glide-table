@@ -9,6 +9,7 @@ import type {
   CellRenderFn,
 } from "@/components/ui/table/features/cell-render/types"
 import type { CellSelectionBounds } from "@/components/ui/table/features/cell-selection/cellSelection"
+import type { ColumnCopyValue } from "@/components/ui/table/types"
 
 export type CopySelectionMode = "visible" | "subtree"
 
@@ -33,6 +34,7 @@ type ColumnCopyMeta = {
   cellRender?: CellRenderFn<Record<string, unknown>>
   cellProps?: Record<string, unknown>
   kind?: CellKind
+  copyValue?: ColumnCopyValue
 }
 
 function isReactNodeIterable(node: ReactNode): node is Iterable<ReactNode> {
@@ -314,19 +316,34 @@ function formatCopyCellText<T extends Record<string, unknown>>(
     ? sourceCell.getValue()
     : readRowColumnValue(rowData, columnDef)
 
+  const row = visibleRow ?? createCopyRenderRow(rowData, fallbackIndex)
+  const ctx = {
+    value,
+    row: row as Row<Record<string, unknown>>,
+    index: row.index,
+    columnId,
+    cellProps: meta?.cellProps,
+    update: () => {},
+  } as CellRenderContext
+
+  const copyValue = meta?.copyValue
+  if (typeof copyValue === "function") {
+    try {
+      return sanitizeClipboardCell(copyValue(ctx))
+    } catch {
+      return formatCellValue(value)
+    }
+  }
+
+  if (copyValue === "value") {
+    return formatCellValue(value)
+  }
+
+  // copyValue === "display" | undefined → prefer rendered text when available
   const cellRender = meta?.cellRender
   if (typeof cellRender === "function") {
     try {
-      const row = visibleRow ?? createCopyRenderRow(rowData, fallbackIndex)
-      const node = cellRender({
-        value,
-        row: row as Row<Record<string, unknown>>,
-        index: row.index,
-        columnId,
-        cellProps: meta?.cellProps,
-        update: () => {},
-      })
-
+      const node = cellRender(ctx)
       return extractRenderedCopyText(node, value, cellPosition, options?.root)
     } catch {
       return formatCellValue(value)
@@ -339,15 +356,6 @@ function formatCopyCellText<T extends Record<string, unknown>>(
   // instead of the raw underlying value (e.g. a masked secret).
   if (options?.registry && meta?.kind && isPrimitiveCopyValue(value)) {
     try {
-      const row = visibleRow ?? createCopyRenderRow(rowData, fallbackIndex)
-      const ctx: CellRenderContext = {
-        value,
-        row: row as Row<Record<string, unknown>>,
-        index: row.index,
-        columnId,
-        cellProps: meta.cellProps,
-        update: () => {},
-      }
       const renderer = resolveCellRenderer(options.registry, meta.kind, ctx)
       if (renderer) {
         const node = renderer.render(ctx)
@@ -546,6 +554,11 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
       : copyRows.map((row) => getRowDepth(row))
   const minDepth = Math.min(...resolvedDepths)
   const visibleRowByOriginal = buildVisibleRowLookup(visibleRows)
+  const copyableColumns = columnCells.flatMap((templateCell, colOffset) => {
+    const meta = templateCell.column.columnDef.meta as ColumnCopyMeta | undefined
+    if (meta?.copyValue === "omit") return []
+    return [{ templateCell, colOffset }]
+  })
 
   return copyRows
     .map((rowData, index) => {
@@ -554,8 +567,8 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
       const matchingCells = visibleRow
         ?.getVisibleCells()
         .slice(startCol, endCol + 1)
-      const line = columnCells
-        .map((templateCell, colOffset) => {
+      const line = copyableColumns
+        .map(({ templateCell, colOffset }) => {
           const sourceCell = matchingCells?.[colOffset]
           const column = sourceCell?.column ?? templateCell.column
 

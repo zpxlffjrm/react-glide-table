@@ -39,6 +39,9 @@ import {
 import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { isEditablePasteTarget } from "@/components/ui/table/features/cell-selection/pasteData";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
+import {
+  isOverlayDismissIgnoreTarget,
+} from "@/components/ui/table/features/selection-dismiss/isOutsideDismissTarget";
 import { applyLeafColumnOrder } from "@/components/ui/table/features/column-reorder/columnReorder";
 import {
   buildColumnFreezeOffsets,
@@ -499,24 +502,20 @@ export function useGlideTable<T extends Record<string, unknown>>(
       ) {
         return;
       }
-
-      clearAllSelections();
-    };
-
-    const handleMouseDown = (event: MouseEvent) => {
-      const root = rootRef.current;
-      if (!root) return;
-      if (event.target instanceof Node && root.contains(event.target)) return;
+      if (
+        isOverlayDismissIgnoreTarget(event.target) ||
+        isOverlayDismissIgnoreTarget(document.activeElement)
+      ) {
+        return;
+      }
 
       clearAllSelections();
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
     };
   }, [clearCellSelection, clearRowSelection]);
 
