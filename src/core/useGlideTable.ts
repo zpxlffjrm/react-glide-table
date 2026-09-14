@@ -37,6 +37,7 @@ import {
   type CellContextWithUpdate,
 } from "@/components/ui/table/features/cell-render/withCellUpdate";
 import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
+import { isEditablePasteTarget } from "@/components/ui/table/features/cell-selection/pasteData";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import { applyLeafColumnOrder } from "@/components/ui/table/features/column-reorder/columnReorder";
 import {
@@ -452,6 +453,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleCellMouseDown,
     handleCellMouseEnter,
     handleFillHandleMouseDown,
+    clearSelection: clearCellSelection,
     copySelection,
   } = useCellSelection({
     data: tableData,
@@ -467,6 +469,56 @@ export function useGlideTable<T extends Record<string, unknown>>(
     cellRendererRegistry,
     rootRef,
   });
+
+  const clearRowSelection = useCallback(() => {
+    if (rowSelectionMode === "none") return;
+
+    const hasSelection = Object.values(rowSelection).some(Boolean);
+    if (!hasSelection) return;
+
+    if (onRowSelectionChange) {
+      onRowSelectionChange(() => ({}));
+      return;
+    }
+
+    setInternalRowSelection({});
+  }, [onRowSelectionChange, rowSelection, rowSelectionMode]);
+
+  useEffect(() => {
+    const clearAllSelections = () => {
+      clearCellSelection();
+      clearRowSelection();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (event.defaultPrevented) return;
+      if (
+        isEditablePasteTarget(event.target) ||
+        isEditablePasteTarget(document.activeElement)
+      ) {
+        return;
+      }
+
+      clearAllSelections();
+    };
+
+    const handleMouseDown = (event: MouseEvent) => {
+      const root = rootRef.current;
+      if (!root) return;
+      if (event.target instanceof Node && root.contains(event.target)) return;
+
+      clearAllSelections();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [clearCellSelection, clearRowSelection]);
 
   const {
     editingCell,
