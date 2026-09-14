@@ -151,11 +151,26 @@ export function useCellSelection<T extends Record<string, unknown>>({
     [enabled],
   )
 
+  const clearSelection = useCallback(() => {
+    const prev = dragStateRef.current
+    if (
+      prev.start === null &&
+      prev.end === null &&
+      !prev.isSelecting &&
+      !prev.isFillDragging
+    ) {
+      return
+    }
+
+    dragStateRef.current = INITIAL_DRAG_STATE
+    setDragState(INITIAL_DRAG_STATE)
+  }, [])
+
   useEffect(() => {
     if (!enabled) {
-      setDragState(INITIAL_DRAG_STATE)
+      clearSelection()
     }
-  }, [enabled])
+  }, [clearSelection, enabled])
 
   useEffect(() => {
     if (!enabled) return
@@ -432,6 +447,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
     handleCellMouseDown,
     handleCellMouseEnter,
     handleFillHandleMouseDown,
+    clearSelection,
     copySelection,
   }
 }
