@@ -540,6 +540,170 @@ describe("serializeSelectionToTSV with cellRender", () => {
     ).toBe("Ada\t\t")
   })
 
+  it("copies raw field values when copyValue is \"value\"", () => {
+    function Button({ children }: { children?: ReactNode }) {
+      return createElement("button", { type: "button" }, children)
+    }
+    Button.displayName = "Button"
+
+    type RowData = { id: string; name: string; partCount: number }
+
+    const original: RowData = { id: "1", name: "Ada", partCount: 3 }
+    const visibleRows = [
+      {
+        id: "0",
+        index: 0,
+        original,
+        getVisibleCells: () => [
+          {
+            column: {
+              id: "name",
+              columnDef: { accessorKey: "name", id: "name" },
+            },
+            getValue: () => original.name,
+          },
+          {
+            column: {
+              id: "partCount",
+              columnDef: {
+                accessorKey: "partCount",
+                id: "partCount",
+                meta: {
+                  copyValue: "value",
+                  cellRender: ({ value }: { value: unknown }) =>
+                    createElement(Button, null, `${Number(value)}개 보기`),
+                },
+              },
+            },
+            getValue: () => original.partCount,
+          },
+          {
+            column: {
+              id: "actions",
+              columnDef: {
+                id: "actions",
+                meta: {
+                  copyValue: () => "",
+                  cellRender: () => createElement(Button, null, "수정"),
+                },
+              },
+            },
+            getValue: () => undefined,
+          },
+        ],
+      },
+    ] as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 2,
+      }),
+    ).toBe("Ada\t3\t")
+  })
+
+  it("skips columns when copyValue is \"omit\"", () => {
+    function Button({ children }: { children?: ReactNode }) {
+      return createElement("button", { type: "button" }, children)
+    }
+    Button.displayName = "Button"
+
+    type RowData = { id: string; name: string; createdAt: string }
+
+    const original: RowData = {
+      id: "1",
+      name: "Ada",
+      createdAt: "2026-09-11",
+    }
+    const visibleRows = [
+      {
+        id: "0",
+        index: 0,
+        original,
+        getVisibleCells: () => [
+          {
+            column: {
+              id: "name",
+              columnDef: { accessorKey: "name", id: "name" },
+            },
+            getValue: () => original.name,
+          },
+          {
+            column: {
+              id: "actions",
+              columnDef: {
+                id: "actions",
+                meta: {
+                  copyValue: "omit",
+                  cellRender: () => createElement(Button, null, "수정"),
+                },
+              },
+            },
+            getValue: () => undefined,
+          },
+          {
+            column: {
+              id: "createdAt",
+              columnDef: { accessorKey: "createdAt", id: "createdAt" },
+            },
+            getValue: () => original.createdAt,
+          },
+        ],
+      },
+    ] as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 2,
+      }),
+    ).toBe("Ada\t2026-09-11")
+  })
+
+  it("uses a copyValue function when provided", () => {
+    type RowData = { id: string; price: number }
+
+    const original: RowData = { id: "1", price: 1234 }
+    const visibleRows = [
+      {
+        id: "0",
+        index: 0,
+        original,
+        getVisibleCells: () => [
+          {
+            column: {
+              id: "price",
+              columnDef: {
+                accessorKey: "price",
+                id: "price",
+                meta: {
+                  copyValue: ({ value }: { value: unknown }) =>
+                    `USD ${Number(value)}`,
+                  cellRender: ({ value }: { value: unknown }) =>
+                    `$${Number(value).toLocaleString("en-US")}`,
+                },
+              },
+            },
+            getValue: () => original.price,
+          },
+        ],
+      },
+    ] as unknown as Row<RowData>[]
+
+    expect(
+      serializeSelectionToTSV(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).toBe("USD 1234")
+  })
+
   it("copies image cells from src url, not the filename field", () => {
     function CustomerCiImage() {
       return createElement("img", { src: "https://cdn.example/ci.png", alt: "" })
