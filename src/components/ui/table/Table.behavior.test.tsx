@@ -872,6 +872,74 @@ describe("DataTable direct usage behavior", () => {
     })
   })
 
+  it("ignores a pending paste if another table claims ownership before the clipboard read resolves", async () => {
+    let resolveReadText: (value: string) => void = () => {}
+    const readText = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveReadText = resolve
+        }),
+    )
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    })
+
+    const onRowsPasteA = vi.fn()
+    const onRowsPasteB = vi.fn()
+
+    const columns: ColumnDef<SimpleRow, unknown>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+      },
+    ]
+
+    const { container } = render(
+      <div>
+        <DataTable
+          data={[{ id: "a1", name: "FirstTable", amount: 1 }]}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+          onRowsPaste={onRowsPasteA}
+        />
+        <DataTable
+          data={[{ id: "b1", name: "SecondTable", amount: 2 }]}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableVirtualization={false}
+          onRowsPaste={onRowsPasteB}
+        />
+      </div>,
+    )
+
+    const tables = container.querySelectorAll(".DataTableJSX")
+    const firstCell = tables[0]?.querySelector("tbody tr td")
+    const secondCell = tables[1]?.querySelector("tbody tr td")
+    expect(firstCell).not.toBeNull()
+    expect(secondCell).not.toBeNull()
+    if (!firstCell || !secondCell) return
+
+    // Table A becomes the active owner and starts an async clipboard read.
+    fireEvent.mouseDown(firstCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+    fireEvent.keyDown(window, { key: "v", metaKey: true })
+
+    await waitFor(() => expect(readText).toHaveBeenCalledTimes(1))
+
+    // Ownership moves to table B before the read resolves.
+    fireEvent.mouseDown(secondCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+
+    resolveReadText("pasted-text")
+    await waitFor(() => expect(readText).toHaveBeenCalledTimes(1))
+
+    expect(onRowsPasteA).not.toHaveBeenCalled()
+    expect(onRowsPasteB).not.toHaveBeenCalled()
+  })
+
   it("blurs an external input when a cell is clicked so copy uses the selection", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, "clipboard", {

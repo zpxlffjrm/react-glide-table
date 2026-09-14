@@ -357,6 +357,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
           const text = await navigator.clipboard.readText()
           if (pasteHandledRef.current) return
           if (pendingPasteModeRef.current !== mode) return
+          if (!isActiveCellSelectionOwner(ownerRef.current)) return
           if (!text) return
 
           pasteHandledRef.current = true
