@@ -63,6 +63,24 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   rootRef?: RefObject<HTMLElement | null>
 }
 
+/**
+ * True when something outside this table currently holds focus (e.g. a modal's
+ * focus-trap moved `document.activeElement` into its own subtree). Keyboard
+ * shortcuts must back off in that case even for non-input focus targets that
+ * `isEditablePasteTarget` doesn't catch (custom text displays, dialog containers).
+ * `document.body` is treated as "no focus" so shortcuts still work right after a
+ * plain cell click, which doesn't itself move focus.
+ */
+function isFocusOutsideRoot(rootRef: RefObject<HTMLElement | null> | undefined): boolean {
+  const root = rootRef?.current
+  if (!root) return false
+
+  const active = document.activeElement
+  if (!active || active === document.body) return false
+
+  return !root.contains(active)
+}
+
 export function useCellSelection<T extends Record<string, unknown>>({
   data,
   rows,
@@ -198,6 +216,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
         return
       }
+      if (isFocusOutsideRoot(rootRef)) return
 
       const delta = getCellNavigationDelta(e.key)
       if (!delta) return
@@ -290,6 +309,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
         return
       }
+      if (isFocusOutsideRoot(rootRef)) return
 
       const isSubtreeShortcut =
         enableSubtreeCopy && e.shiftKey && e.key.toLowerCase() === "c"
@@ -340,6 +360,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
         return
       }
+      if (isFocusOutsideRoot(rootRef)) return
 
       if (e.shiftKey && !enableInsertPaste) {
         ignoreNextPasteRef.current = true
@@ -375,6 +396,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       if (isEditablePasteTarget(e.target) || isEditablePasteTarget(document.activeElement)) {
         return
       }
+      if (isFocusOutsideRoot(rootRef)) return
 
       if (ignoreNextPasteRef.current) {
         ignoreNextPasteRef.current = false
