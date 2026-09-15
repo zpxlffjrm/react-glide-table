@@ -729,9 +729,6 @@ describe("DataTable direct usage behavior", () => {
     const secondTableRows: SimpleRow[] = [{ id: "b1", name: "SecondTable", amount: 2 }]
 
     function TwoTables() {
-      // Recreated on every render, mirroring the unstable onRowSelectionChange
-      // reference that originally starved this table's Escape listener and let
-      // it repeatedly re-register with the shared registry.
       const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({
         "1": true,
       })

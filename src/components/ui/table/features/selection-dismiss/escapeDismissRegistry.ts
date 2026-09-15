@@ -41,7 +41,17 @@ function handleEscape(event: KeyboardEvent): void {
   // `clearAllByOwner` mid-iteration. Iterating a snapshot means each owner
   // registered at the start of the keypress runs exactly once.
   for (const clearAllSelections of [...clearAllByOwner.values()]) {
-    clearAllSelections();
+    // One table's callback throwing (e.g. consumer code invoked through a
+    // controlled onRowSelectionChange) must not stop the remaining tables
+    // from clearing. Separate native listeners would have isolated a throw
+    // this way; a single shared loop has to do it explicitly.
+    try {
+      clearAllSelections();
+    } catch (error) {
+      // Report rather than swallow, without letting the throw abort the
+      // loop and starve the tables that haven't cleared yet.
+      console.error("[react-glide-table] escape-dismiss callback failed", error);
+    }
   }
 }
 
