@@ -35,7 +35,12 @@ function handleEscape(event: KeyboardEvent): void {
     return;
   }
 
-  for (const clearAllSelections of clearAllByOwner.values()) {
+  // Snapshot before invoking: a callback can synchronously trigger its
+  // owner's effect cleanup/re-registration (e.g. a controlled selection
+  // callback that causes a synchronous React update), which would mutate
+  // `clearAllByOwner` mid-iteration. Iterating a snapshot means each owner
+  // registered at the start of the keypress runs exactly once.
+  for (const clearAllSelections of [...clearAllByOwner.values()]) {
     clearAllSelections();
   }
 }

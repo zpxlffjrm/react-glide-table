@@ -725,6 +725,70 @@ describe("DataTable direct usage behavior", () => {
     expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
   })
 
+  it("clears selection in every mounted table with a single Escape press", () => {
+    const secondTableRows: SimpleRow[] = [{ id: "b1", name: "SecondTable", amount: 2 }]
+
+    function TwoTables() {
+      // Recreated on every render, mirroring the unstable onRowSelectionChange
+      // reference that originally starved this table's Escape listener and let
+      // it repeatedly re-register with the shared registry.
+      const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({
+        "1": true,
+      })
+
+      return (
+        <div>
+          <DataTable
+            data={SIMPLE_ROWS}
+            columns={[{ id: "name", accessorKey: "name", header: "Name" }]}
+            getRowId={(row) => row.id}
+            rowSelectionMode="single"
+            rowSelection={rowSelection}
+            onRowSelectionChange={(updater) =>
+              setRowSelection((prev) => (typeof updater === "function" ? updater(prev) : updater))
+            }
+            enableVirtualization={false}
+          />
+          <DataTable
+            data={secondTableRows}
+            columns={[
+              {
+                id: "name",
+                accessorKey: "name",
+                header: "Name",
+                cell: ({ row, getValue }) => (
+                  <span data-testid="second-table-cell">
+                    {String(getValue<string>() ?? "")}:
+                    {row.getIsCellDragSelected?.("name") ? "selected" : "idle"}
+                  </span>
+                ),
+              },
+            ]}
+            getRowId={(row) => row.id}
+            enableVirtualization={false}
+          />
+        </div>
+      )
+    }
+
+    const { container } = render(<TwoTables />)
+    expect(screen.getByText("✓ 1 selected")).toBeInTheDocument()
+
+    const tables = container.querySelectorAll(".DataTableJSX")
+    const secondCell = tables[1]?.querySelector("tbody tr td")
+    expect(secondCell).not.toBeNull()
+    if (!secondCell) return
+
+    fireEvent.mouseDown(secondCell, { clientY: 4 })
+    fireEvent.mouseUp(window)
+    expect(screen.getByTestId("second-table-cell")).toHaveTextContent("SecondTable:selected")
+
+    fireEvent.keyDown(window, { key: "Escape" })
+
+    expect(screen.queryByText("✓ 1 selected")).not.toBeInTheDocument()
+    expect(screen.getByTestId("second-table-cell")).toHaveTextContent("SecondTable:idle")
+  })
+
   it("does not clear selection when Escape is pressed inside a portaled dialog", async () => {
     const user = userEvent.setup()
     const onRowSelectionChange = vi.fn()
