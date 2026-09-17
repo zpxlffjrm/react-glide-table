@@ -1066,15 +1066,23 @@ describe("serializeSelectionToTSV with a cell renderer registry", () => {
   })
 })
 
+function stubExecCommand(returnValue: boolean) {
+  const fn = vi.fn().mockReturnValue(returnValue)
+  Object.defineProperty(document, "execCommand", {
+    configurable: true,
+    value: fn,
+  })
+  return fn
+}
+
 describe("writeSelectionToClipboard", () => {
-  it("returns false when clipboard write fails", async () => {
+  it("returns false when navigator.clipboard is unavailable and execCommand also fails", async () => {
     const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: {
-        writeText: vi.fn().mockRejectedValue(new Error("denied")),
-      },
+      value: undefined,
     })
+    stubExecCommand(false)
 
     await expect(
       writeSelectionToClipboard(visibleRows, {
@@ -1084,5 +1092,50 @@ describe("writeSelectionToClipboard", () => {
         endCol: 0,
       }),
     ).resolves.toBe(false)
+  })
+
+  it("falls back to execCommand when navigator.clipboard is unavailable (e.g. HTTP)", async () => {
+    const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: undefined,
+    })
+    const execCommand = stubExecCommand(true)
+
+    await expect(
+      writeSelectionToClipboard(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).resolves.toBe(true)
+
+    expect(execCommand).toHaveBeenCalledWith("copy")
+  })
+
+  it("returns false without retrying execCommand when navigator.clipboard.writeText rejects", async () => {
+    // A rejection is only observed after an `await`, so by then we're no
+    // longer in the synchronous user-gesture call stack `execCommand`
+    // needs - retrying it here would be unreliable, so we don't.
+    const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("denied")),
+      },
+    })
+    const execCommand = stubExecCommand(true)
+
+    await expect(
+      writeSelectionToClipboard(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).resolves.toBe(false)
+
+    expect(execCommand).not.toHaveBeenCalled()
   })
 })
