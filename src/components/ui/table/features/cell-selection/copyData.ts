@@ -609,6 +609,40 @@ export function serializeSelectionToTSV<T extends Record<string, unknown>>(
   )
 }
 
+/**
+ * Legacy fallback for origins where `navigator.clipboard` is unavailable
+ * (e.g. plain HTTP, which isn't a secure context) or where `writeText`
+ * rejects. `execCommand("copy")` has no secure-context requirement, but it
+ * must run synchronously within the user-gesture call stack that triggered
+ * the copy, so this is only reached before/without an intervening `await`.
+ */
+function writeTextWithExecCommand(text: string): boolean {
+  if (typeof document === "undefined") return false
+
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.setAttribute("readonly", "")
+  textarea.style.position = "fixed"
+  textarea.style.top = "0"
+  textarea.style.left = "0"
+  textarea.style.opacity = "0"
+  textarea.style.pointerEvents = "none"
+  document.body.appendChild(textarea)
+
+  const previouslyFocused = document.activeElement as HTMLElement | null
+
+  try {
+    textarea.focus()
+    textarea.select()
+    return document.execCommand("copy")
+  } catch {
+    return false
+  } finally {
+    document.body.removeChild(textarea)
+    previouslyFocused?.focus?.()
+  }
+}
+
 export async function writeSelectionToClipboard<T extends Record<string, unknown>>(
   visibleRows: Row<T>[],
   bounds: CellSelectionBounds,
@@ -618,11 +652,15 @@ export async function writeSelectionToClipboard<T extends Record<string, unknown
   const text = serializeSelectionToTSV(visibleRows, bounds, mode, options)
   if (!text) return false
 
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch {
-    return false
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Permission denied or another runtime failure - fall through to the
+      // legacy fallback below.
+    }
   }
 
-  return true
+  return writeTextWithExecCommand(text)
 }

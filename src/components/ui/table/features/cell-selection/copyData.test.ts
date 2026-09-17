@@ -1066,8 +1066,17 @@ describe("serializeSelectionToTSV with a cell renderer registry", () => {
   })
 })
 
+function stubExecCommand(returnValue: boolean) {
+  const fn = vi.fn().mockReturnValue(returnValue)
+  Object.defineProperty(document, "execCommand", {
+    configurable: true,
+    value: fn,
+  })
+  return fn
+}
+
 describe("writeSelectionToClipboard", () => {
-  it("returns false when clipboard write fails", async () => {
+  it("returns false when clipboard write fails and execCommand fallback also fails", async () => {
     const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -1075,6 +1084,7 @@ describe("writeSelectionToClipboard", () => {
         writeText: vi.fn().mockRejectedValue(new Error("denied")),
       },
     })
+    stubExecCommand(false)
 
     await expect(
       writeSelectionToClipboard(visibleRows, {
@@ -1084,5 +1094,45 @@ describe("writeSelectionToClipboard", () => {
         endCol: 0,
       }),
     ).resolves.toBe(false)
+  })
+
+  it("falls back to execCommand when navigator.clipboard is unavailable (e.g. HTTP)", async () => {
+    const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: undefined,
+    })
+    const execCommand = stubExecCommand(true)
+
+    await expect(
+      writeSelectionToClipboard(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).resolves.toBe(true)
+
+    expect(execCommand).toHaveBeenCalledWith("copy")
+  })
+
+  it("falls back to execCommand when navigator.clipboard.writeText rejects", async () => {
+    const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("denied")),
+      },
+    })
+    stubExecCommand(true)
+
+    await expect(
+      writeSelectionToClipboard(visibleRows, {
+        startRow: 0,
+        endRow: 0,
+        startCol: 0,
+        endCol: 0,
+      }),
+    ).resolves.toBe(true)
   })
 })
