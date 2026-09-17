@@ -1076,13 +1076,11 @@ function stubExecCommand(returnValue: boolean) {
 }
 
 describe("writeSelectionToClipboard", () => {
-  it("returns false when clipboard write fails and execCommand fallback also fails", async () => {
+  it("returns false when navigator.clipboard is unavailable and execCommand also fails", async () => {
     const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: {
-        writeText: vi.fn().mockRejectedValue(new Error("denied")),
-      },
+      value: undefined,
     })
     stubExecCommand(false)
 
@@ -1116,7 +1114,10 @@ describe("writeSelectionToClipboard", () => {
     expect(execCommand).toHaveBeenCalledWith("copy")
   })
 
-  it("falls back to execCommand when navigator.clipboard.writeText rejects", async () => {
+  it("returns false without retrying execCommand when navigator.clipboard.writeText rejects", async () => {
+    // A rejection is only observed after an `await`, so by then we're no
+    // longer in the synchronous user-gesture call stack `execCommand`
+    // needs - retrying it here would be unreliable, so we don't.
     const visibleRows = createVisibleRows([{ id: "1", name: "A", qty: 1 }])
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -1124,7 +1125,7 @@ describe("writeSelectionToClipboard", () => {
         writeText: vi.fn().mockRejectedValue(new Error("denied")),
       },
     })
-    stubExecCommand(true)
+    const execCommand = stubExecCommand(true)
 
     await expect(
       writeSelectionToClipboard(visibleRows, {
@@ -1133,6 +1134,8 @@ describe("writeSelectionToClipboard", () => {
         startCol: 0,
         endCol: 0,
       }),
-    ).resolves.toBe(true)
+    ).resolves.toBe(false)
+
+    expect(execCommand).not.toHaveBeenCalled()
   })
 })

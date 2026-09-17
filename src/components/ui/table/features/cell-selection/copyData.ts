@@ -611,10 +611,12 @@ export function serializeSelectionToTSV<T extends Record<string, unknown>>(
 
 /**
  * Legacy fallback for origins where `navigator.clipboard` is unavailable
- * (e.g. plain HTTP, which isn't a secure context) or where `writeText`
- * rejects. `execCommand("copy")` has no secure-context requirement, but it
- * must run synchronously within the user-gesture call stack that triggered
- * the copy, so this is only reached before/without an intervening `await`.
+ * (e.g. plain HTTP, which isn't a secure context). `execCommand("copy")` has
+ * no secure-context requirement, but it must run synchronously within the
+ * user-gesture call stack that triggered the copy - so this is only called
+ * from the synchronous "API missing" branch below, never after an awaited
+ * `writeText` rejection (by then the gesture's call stack is gone and
+ * `execCommand` may be denied).
  */
 function writeTextWithExecCommand(text: string): boolean {
   if (typeof document === "undefined") return false
@@ -652,15 +654,20 @@ export async function writeSelectionToClipboard<T extends Record<string, unknown
   const text = serializeSelectionToTSV(visibleRows, bounds, mode, options)
   if (!text) return false
 
-  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch {
-      // Permission denied or another runtime failure - fall through to the
-      // legacy fallback below.
-    }
+  if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+    // No Clipboard API at all (e.g. plain HTTP) - still synchronous, so the
+    // user-gesture call stack `execCommand` needs is intact.
+    return writeTextWithExecCommand(text)
   }
 
-  return writeTextWithExecCommand(text)
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // Permission denied or another runtime failure. Not retried via
+    // execCommand: by now we're past the awaited rejection, outside the
+    // originating gesture's call stack, so the legacy fallback would be
+    // unreliable at best.
+    return false
+  }
 }
