@@ -211,23 +211,29 @@ export function DataTableRow<T extends Record<string, unknown>>({
   // 않고, 이 행이 속한 각 그룹의 hover 여부를 문자열 시그니처 하나로 구독한다 —
   // 어느 그룹이든 멤버십이 바뀌면 시그니처가 달라져 다시 렌더된다.
   // primary 컬럼은 이미 isGroupHovered로 반응하므로 여기서 다시 계산하지 않는다.
+  // resolveRowSpanAt은 최악의 경우 rowIndex부터 역방향으로 걸어서 O(rows)이므로,
+  // store가 알림을 보낼 때마다(즉 모든 행에서) 다시 계산하지 않도록 이 행의
+  // range는 스냅샷 밖(렌더 본문)에서 한 번만 구하고, 스냅샷은 정수 비교만 한다.
   const rowSpanColumnIds = enableRowSpan
     ? [...columnRowSpanMap.keys()].filter((id) => id !== primaryRowSpanColumnId)
     : [];
+  const nestedRowSpanRanges = rowSpanColumnIds.map((columnId) => {
+    const { startRow, rowSpan: span } = resolveRowSpanAt(
+      columnRowSpanMap.get(columnId),
+      rowIndex,
+    );
+
+    return { columnId, startRow, span };
+  });
   const nestedHoverSignature = useSyncExternalStore(
     hoverStore.subscribe,
     () => {
       const hovered = hoverStore.getHoveredRowIndex();
 
-      return rowSpanColumnIds
-        .map((columnId) => {
-          const { startRow, rowSpan: span } = resolveRowSpanAt(
-            columnRowSpanMap.get(columnId),
-            rowIndex,
-          );
-
-          return isRowGroupHovered(hovered, true, startRow, span) ? "1" : "0";
-        })
+      return nestedRowSpanRanges
+        .map(({ startRow, span }) =>
+          isRowGroupHovered(hovered, true, startRow, span) ? "1" : "0",
+        )
         .join("");
     },
     () => rowSpanColumnIds.map(() => "0").join(""),
