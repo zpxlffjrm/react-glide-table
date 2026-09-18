@@ -1,5 +1,10 @@
 import { flexRender, type Cell, type Row } from "@tanstack/react-table";
-import { useEffect, useRef, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 
 import {
   CELL_ALIGN_CLASS,
@@ -26,10 +31,12 @@ import {
   getColumnFreezeStyle,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
-import {
-  buildSearchMatchKey,
-} from "@/components/ui/table/features/inline-search/inlineSearch";
+import { buildSearchMatchKey } from "@/components/ui/table/features/inline-search/inlineSearch";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
+import {
+  isRowGroupHovered,
+  isRowHovered as computeIsRowHovered,
+} from "@/components/ui/table/features/row-hover/rowHover";
 import {
   resolveRowSpanAt,
   type RowSpanInfo,
@@ -126,7 +133,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
     enableRowSpan,
     primaryRowSpanColumnId,
     columnRowSpanMap,
-    hoveredRowIndex,
+    hoverStore,
     selectedRowIndices,
     onRowHover,
   } = rowSpan;
@@ -170,7 +177,6 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
   const rowIndex = row.index;
   const rowData = row.original;
-  const isRowHovered = hoveredRowIndex === rowIndex;
   const isRowSelected = row.getIsSelected();
   const { startRow: primaryGroupStart, rowSpan: primaryGroupSpan } =
     resolveRowSpanAt(
@@ -179,11 +185,65 @@ export function DataTableRow<T extends Record<string, unknown>>({
         : undefined,
       rowIndex,
     );
-  const isGroupHovered =
-    enableRowSpan &&
-    hoveredRowIndex !== null &&
-    hoveredRowIndex >= primaryGroupStart &&
-    hoveredRowIndex <= primaryGroupStart + primaryGroupSpan - 1;
+  // hoverStore를 직접 구독한다: store 참조 자체는 절대 바뀌지 않으므로 hover는
+  // DataTableRowContext를 무효화하지 않고, 이 행/그룹의 강조 여부가 실제로
+  // 바뀔 때만 이 컴포넌트가 다시 렌더된다 (다른 모든 행은 그대로 있음).
+  // getServerSnapshot: store는 항상 unhovered(null)로 시작하므로 false로 고정.
+  const isRowHovered = useSyncExternalStore(
+    hoverStore.subscribe,
+    () => computeIsRowHovered(hoverStore.getHoveredRowIndex(), rowIndex),
+    () => false,
+  );
+  const isGroupHovered = useSyncExternalStore(
+    hoverStore.subscribe,
+    () =>
+      isRowGroupHovered(
+        hoverStore.getHoveredRowIndex(),
+        enableRowSpan,
+        primaryGroupStart,
+        primaryGroupSpan,
+      ),
+    () => false,
+  );
+
+  // primary 외 nested rowSpan 컬럼들도 각자의 그룹 범위로 반응하게 만든다. 정적인
+  // (row와 무관하게 테이블 구성에서 고정된) 컬럼 id 목록이라 훅 호출 순서를 어기지
+  // 않고, 이 행이 속한 각 그룹의 hover 여부를 문자열 시그니처 하나로 구독한다 —
+  // 어느 그룹이든 멤버십이 바뀌면 시그니처가 달라져 다시 렌더된다.
+  // primary 컬럼은 이미 isGroupHovered로 반응하므로 여기서 다시 계산하지 않는다.
+  // resolveRowSpanAt은 최악의 경우 rowIndex부터 역방향으로 걸어서 O(rows)이므로,
+  // store가 알림을 보낼 때마다(즉 모든 행에서) 다시 계산하지 않도록 이 행의
+  // range는 스냅샷 밖(렌더 본문)에서 한 번만 구하고, 스냅샷은 정수 비교만 한다.
+  const rowSpanColumnIds = enableRowSpan
+    ? [...columnRowSpanMap.keys()].filter((id) => id !== primaryRowSpanColumnId)
+    : [];
+  const nestedRowSpanRanges = rowSpanColumnIds.map((columnId) => {
+    const { startRow, rowSpan: span } = resolveRowSpanAt(
+      columnRowSpanMap.get(columnId),
+      rowIndex,
+    );
+
+    return { columnId, startRow, span };
+  });
+  const nestedHoverSignature = useSyncExternalStore(
+    hoverStore.subscribe,
+    () => {
+      const hovered = hoverStore.getHoveredRowIndex();
+
+      return nestedRowSpanRanges
+        .map(({ startRow, span }) =>
+          isRowGroupHovered(hovered, true, startRow, span) ? "1" : "0",
+        )
+        .join("");
+    },
+    () => rowSpanColumnIds.map(() => "0").join(""),
+  );
+  const nestedHoverByColumn = new Map(
+    rowSpanColumnIds.map((columnId, index) => [
+      columnId,
+      nestedHoverSignature[index] === "1",
+    ]),
+  );
 
   const visibleCells = row.getVisibleCells();
   const columnIdsByIndex = visibleCells.map((cell) => cell.column.id);
@@ -321,10 +381,13 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
         const cellRowSpan = rowSpanInfo?.rowSpan ?? 1;
         // Nested merges (category/region) start on different rows — check span range, not primary group key.
+        // The primary column's range is exactly what isGroupHovered already tracks reactively.
+        // Non-primary (nested) rowSpan columns read the reactive nestedHoverByColumn snapshot
+        // (built from nestedHoverSignature above) instead of touching the store directly here.
         const isMergedCellHovered =
-          hoveredRowIndex !== null &&
-          hoveredRowIndex >= rowIndex &&
-          hoveredRowIndex <= rowIndex + cellRowSpan - 1;
+          columnId === primaryRowSpanColumnId
+            ? isGroupHovered
+            : (nestedHoverByColumn.get(columnId) ?? false);
         const showCellHover = isRowSpanColumn
           ? isMergedCellHovered
           : isRowHovered;
