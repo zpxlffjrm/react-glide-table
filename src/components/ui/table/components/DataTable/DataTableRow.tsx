@@ -1,5 +1,10 @@
 import { flexRender, type Cell, type Row } from "@tanstack/react-table";
-import { useEffect, useRef, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 
 import {
   CELL_ALIGN_CLASS,
@@ -26,10 +31,12 @@ import {
   getColumnFreezeStyle,
 } from "@/components/ui/table/features/column-freeze/columnFreeze";
 import { getColumnSizeStyle } from "@/components/ui/table/features/column-resize/columnResize";
-import {
-  buildSearchMatchKey,
-} from "@/components/ui/table/features/inline-search/inlineSearch";
+import { buildSearchMatchKey } from "@/components/ui/table/features/inline-search/inlineSearch";
 import { canExpandRow } from "@/components/ui/table/features/row-expand/row-expand";
+import {
+  isRowGroupHovered,
+  isRowHovered as computeIsRowHovered,
+} from "@/components/ui/table/features/row-hover/rowHover";
 import {
   resolveRowSpanAt,
   type RowSpanInfo,
@@ -126,7 +133,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
     enableRowSpan,
     primaryRowSpanColumnId,
     columnRowSpanMap,
-    hoveredRowIndex,
+    hoverStore,
     selectedRowIndices,
     onRowHover,
   } = rowSpan;
@@ -170,7 +177,6 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
   const rowIndex = row.index;
   const rowData = row.original;
-  const isRowHovered = hoveredRowIndex === rowIndex;
   const isRowSelected = row.getIsSelected();
   const { startRow: primaryGroupStart, rowSpan: primaryGroupSpan } =
     resolveRowSpanAt(
@@ -179,11 +185,20 @@ export function DataTableRow<T extends Record<string, unknown>>({
         : undefined,
       rowIndex,
     );
-  const isGroupHovered =
-    enableRowSpan &&
-    hoveredRowIndex !== null &&
-    hoveredRowIndex >= primaryGroupStart &&
-    hoveredRowIndex <= primaryGroupStart + primaryGroupSpan - 1;
+  // hoverStore를 직접 구독한다: store 참조 자체는 절대 바뀌지 않으므로 hover는
+  // DataTableRowContext를 무효화하지 않고, 이 행/그룹의 강조 여부가 실제로
+  // 바뀔 때만 이 컴포넌트가 다시 렌더된다 (다른 모든 행은 그대로 있음).
+  const isRowHovered = useSyncExternalStore(hoverStore.subscribe, () =>
+    computeIsRowHovered(hoverStore.getHoveredRowIndex(), rowIndex),
+  );
+  const isGroupHovered = useSyncExternalStore(hoverStore.subscribe, () =>
+    isRowGroupHovered(
+      hoverStore.getHoveredRowIndex(),
+      enableRowSpan,
+      primaryGroupStart,
+      primaryGroupSpan,
+    ),
+  );
 
   const visibleCells = row.getVisibleCells();
   const columnIdsByIndex = visibleCells.map((cell) => cell.column.id);
@@ -321,10 +336,17 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
         const cellRowSpan = rowSpanInfo?.rowSpan ?? 1;
         // Nested merges (category/region) start on different rows — check span range, not primary group key.
+        // The primary column's range is exactly what isGroupHovered already tracks reactively.
+        // Non-primary (nested) rowSpan columns fall back to a non-reactive read of the store: this
+        // row only re-renders when its own isRowHovered/isGroupHovered flips, so a hover move that
+        // stays within the primary range but crosses only a nested sub-group's boundary won't by
+        // itself trigger this row to refresh a *different* row's nested cell — see rowHover.ts.
         const isMergedCellHovered =
-          hoveredRowIndex !== null &&
-          hoveredRowIndex >= rowIndex &&
-          hoveredRowIndex <= rowIndex + cellRowSpan - 1;
+          columnId === primaryRowSpanColumnId
+            ? isGroupHovered
+            : hoverStore.getHoveredRowIndex() !== null &&
+              hoverStore.getHoveredRowIndex()! >= rowIndex &&
+              hoverStore.getHoveredRowIndex()! <= rowIndex + cellRowSpan - 1;
         const showCellHover = isRowSpanColumn
           ? isMergedCellHovered
           : isRowHovered;

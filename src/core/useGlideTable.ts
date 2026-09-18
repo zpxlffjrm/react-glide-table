@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table/features/cell-render/withCellUpdate";
 import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
+import { createRowHoverStore } from "@/components/ui/table/features/row-hover/rowHover";
 import { registerEscapeDismiss } from "@/components/ui/table/features/selection-dismiss/escapeDismissRegistry";
 import { applyLeafColumnOrder } from "@/components/ui/table/features/column-reorder/columnReorder";
 import {
@@ -217,7 +218,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const [internalExpandedRows, setInternalExpandedRows] = useState<Set<string>>(
     () => new Set(),
   );
-  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+  const [hoverStore] = useState(createRowHoverStore);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const escapeDismissOwnerRef = useRef<symbol>(Symbol("escape-dismiss-owner"));
@@ -516,17 +517,13 @@ export function useGlideTable<T extends Record<string, unknown>>(
   );
 
   const getCellContext = useCallback(
-    <TValue,>(cell: Cell<T, TValue>) =>
+    <TValue>(cell: Cell<T, TValue>) =>
       withCellUpdate(cell.getContext(), commitRenderedCellValue),
     [commitRenderedCellValue],
   );
 
   const handleCellMouseDownWithCommit = useCallback(
-    (
-      rowIndex: number,
-      colIndex: number,
-      options?: { shiftKey?: boolean },
-    ) => {
+    (rowIndex: number, colIndex: number, options?: { shiftKey?: boolean }) => {
       const isSameEditingCell =
         editingCell?.rowIndex === rowIndex &&
         editingCell?.colIndex === colIndex;
@@ -757,12 +754,15 @@ export function useGlideTable<T extends Record<string, unknown>>(
   ]);
 
   const clearHover = useCallback(() => {
-    setHoveredRowIndex(null);
-  }, []);
+    hoverStore.setHoveredRowIndex(null);
+  }, [hoverStore]);
 
-  const handleRowHover = useCallback((rowIndex: number, _rowData: T) => {
-    setHoveredRowIndex(rowIndex);
-  }, []);
+  const handleRowHover = useCallback(
+    (rowIndex: number, _rowData: T) => {
+      hoverStore.setHoveredRowIndex(rowIndex);
+    },
+    [hoverStore],
+  );
 
   const handleToggleSelect = useCallback(
     (row: Row<T>) => {
@@ -793,7 +793,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
         primaryRowSpanKey,
         primaryRowSpanColumnId,
         columnRowSpanMap,
-        hoveredRowIndex,
+        hoverStore,
         selectedRowIndices,
         onRowHover:
           handleRowHover as DataTableRowContextValue["rowSpan"]["onRowHover"],
@@ -853,7 +853,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     primaryRowSpanKey,
     primaryRowSpanColumnId,
     columnRowSpanMap,
-    hoveredRowIndex,
+    hoverStore,
     selectedRowIndices,
     handleRowHover,
     rowSelectionMode,
