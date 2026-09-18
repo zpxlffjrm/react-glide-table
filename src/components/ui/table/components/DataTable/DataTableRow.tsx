@@ -188,16 +188,52 @@ export function DataTableRow<T extends Record<string, unknown>>({
   // hoverStore를 직접 구독한다: store 참조 자체는 절대 바뀌지 않으므로 hover는
   // DataTableRowContext를 무효화하지 않고, 이 행/그룹의 강조 여부가 실제로
   // 바뀔 때만 이 컴포넌트가 다시 렌더된다 (다른 모든 행은 그대로 있음).
-  const isRowHovered = useSyncExternalStore(hoverStore.subscribe, () =>
-    computeIsRowHovered(hoverStore.getHoveredRowIndex(), rowIndex),
+  // getServerSnapshot: store는 항상 unhovered(null)로 시작하므로 false로 고정.
+  const isRowHovered = useSyncExternalStore(
+    hoverStore.subscribe,
+    () => computeIsRowHovered(hoverStore.getHoveredRowIndex(), rowIndex),
+    () => false,
   );
-  const isGroupHovered = useSyncExternalStore(hoverStore.subscribe, () =>
-    isRowGroupHovered(
-      hoverStore.getHoveredRowIndex(),
-      enableRowSpan,
-      primaryGroupStart,
-      primaryGroupSpan,
-    ),
+  const isGroupHovered = useSyncExternalStore(
+    hoverStore.subscribe,
+    () =>
+      isRowGroupHovered(
+        hoverStore.getHoveredRowIndex(),
+        enableRowSpan,
+        primaryGroupStart,
+        primaryGroupSpan,
+      ),
+    () => false,
+  );
+
+  // primary 외 nested rowSpan 컬럼들도 각자의 그룹 범위로 반응하게 만든다. 정적인
+  // (row와 무관하게 테이블 구성에서 고정된) 컬럼 id 목록이라 훅 호출 순서를 어기지
+  // 않고, 이 행이 속한 각 그룹의 hover 여부를 문자열 시그니처 하나로 구독한다 —
+  // 어느 그룹이든 멤버십이 바뀌면 시그니처가 달라져 다시 렌더된다.
+  const rowSpanColumnIds = enableRowSpan ? [...columnRowSpanMap.keys()] : [];
+  const nestedHoverSignature = useSyncExternalStore(
+    hoverStore.subscribe,
+    () => {
+      const hovered = hoverStore.getHoveredRowIndex();
+
+      return rowSpanColumnIds
+        .map((columnId) => {
+          const { startRow, rowSpan: span } = resolveRowSpanAt(
+            columnRowSpanMap.get(columnId),
+            rowIndex,
+          );
+
+          return isRowGroupHovered(hovered, true, startRow, span) ? "1" : "0";
+        })
+        .join("");
+    },
+    () => rowSpanColumnIds.map(() => "0").join(""),
+  );
+  const nestedHoverByColumn = new Map(
+    rowSpanColumnIds.map((columnId, index) => [
+      columnId,
+      nestedHoverSignature[index] === "1",
+    ]),
   );
 
   const visibleCells = row.getVisibleCells();
@@ -337,10 +373,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
         const cellRowSpan = rowSpanInfo?.rowSpan ?? 1;
         // Nested merges (category/region) start on different rows — check span range, not primary group key.
         // The primary column's range is exactly what isGroupHovered already tracks reactively.
-        // Non-primary (nested) rowSpan columns fall back to a non-reactive read of the store: this
-        // row only re-renders when its own isRowHovered/isGroupHovered flips, so a hover move that
-        // stays within the primary range but crosses only a nested sub-group's boundary won't by
-        // itself trigger this row to refresh a *different* row's nested cell — see rowHover.ts.
+        // Non-primary (nested) rowSpan columns read nestedHoverByColumn, which reacts through the
+        // same store subscription (nestedHoverSignature above) — see rowHover.ts.
         const isMergedCellHovered =
           columnId === primaryRowSpanColumnId
             ? isGroupHovered
