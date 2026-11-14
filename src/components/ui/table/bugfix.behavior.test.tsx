@@ -7,7 +7,7 @@ import { StrictMode, useState } from "react"
 import { describe, expect, it, vi } from "vitest"
 
 import { computeRowSpans } from "@/components/ui/table/features/row-span/rowSpan"
-import { DataTable, Table, parseClipboardTSV, parseClipboardTSVWithDepths } from "@/index"
+import { DataTable, Table, parseClipboardTSV } from "@/index"
 import type { ColumnDef, DataTableCopyActions, RowsPastePayload } from "@/index"
 
 type AnyRow = Record<string, unknown>
@@ -630,13 +630,27 @@ describe("copy", () => {
 
 describe("paste", () => {
   it("H8: keeps a blank first column from a spreadsheet in place", () => {
-    expect(parseClipboardTSVWithDepths("A\tB\tC\n\tB2\tC2")).toEqual({
-      values: [
-        ["A", "B", "C"],
-        ["", "B2", "C2"],
-      ],
-      depths: [0, 0],
-    })
+    mockClipboard()
+    const onRowsPaste = vi.fn<(payload: RowsPastePayload) => void>()
+    const columns: ColumnDef<AnyRow>[] = [{ accessorKey: "a" }, { accessorKey: "b" }, { accessorKey: "c" }]
+    const { container } = render(
+      <DataTable
+        data={[{ a: "", b: "", c: "" }, { a: "", b: "", c: "" }]}
+        columns={columns}
+        onRowsPaste={onRowsPaste}
+        enableVirtualization={false}
+      />,
+    )
+    selectRange(container, [0, 0], [0, 0])
+
+    firePaste("A\tB\tC\n\tB2\tC2")
+
+    expect(onRowsPaste).toHaveBeenCalledTimes(1)
+    expect(onRowsPaste.mock.calls[0]![0].values).toEqual([
+      ["A", "B", "C"],
+      ["", "B2", "C2"],
+    ])
+    expect(onRowsPaste.mock.calls[0]![0].depths).toEqual([0, 0])
   })
 
   it("H8: still recovers tree depth from this table's own subtree copy", async () => {
