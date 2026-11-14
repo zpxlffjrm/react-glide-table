@@ -1,5 +1,6 @@
 import type { Row } from "@tanstack/react-table"
 
+import { applyCellChangesToData } from "@/components/ui/table/features/data-patch/dataPatch"
 import type { CellEditType } from "@/components/ui/table/types"
 
 export type EditingCell = {
@@ -90,10 +91,10 @@ export function applyCellEdit<T extends Record<string, unknown>>(
   const parsed = parseCellEditValue(raw, getColumnEditType(columnDef))
   if (!parsed.ok) return null
 
-  const newData = data.map((row) => ({ ...row }))
-  if (!newData[rowIndex]) return null
+  const row = rows[rowIndex]
+  if (!row) return null
 
-  ;(newData[rowIndex] as Record<string, unknown>)[accessorKey] = parsed.value
-
-  return newData
+  return applyCellChangesToData(data, [
+    { original: row.original, index: row.index, accessorKey, value: parsed.value },
+  ])
 }

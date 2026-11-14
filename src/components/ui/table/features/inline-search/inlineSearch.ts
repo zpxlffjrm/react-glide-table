@@ -202,11 +202,12 @@ export function buildTreeSearchCorpus<T extends Record<string, unknown>>(
     const children = node.children
     if (!Array.isArray(children) || children.length === 0) return
 
+    // Expand keys are strings (numeric ids included), like the toggle button's.
     const toggleValue = node[toggleField]
+    const toggleKey =
+      toggleValue === null || toggleValue === undefined ? "" : String(toggleValue)
     const childAncestors =
-      typeof toggleValue === "string" && toggleValue.length > 0
-        ? [...ancestorToggleKeys, toggleValue]
-        : ancestorToggleKeys
+      toggleKey.length > 0 ? [...ancestorToggleKeys, toggleKey] : ancestorToggleKeys
 
     for (const child of children) {
       if (child && typeof child === "object") {

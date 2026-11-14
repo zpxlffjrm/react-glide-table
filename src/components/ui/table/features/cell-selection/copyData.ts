@@ -9,7 +9,12 @@ import type {
   CellRenderFn,
 } from "@/components/ui/table/features/cell-render/types"
 import type { CellSelectionBounds } from "@/components/ui/table/features/cell-selection/cellSelection"
+import { formatCellValue } from "@/components/ui/table/features/cell-selection/formatCellValue"
+import { rememberSubtreeCopy } from "@/components/ui/table/features/cell-selection/subtreeClipboard"
+import { getTreeRowKey } from "@/components/ui/table/features/data-patch/dataPatch"
 import type { ColumnCopyValue } from "@/components/ui/table/types"
+
+export { formatCellValue }
 
 export type CopySelectionMode = "visible" | "subtree"
 
@@ -249,6 +254,16 @@ export function reactNodeToText(node: ReactNode): string {
   return ""
 }
 
+/**
+ * Spreadsheet TSV quoting: a cell holding a tab, line break or a leading
+ * quote is wrapped in quotes (inner quotes doubled) so it stays one cell.
+ */
+export function quoteTsvCell(text: string): string {
+  if (!/[\t\n\r]/.test(text) && !text.startsWith('"')) return text
+
+  return `"${text.replace(/"/g, '""')}"`
+}
+
 function sanitizeClipboardCell(text: string): string {
   return text.replace(/\s+/g, " ").trim()
 }
@@ -396,51 +411,6 @@ function formatCopyCellText<T extends Record<string, unknown>>(
   return formatCellValue(value)
 }
 
-function formatPrimitive(value: unknown): string {
-  if (value === null || value === undefined) return ""
-  if (typeof value === "string") return value
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value)
-  }
-
-  return ""
-}
-
-/** Prefer display fields used by drilldown / similar object cell values. */
-function formatObjectValue(value: Record<string, unknown>): string {
-  const text = value.text ?? value.label ?? value.name ?? value.title
-  if (text != null && text !== "") {
-    return formatCellValue(text)
-  }
-
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return ""
-  }
-}
-
-/**
- * Clipboard / Excel paste expects one plain string per cell.
- * Avoids `String(object)` → `[object Object]` and joins arrays with `, `.
- */
-export function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) return ""
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => formatCellValue(item))
-      .filter((item) => item.length > 0)
-      .join(", ")
-  }
-
-  if (typeof value === "object") {
-    return formatObjectValue(value as Record<string, unknown>)
-  }
-
-  return formatPrimitive(value)
-}
-
 function getNestedValue(row: Record<string, unknown>, path: string): unknown {
   if (!path.includes(".")) return row[path]
 
@@ -515,17 +485,35 @@ export function collectCopyRowEntries<T extends Record<string, unknown>>(
 ): CopyRowEntry<T>[] {
   const { startRow, endRow } = bounds
   const result: CopyRowEntry<T>[] = []
-  const includedOriginalIds = new Set<string>()
+
+  if (mode !== "subtree") {
+    // A plain copy is exactly the selected rows: no de-duplication (ids may
+    // legitimately repeat) and no tree depth.
+    for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
+      const row = visibleRows[rowIndex]
+      if (row) result.push({ row: row.original, depth: 0 })
+    }
+
+    return result
+  }
+
+  // Subtree copy walks `children`, which can reach rows that are also
+  // selected (expanded). The tree path key identifies the same row across the
+  // visible copy and the nested node; fall back to `id`/`uniqueId` for rows
+  // built outside the table's tree conversion.
+  const included = new Set<unknown>()
+  const keyOf = (node: T): unknown =>
+    getTreeRowKey(node) ?? (getOriginalRowId(node) || node)
 
   const appendSubtree = (node: T, depth: number) => {
     const children = node.children
     if (!Array.isArray(children) || children.length === 0) return
 
     for (const child of children as T[]) {
-      const childId = getOriginalRowId(child)
-      if (!(childId && includedOriginalIds.has(childId))) {
+      const key = keyOf(child)
+      if (!included.has(key)) {
         result.push({ row: child, depth })
-        if (childId) includedOriginalIds.add(childId)
+        included.add(key)
       }
 
       appendSubtree(child, depth + 1)
@@ -536,14 +524,14 @@ export function collectCopyRowEntries<T extends Record<string, unknown>>(
     const row = visibleRows[rowIndex]
     if (!row) continue
 
-    const originalId = getOriginalRowId(row.original)
-    if (originalId && includedOriginalIds.has(originalId)) continue
+    const key = keyOf(row.original)
+    if (included.has(key)) continue
 
     const depth = getRowDepth(row.original)
     result.push({ row: row.original, depth })
-    if (originalId) includedOriginalIds.add(originalId)
+    included.add(key)
 
-    if (mode !== "subtree" || !hasSubtree(row.original)) continue
+    if (!hasSubtree(row.original)) continue
 
     appendSubtree(row.original, depth + 1)
   }
@@ -609,7 +597,8 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
             options,
           )
 
-          return options?.escapeFormulas ? escapeSpreadsheetFormula(text) : text
+          const escaped = options?.escapeFormulas ? escapeSpreadsheetFormula(text) : text
+          return quoteTsvCell(escaped)
         })
         .join("\t")
 
@@ -679,6 +668,8 @@ export async function writeSelectionToClipboard<T extends Record<string, unknown
 ): Promise<boolean> {
   const text = serializeSelectionToTSV(visibleRows, bounds, mode, options)
   if (!text) return false
+
+  if (mode === "subtree") rememberSubtreeCopy(text)
 
   if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
     // No Clipboard API at all (e.g. plain HTTP) - still synchronous, so the

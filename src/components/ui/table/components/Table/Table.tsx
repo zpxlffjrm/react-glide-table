@@ -51,6 +51,8 @@ function TableRoot<T extends Record<string, unknown>>({
   className,
   totalCount,
   filteredCount,
+  onDataChange,
+  getRowId,
   ...dataTableProps
 }: TableProps<T>) {
   const { header, pagination: paginationElement } = useMemo(
@@ -86,13 +88,48 @@ function TableRoot<T extends Record<string, unknown>>({
   const page = paginationProps?.page ?? 1
   const resolvedTotalCount = paginationProps?.totalCount ?? totalCount ?? data.length
 
+  const isManualPagination = Boolean(paginationProps?.manual)
+
   const tableData = useMemo(() => {
     const sortedData = sortTableData(data, sort)
 
-    if (!paginationProps) return sortedData
+    if (!paginationProps || isManualPagination) return sortedData
 
     return paginateTableData(sortedData, page, pageSize)
-  }, [data, sort, paginationProps, page, pageSize])
+  }, [data, sort, paginationProps, isManualPagination, page, pageSize])
+
+  // The DataTable below only sees the sorted / paged rows. Map them back to
+  // their index in the consumer's `data` so ids and writes stay correct.
+  const originalIndexByRow = useMemo(() => {
+    const map = new Map<T, number>()
+    data.forEach((row, index) => map.set(row, index))
+    return map
+  }, [data])
+
+  const resolvedGetRowId = useMemo<TableProps<T>["getRowId"]>(() => {
+    if (getRowId) return getRowId
+    // Tree tables get stable ids from the tree conversion itself.
+    if (dataTableProps.toggleField) return undefined
+
+    return (row: T, index: number) => String(originalIndexByRow.get(row) ?? index)
+  }, [dataTableProps.toggleField, getRowId, originalIndexByRow])
+
+  const handleDataChange = useMemo<TableProps<T>["onDataChange"]>(() => {
+    if (!onDataChange) return undefined
+
+    return (next: T[]) => {
+      // `next` is the visible slice with only the edited rows replaced.
+      const merged = data.slice()
+      tableData.forEach((row, index) => {
+        const nextRow = next[index]
+        if (nextRow === undefined || nextRow === row) return
+
+        const originalIndex = originalIndexByRow.get(row)
+        if (originalIndex !== undefined) merged[originalIndex] = nextRow
+      })
+      onDataChange(merged)
+    }
+  }, [data, onDataChange, originalIndexByRow, tableData])
 
   if (countLeafColumns(columnTree) === 0) {
     console.warn("[Table] Declare at least one Table.Column inside Table.Header.")
@@ -102,6 +139,8 @@ function TableRoot<T extends Record<string, unknown>>({
     <div className="TableJSX">
       <DataTable
         {...dataTableProps}
+        getRowId={resolvedGetRowId}
+        onDataChange={handleDataChange}
         data={tableData}
         columns={columns}
         totalCount={paginationProps ? resolvedTotalCount : totalCount}
@@ -115,6 +154,8 @@ function TableRoot<T extends Record<string, unknown>>({
           totalCount={resolvedTotalCount}
           onChange={paginationProps.onChange}
           className={paginationProps.className}
+          previousLabel={paginationProps.previousLabel}
+          nextLabel={paginationProps.nextLabel}
         />
       )}
     </div>

@@ -179,12 +179,42 @@ export function isCellInSelection(
   );
 }
 
+/**
+ * Spreadsheet-style fill range: the source extends along ONE axis toward the
+ * pointer and keeps its full width (vertical fill) or height (horizontal
+ * fill). The axis is whichever direction the pointer has left the source by
+ * more cells. A pointer still inside the source yields the source itself.
+ */
+export function resolveFillBounds(
+  source: CellSelectionBounds,
+  pointer: CellPosition,
+): CellSelectionBounds {
+  const below = pointer.row - source.endRow;
+  const above = source.startRow - pointer.row;
+  const right = pointer.col - source.endCol;
+  const left = source.startCol - pointer.col;
+  const vertical = Math.max(below, above, 0);
+  const horizontal = Math.max(right, left, 0);
+
+  if (vertical === 0 && horizontal === 0) return { ...source };
+
+  if (vertical >= horizontal) {
+    return below > 0
+      ? { ...source, endRow: pointer.row }
+      : { ...source, startRow: pointer.row };
+  }
+
+  return right > 0
+    ? { ...source, endCol: pointer.col }
+    : { ...source, startCol: pointer.col };
+}
+
 export function getActiveSelectionBounds(
   dragState: DragState,
   selectionBounds: CellSelectionBounds | null,
 ): CellSelectionBounds | null {
-  if (dragState.isFillDragging && dragState.fillAnchor && dragState.fillEnd) {
-    return getCellSelectionBounds(dragState.fillAnchor, dragState.fillEnd);
+  if (dragState.isFillDragging && dragState.fillEnd && selectionBounds) {
+    return resolveFillBounds(selectionBounds, dragState.fillEnd);
   }
 
   return selectionBounds;
