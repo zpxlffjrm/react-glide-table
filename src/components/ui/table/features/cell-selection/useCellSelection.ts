@@ -48,6 +48,8 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   columnCount?: number
   /** Enables Ctrl/Cmd+Shift+C subtree copy. Defaults to true when tree expand is enabled. */
   enableSubtreeCopy?: boolean
+  /** Neutralizes spreadsheet formulas in copied cells. Defaults to false. */
+  escapeCopyFormulas?: boolean
   /** Enables Ctrl/Cmd+Shift+V insert paste. Defaults to true. */
   enableInsertPaste?: boolean
   onDataChange?: (data: T[]) => void
@@ -87,6 +89,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
   enabled = true,
   columnCount = 0,
   enableSubtreeCopy = false,
+  escapeCopyFormulas = false,
   enableInsertPaste = true,
   onDataChange,
   onBatchChange,
@@ -287,6 +290,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       return writeSelectionToClipboard(rows, activeSelectionBounds, mode, {
         registry: cellRendererRegistry,
         root: rootRef?.current,
+        escapeFormulas: escapeCopyFormulas,
       })
     },
     [
@@ -294,6 +298,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
       cellRendererRegistry,
       enableSubtreeCopy,
       enabled,
+      escapeCopyFormulas,
       rootRef,
       rows,
     ],
