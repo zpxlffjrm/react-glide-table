@@ -1,3 +1,4 @@
+import { formatCellValue } from "@/components/ui/table/features/cell-selection/formatCellValue"
 import { BUILTIN_CELL_RENDERERS } from "@/components/ui/table/features/cell-render/builtins"
 import type {
   CellKind,
@@ -51,5 +52,7 @@ export function formatDefaultCellValue(value: unknown): string | null {
     return String(value)
   }
   if (typeof value === "bigint") return value.toString()
-  return String(value)
+  // Objects, arrays and dates: the same readable text copy uses, never
+  // "[object Object]".
+  return formatCellValue(value)
 }

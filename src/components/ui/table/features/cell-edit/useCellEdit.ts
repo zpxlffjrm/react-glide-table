@@ -1,5 +1,5 @@
 import type { Row } from "@tanstack/react-table"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   getCellEditDraftValue,
@@ -23,21 +23,36 @@ export function useCellEdit<T extends Record<string, unknown>>({
   onDataChange,
   onCellChange,
 }: UseCellEditOptions<T>) {
-  const [editingCell, setEditingCell] = useState<EditingCell | null>(null)
+  // The edited cell is tracked by row id + column id, not by position:
+  // rows inserted above, a re-sort or a collapse must not move the editor
+  // (and its draft) onto a different row.
+  const [editingKey, setEditingKey] = useState<EditingKey | null>(null)
   const [draftValue, setDraftValue] = useState("")
   const draftValueRef = useRef(draftValue)
-  const editingCellRef = useRef(editingCell)
 
   useEffect(() => {
     draftValueRef.current = draftValue
   }, [draftValue])
 
+  const editingCell = useMemo<EditingCell | null>(
+    () => resolveEditingCell(rows, editingKey),
+    [rows, editingKey],
+  )
+  const editingCellRef = useRef(editingCell)
+  editingCellRef.current = editingCell
+
+  // The edited row (or column) is gone: drop the editor instead of letting it
+  // land on whatever now sits at the old position.
   useEffect(() => {
-    editingCellRef.current = editingCell
-  }, [editingCell])
+    if (editingKey && !editingCell) {
+      setEditingKey(null)
+      setDraftValue("")
+    }
+  }, [editingCell, editingKey])
 
   const cancelEdit = useCallback(() => {
-    setEditingCell(null)
+    editingCellRef.current = null
+    setEditingKey(null)
     setDraftValue("")
   }, [])
 
@@ -90,8 +105,12 @@ export function useCellEdit<T extends Record<string, unknown>>({
 
   const startEdit = useCallback(
     (rowIndex: number, colIndex: number) => {
-      const cell = rows[rowIndex]?.getVisibleCells()[colIndex]
-      if (!cell || !isColumnEditable(cell.column.columnDef)) return
+      const row = rows[rowIndex]
+      const cell = row?.getVisibleCells()[colIndex]
+      if (!row || !cell || !isColumnEditable(cell.column.columnDef)) return
+      // Objects/arrays have no faithful text form: editing them would write
+      // "[object Object]" / "a,b" back over the structured value.
+      if (!isTextEditableValue(cell.getValue())) return
 
       const current = editingCellRef.current
       if (
@@ -102,7 +121,7 @@ export function useCellEdit<T extends Record<string, unknown>>({
         return
       }
 
-      setEditingCell({ rowIndex, colIndex })
+      setEditingKey({ rowId: row.id, columnId: cell.column.id })
       setDraftValue(getCellEditDraftValue(cell.getValue()))
     },
     [commitEdit, rows],
@@ -116,6 +135,29 @@ export function useCellEdit<T extends Record<string, unknown>>({
     commitEdit,
     cancelEdit,
   }
+}
+
+type EditingKey = { rowId: string; columnId: string }
+
+function resolveEditingCell<T extends Record<string, unknown>>(
+  rows: Row<T>[],
+  key: EditingKey | null,
+): EditingCell | null {
+  if (!key) return null
+
+  const rowIndex = rows.findIndex((row) => row.id === key.rowId)
+  if (rowIndex < 0) return null
+
+  const colIndex = rows[rowIndex]!
+    .getVisibleCells()
+    .findIndex((cell) => cell.column.id === key.columnId)
+  if (colIndex < 0) return null
+
+  return { rowIndex, colIndex }
+}
+
+function isTextEditableValue(value: unknown): boolean {
+  return value === null || value === undefined || typeof value !== "object"
 }
 
 export type { EditingCell }

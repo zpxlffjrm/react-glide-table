@@ -1,6 +1,7 @@
 import type { Row } from "@tanstack/react-table"
 
 import { getColumnAccessorKey } from "@/components/ui/table/features/cell-edit/cellEdit"
+import { applyCellChangesToData } from "@/components/ui/table/features/data-patch/dataPatch"
 
 type CommitCellValueOptions<T extends Record<string, unknown>> = {
   data: T[]
@@ -13,6 +14,8 @@ type CommitCellValueOptions<T extends Record<string, unknown>> = {
 }
 
 /**
+ * `data` is the consumer's original array (not the flattened tree rows).
+ *
  * Shared commit path for custom `render` updates and built-in cell kinds.
  * Prefers `onCellChange`; falls back to immutable `onDataChange` patch.
  */
@@ -45,14 +48,15 @@ export function commitCellValue<T extends Record<string, unknown>>({
   const accessorKey = getColumnAccessorKey(cell.column.columnDef)
   if (!accessorKey) return false
 
-  const dataIndex = row.index
-  if (dataIndex < 0 || dataIndex >= data.length) return false
+  // Tree rows carry their path into the original (nested) data; plain rows
+  // use `row.index`. Either way the full original array is patched.
+  const next = applyCellChangesToData(data, [
+    { original: row.original, index: row.index, accessorKey, value },
+  ])
+  if (next === data || next.every((item, index) => item === data[index])) {
+    return false
+  }
 
-  const next = data.map((item) => ({ ...item }))
-  const target = next[dataIndex]
-  if (!target) return false
-
-  ;(target as Record<string, unknown>)[accessorKey] = value
   onDataChange?.(next)
 
   return true

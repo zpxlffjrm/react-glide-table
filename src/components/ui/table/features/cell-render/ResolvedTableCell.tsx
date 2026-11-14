@@ -13,6 +13,7 @@ import type {
 } from "@/components/ui/table/features/cell-render/types"
 
 type ColumnCellMeta<T extends Record<string, unknown>> = {
+  editable?: boolean
   kind?: CellKind
   cellProps?: Record<string, unknown>
   cellRender?: CellRenderFn<T>
@@ -36,12 +37,17 @@ export function ResolvedTableCell<T extends Record<string, unknown>>({
     [cellRender, columnId, row.id],
   )
 
+  // `editable: false` makes built-in interactive kinds (the boolean
+  // checkbox) read-only, the same as `cellProps.readonly`.
+  const cellProps =
+    meta?.editable === false ? { ...meta.cellProps, readonly: true } : meta?.cellProps
+
   const ctx = {
     value,
     row,
     index: row.index,
     columnId,
-    cellProps: meta?.cellProps,
+    cellProps,
     update,
   } as CellRenderContext<T>
 

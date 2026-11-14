@@ -601,6 +601,11 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 onKeyDown={(event) => {
                   editInputProps?.onKeyDown?.(event);
                   if (event.defaultPrevented) return;
+                  // IME (e.g. Hangul) composition: Enter confirms the
+                  // composition, it must not commit the edit yet.
+                  if (event.nativeEvent.isComposing || event.keyCode === 229) {
+                    return;
+                  }
 
                   if (event.key === "Enter") {
                     event.preventDefault();

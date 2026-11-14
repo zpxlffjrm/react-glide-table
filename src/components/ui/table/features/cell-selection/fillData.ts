@@ -1,6 +1,10 @@
 import type { ColumnDef, Row } from "@tanstack/react-table"
 
-import { isColumnEditable } from "@/components/ui/table/features/cell-edit/cellEdit"
+import {
+  isColumnEditable,
+  isProtectedColumn,
+} from "@/components/ui/table/features/cell-edit/cellEdit"
+import { applyCellChangesToData } from "@/components/ui/table/features/data-patch/dataPatch"
 import {
   getCellSelectionBounds,
   isCellInSelection,
@@ -60,6 +64,9 @@ function collectFillTargets<T extends Record<string, unknown>>(
       // Fill writes like an edit, so it must respect the same guard: never
       // overwrite read-only (or protected) columns.
       if (!isColumnEditable(targetCell.column.columnDef)) continue
+      // A masked source must never be copied out in the clear: filling from
+      // a protected column into a plain one would reveal the raw value.
+      if (isProtectedColumn(sourceCell.column.columnDef)) continue
 
       const accessorKey = getColumnAccessorKey(
         targetCell.column.columnDef as ColumnDef<unknown, unknown>,
@@ -95,16 +102,24 @@ export function applyFillData<T extends Record<string, unknown>>(
   sourceBounds: CellSelectionBounds,
   fillBounds: CellSelectionBounds,
 ): T[] {
-  const newData = data.map((row) => ({ ...row }))
   const targets = collectFillTargets(rows, sourceBounds, fillBounds)
 
-  for (const target of targets) {
-    if (!newData[target.rowIndex]) continue
+  return applyCellChangesToData(
+    data,
+    targets.flatMap((target) => {
+      const row = rows[target.rowIndex]
+      if (!row) return []
 
-    ;(newData[target.rowIndex] as Record<string, unknown>)[target.accessorKey] = target.value
-  }
-
-  return newData
+      return [
+        {
+          original: row.original,
+          index: row.index,
+          accessorKey: target.accessorKey,
+          value: target.value,
+        },
+      ]
+    }),
+  )
 }
 
 export function hasFillExtension(

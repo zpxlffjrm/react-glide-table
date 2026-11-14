@@ -3,6 +3,19 @@ export type TableSortState = {
   direction: "asc" | "desc"
 }
 
+/** Reads `field`, following a dotted path ("address.city") when needed. */
+function readField(row: Record<string, unknown>, field: string): unknown {
+  if (field in row || !field.includes(".")) return row[field]
+
+  return field.split(".").reduce<unknown>((current, key) => {
+    if (current === null || current === undefined || typeof current !== "object") {
+      return undefined
+    }
+
+    return (current as Record<string, unknown>)[key]
+  }, row)
+}
+
 export function sortTableData<T extends Record<string, unknown>>(
   data: T[],
   sort: TableSortState | null,
@@ -13,8 +26,8 @@ export function sortTableData<T extends Record<string, unknown>>(
   const multiplier = direction === "asc" ? 1 : -1
 
   return [...data].sort((left, right) => {
-    const leftValue = left[field]
-    const rightValue = right[field]
+    const leftValue = readField(left, field)
+    const rightValue = readField(right, field)
 
     if (
       (leftValue === null || leftValue === undefined) &&
@@ -29,7 +42,10 @@ export function sortTableData<T extends Record<string, unknown>>(
       return (leftValue - rightValue) * multiplier
     }
 
-    return String(leftValue).localeCompare(String(rightValue), "ko") * multiplier
+    // `numeric` orders "2" < "9" < "10" instead of by character.
+    return (
+      String(leftValue).localeCompare(String(rightValue), "ko", { numeric: true }) * multiplier
+    )
   })
 }
 
@@ -38,7 +54,9 @@ export function paginateTableData<T extends Record<string, unknown>>(
   page: number,
   pageSize: number,
 ): T[] {
-  const safePage = Math.max(1, page)
+  // Clamp to the last page, matching what TablePagination displays.
+  const lastPage = getTotalPages(data.length, pageSize)
+  const safePage = Math.min(Math.max(1, page), lastPage)
   const start = (safePage - 1) * pageSize
 
   return data.slice(start, start + pageSize)

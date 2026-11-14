@@ -89,6 +89,10 @@ export function DataTableSearch({
       : 0
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // IME (e.g. Hangul) composition: Enter/arrows confirm the composition,
+    // they are not navigation.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+
     if (
       ((event.ctrlKey || event.metaKey) && event.code === "KeyF") ||
       event.key === "Escape"

@@ -31,6 +31,7 @@ import {
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
 import { isProtectedColumn } from "@/components/ui/table/features/cell-edit/cellEdit";
+import { getTreeRowKey } from "@/components/ui/table/features/data-patch/dataPatch";
 import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue";
 import { createCellRendererRegistry } from "@/components/ui/table/features/cell-render/registry";
 import {
@@ -173,6 +174,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     expandedRows: controlledExpandedRows,
     onExpandedRowsChange,
     preventExpand = false,
+    autoExpandOnLoad = true,
     enableSubtreeCopy,
     escapeCopyFormulas = false,
     onCopyActionsReady,
@@ -292,7 +294,12 @@ export function useGlideTable<T extends Record<string, unknown>>(
     expandedRows,
     onExpandedRowsChange: enableExpand ? handleExpandedRowsChange : undefined,
     preventExpand,
+    autoExpandOnLoad,
   });
+
+  // Writes (`onDataChange`) always patch the consumer's original array; tree
+  // rows carry their path into it, plain rows use `row.index`.
+  const sourceData = useMemo(() => (data ?? []) as T[], [data]);
 
   const table = useReactTable({
     data: tableData,
@@ -347,7 +354,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     getCoreRowModel: getCoreRowModel(),
     getRowId: getRowId
       ? (originalRow, index) => getRowId(originalRow as T, index)
-      : (_originalRow, index) => String(index),
+      : // Tree rows: their path in the original data, which (unlike the
+        // flattened index) survives expanding/collapsing rows above.
+        (originalRow, index) => getTreeRowKey(originalRow) ?? String(index),
   });
 
   const rowSpanColumnKeys = useMemo(() => {
@@ -460,10 +469,11 @@ export function useGlideTable<T extends Record<string, unknown>>(
     clearSelection: clearCellSelection,
     copySelection,
   } = useCellSelection({
-    data: tableData,
+    data: sourceData,
     rows,
     enabled: enableCellSelection,
     columnCount: visibleLeafColumns.length,
+    columnSignature: visibleLeafColumns.map((column) => column.id).join("\u0000"),
     enableSubtreeCopy: resolvedEnableSubtreeCopy,
     escapeCopyFormulas,
     enableInsertPaste: enableInsertPaste ?? true,
@@ -503,20 +513,31 @@ export function useGlideTable<T extends Record<string, unknown>>(
     startEdit,
     commitEdit,
     cancelEdit,
-  } = useCellEdit({ data: tableData, rows, onDataChange, onCellChange });
+  } = useCellEdit({ data: sourceData, rows, onDataChange, onCellChange });
 
   const commitRenderedCellValue = useCallback(
-    (rowId: string, columnId: string, value: unknown) =>
-      commitCellValue({
-        data: tableData,
+    (rowId: string, columnId: string, value: unknown) => {
+      // Renderer writes (e.g. the boolean checkbox) obey the same read-only
+      // rules as the editor: `editable: false` and protected columns refuse.
+      const columnDef = table.getColumn(columnId)?.columnDef;
+      if (
+        columnDef &&
+        (columnDef.meta?.editable === false || isProtectedColumn(columnDef))
+      ) {
+        return false;
+      }
+
+      return commitCellValue({
+        data: sourceData,
         rows,
         rowId,
         columnId,
         value,
         onCellChange,
         onDataChange,
-      }),
-    [onCellChange, onDataChange, rows, tableData],
+      });
+    },
+    [onCellChange, onDataChange, rows, sourceData, table],
   );
 
   const getCellContext = useCallback(
@@ -554,31 +575,16 @@ export function useGlideTable<T extends Record<string, unknown>>(
       if (getRowId) return getRowId(row, index);
 
       // Tree corpus includes collapsed rows, so index-based IDs desync from
-      // the visible row list. Prefer stable per-row fields; toggleField can
-      // collide (duplicate expand keys), so only use it as a last resort.
+      // the visible row list. Every tree row (visible copy or collapsed node)
+      // carries the same path key into the original data.
       if (enableExpand) {
-        const record = row as Record<string, unknown>;
-        const idValue = record.id;
-        if (idValue != null && String(idValue).length > 0) {
-          return String(idValue);
-        }
-
-        const uniqueId = record.uniqueId;
-        if (uniqueId != null && String(uniqueId).length > 0) {
-          return String(uniqueId);
-        }
-
-        if (toggleField) {
-          const toggleValue = record[toggleField];
-          if (toggleValue != null && String(toggleValue).length > 0) {
-            return String(toggleValue);
-          }
-        }
+        const treeKey = getTreeRowKey(row);
+        if (treeKey) return treeKey;
       }
 
       return String(index);
     },
-    [enableExpand, getRowId, toggleField],
+    [enableExpand, getRowId],
   );
 
   const searchCorpus = useMemo(() => {
@@ -714,11 +720,22 @@ export function useGlideTable<T extends Record<string, unknown>>(
 
   const initialSearchStartRow = virtualRows[0]?.index ?? 0;
 
+  const searchColumnSignature = visibleLeafColumns
+    .map((column) => column.id)
+    .join("\u0000");
+  const searchContentKey = useMemo(
+    () => ({ data: sourceData, columns: searchColumnSignature }),
+    [sourceData, searchColumnSignature],
+  );
+
   const inlineSearch = useInlineSearch({
     enabled: enableInlineSearch,
     rowCount: searchCorpus.length,
     columnCount: visibleLeafColumns.length,
     getCellValue: getSearchCellValue,
+    // Re-scan when the rows' content/order or the column order changes
+    // (edits, re-sorts, reorders) — not on tree expand/collapse.
+    contentKey: searchContentKey,
     initialStartRow: initialSearchStartRow,
     showSearch,
     searchValue,

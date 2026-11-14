@@ -10,6 +10,15 @@ export type TablePaginationProps = {
   totalCount?: number
   onChange: (page: number) => void
   className?: string
+  /**
+   * The table's `data` already is this page (server-side pagination): it is
+   * shown as-is instead of being sliced again.
+   */
+  manual?: boolean
+  /** Accessible label of the previous-page button. */
+  previousLabel?: string
+  /** Accessible label of the next-page button. */
+  nextLabel?: string
 }
 
 function TablePagination({
@@ -18,6 +27,8 @@ function TablePagination({
   totalCount = 0,
   onChange,
   className,
+  previousLabel = "Previous page",
+  nextLabel = "Next page",
 }: TablePaginationProps) {
   const totalPages = getTotalPages(totalCount, pageSize)
   const safePage = Math.min(Math.max(1, page), totalPages)
@@ -31,7 +42,7 @@ function TablePagination({
         className="pagination-button"
         disabled={!canGoPrev}
         onClick={() => onChange(safePage - 1)}
-        aria-label="Previous page">
+        aria-label={previousLabel}>
         <ChevronLeft className="pagination-button-icon" />
       </button>
       <span className="pagination-label">
@@ -42,7 +53,7 @@ function TablePagination({
         className="pagination-button"
         disabled={!canGoNext}
         onClick={() => onChange(safePage + 1)}
-        aria-label="Next page">
+        aria-label={nextLabel}>
         <ChevronRight className="pagination-button-icon" />
       </button>
     </div>

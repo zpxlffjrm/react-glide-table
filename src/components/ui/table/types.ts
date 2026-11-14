@@ -262,6 +262,12 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   /** When true, expand is disabled (children always visible) */
   preventExpand?: boolean;
   /**
+   * Expand every parent once when data first loads (reported through
+   * `onExpandedRowsChange` when controlled). Default `true`. Set `false` to
+   * keep the initial `expandedRows` you pass in.
+   */
+  autoExpandOnLoad?: boolean;
+  /**
    * Enables Ctrl/Cmd+Shift+C and programmatic subtree copy for collapsed tree rows.
    * Defaults to true when `toggleField` is set.
    */

@@ -25,6 +25,12 @@ export type UseInlineSearchOptions = {
   rowCount: number
   columnCount: number
   getCellValue: (rowIndex: number, colIndex: number) => unknown
+  /**
+   * Any value that changes when the searched content changes (rows edited or
+   * re-ordered, columns reordered). A new value re-runs the current search so
+   * highlights never point at stale cells.
+   */
+  contentKey?: unknown
   /** Prefer starting the scan near the visible window (virtualized tables). */
   initialStartRow?: number
   showSearch?: boolean
@@ -63,11 +69,35 @@ export type UseInlineSearchResult = {
 
 const EMPTY_MATCH_KEYS = new Set<string>()
 
+/** Searchable tables currently mounted, and where the user last pointed. */
+let searchInstanceCount = 0
+let lastPointerTarget: EventTarget | null = null
+
+function trackPointerTarget(event: Event) {
+  lastPointerTarget = event.target
+}
+
+function registerSearchInstance(): () => void {
+  if (searchInstanceCount === 0) {
+    document.addEventListener("pointerdown", trackPointerTarget, true)
+  }
+  searchInstanceCount += 1
+
+  return () => {
+    searchInstanceCount -= 1
+    if (searchInstanceCount === 0) {
+      document.removeEventListener("pointerdown", trackPointerTarget, true)
+      lastPointerTarget = null
+    }
+  }
+}
+
 export function useInlineSearch({
   enabled = false,
   rowCount,
   columnCount,
   getCellValue,
+  contentKey,
   initialStartRow = 0,
   showSearch: controlledShowSearch,
   searchValue: controlledSearchValue,
@@ -326,6 +356,7 @@ export function useInlineSearch({
 
     beginSearch(searchValue)
   }, [
+    contentKey,
     beginSearch,
     cancelSearch,
     controlledSearchResults,
@@ -350,6 +381,16 @@ export function useInlineSearch({
         if (!focusInside && active !== document.body) {
           return
         }
+        // Focus on <body> doesn't say which table is meant. With several
+        // searchable tables mounted, only the last one the user pointed at
+        // answers (or none, until one has been touched).
+        if (
+          !focusInside &&
+          searchInstanceCount > 1 &&
+          !(lastPointerTarget instanceof Node && root.contains(lastPointerTarget))
+        ) {
+          return
+        }
       }
 
       event.preventDefault()
@@ -368,8 +409,12 @@ export function useInlineSearch({
     }
 
     window.addEventListener("keydown", handleKeyDown, true)
+    const releaseInstance = registerSearchInstance()
 
-    return () => window.removeEventListener("keydown", handleKeyDown, true)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true)
+      releaseInstance()
+    }
   }, [controlledShowSearch, enabled, rootRef, showSearch])
 
   useEffect(() => () => cancelSearch(), [cancelSearch])

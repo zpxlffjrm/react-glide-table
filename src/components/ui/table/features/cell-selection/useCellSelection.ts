@@ -1,5 +1,5 @@
 import type { Row } from "@tanstack/react-table"
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
 
 import type { CellRendererRegistry } from "@/components/ui/table/features/cell-render/registry"
 import {
@@ -14,6 +14,7 @@ import {
   getActiveSelectionBounds,
   getCellNavigationDelta,
   getCellSelectionBounds,
+  resolveFillBounds,
   INITIAL_DRAG_STATE,
   type CellMouseDownOptions,
   type CellPosition,
@@ -28,6 +29,7 @@ import {
   collectFillChanges,
   hasFillExtension,
 } from "@/components/ui/table/features/cell-selection/fillData"
+import { isOwnSubtreeCopy } from "@/components/ui/table/features/cell-selection/subtreeClipboard"
 import {
   buildRowsPastePayload,
   isEditablePasteTarget,
@@ -46,6 +48,12 @@ type UseCellSelectionOptions<T extends Record<string, unknown>> = {
   enabled?: boolean
   /** Visible leaf column count used to clamp keyboard navigation. */
   columnCount?: number
+  /**
+   * Visible leaf column ids in order (any stable string). When it changes
+   * (columns reordered, added or removed) the index-based selection would
+   * point at different columns, so it is cleared.
+   */
+  columnSignature?: string
   /** Enables Ctrl/Cmd+Shift+C subtree copy. Defaults to true when tree expand is enabled. */
   enableSubtreeCopy?: boolean
   /** Neutralizes spreadsheet formulas in copied cells. Defaults to false. */
@@ -88,6 +96,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
   rows,
   enabled = true,
   columnCount = 0,
+  columnSignature,
   enableSubtreeCopy = false,
   escapeCopyFormulas = false,
   enableInsertPaste = true,
@@ -107,10 +116,28 @@ export function useCellSelection<T extends Record<string, unknown>>({
   dragStateRef.current = dragState
   onCellNavigateRef.current = onCellNavigate
 
-  const cellSelectionBounds = getCellSelectionBounds(dragState.start, dragState.end)
-  const activeSelectionBounds = enabled
-    ? getActiveSelectionBounds(dragState, cellSelectionBounds)
-    : null
+  // Pointer handlers compute from the ref and write it back immediately, so
+  // the native window mouseup listener always sees the latest drag state even
+  // before React re-renders.
+  const updateDragState = useCallback((update: (prev: DragState) => DragState) => {
+    const prev = dragStateRef.current
+    const next = update(prev)
+    if (next === prev) return
+
+    dragStateRef.current = next
+    setDragState(next)
+  }, [])
+
+  // Memoized so the window listeners below are not torn down and re-added on
+  // every render of the table.
+  const activeSelectionBounds = useMemo(() => {
+    if (!enabled) return null
+
+    return getActiveSelectionBounds(
+      dragState,
+      getCellSelectionBounds(dragState.start, dragState.end),
+    )
+  }, [dragState, enabled])
 
   const handleCellMouseDown = useCallback(
     (rowIndex: number, colIndex: number, options?: CellMouseDownOptions) => {
@@ -118,7 +145,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
 
       claimCellSelectionOwner(ownerRef.current)
 
-      setDragState((prev) => {
+      updateDragState((prev) => {
         if (options?.shiftKey && prev.start) {
           return {
             ...prev,
@@ -140,26 +167,28 @@ export function useCellSelection<T extends Record<string, unknown>>({
         }
       })
     },
-    [enabled],
+    [enabled, updateDragState],
   )
 
   const handleCellMouseEnter = useCallback(
     (rowIndex: number, colIndex: number) => {
       if (!enabled) return
 
-      setDragState((prev) => {
+      updateDragState((prev) => {
         if (prev.isSelecting) {
+          if (prev.end?.row === rowIndex && prev.end.col === colIndex) return prev
           return { ...prev, end: { row: rowIndex, col: colIndex } }
         }
 
         if (prev.isFillDragging) {
+          if (prev.fillEnd?.row === rowIndex && prev.fillEnd.col === colIndex) return prev
           return { ...prev, fillEnd: { row: rowIndex, col: colIndex } }
         }
 
         return prev
       })
     },
-    [enabled],
+    [enabled, updateDragState],
   )
 
   const handleFillHandleMouseDown = useCallback(
@@ -168,7 +197,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
 
       claimCellSelectionOwner(ownerRef.current)
 
-      setDragState((prev) => {
+      updateDragState((prev) => {
         const bounds = getCellSelectionBounds(prev.start, prev.end)
         if (!bounds) return prev
 
@@ -181,7 +210,7 @@ export function useCellSelection<T extends Record<string, unknown>>({
         }
       })
     },
-    [enabled],
+    [enabled, updateDragState],
   )
 
   const clearSelection = useCallback(() => {
@@ -209,6 +238,33 @@ export function useCellSelection<T extends Record<string, unknown>>({
   useEffect(() => {
     return registerCellSelectionOwner(ownerRef.current, clearSelection)
   }, [clearSelection])
+
+  // Selection is index-based: when rows shrink below it (data replaced, tree
+  // collapsed) or the column layout changes, it would silently point at other
+  // cells — and copy/paste/fill would act on them. Drop it instead.
+  const previousColumnSignatureRef = useRef(columnSignature)
+  useEffect(() => {
+    const columnsChanged =
+      columnSignature !== undefined &&
+      previousColumnSignatureRef.current !== undefined &&
+      previousColumnSignatureRef.current !== columnSignature
+    previousColumnSignatureRef.current = columnSignature
+
+    const prev = dragStateRef.current
+    if (!prev.start || !prev.end) return
+
+    const bounds = getCellSelectionBounds(prev.start, prev.end)
+    const resolvedColumnCount =
+      columnCount > 0 ? columnCount : (rows[0]?.getVisibleCells().length ?? 0)
+    const outOfRange =
+      bounds !== null &&
+      (bounds.endRow >= rows.length ||
+        (resolvedColumnCount > 0 && bounds.endCol >= resolvedColumnCount))
+
+    if (columnsChanged || outOfRange) {
+      clearSelection()
+    }
+  }, [clearSelection, columnCount, columnSignature, rows])
 
   useEffect(() => {
     if (!enabled) return
@@ -342,6 +398,9 @@ export function useCellSelection<T extends Record<string, unknown>>({
         text,
         mode,
         activeSelectionBounds.endRow,
+        // Leading blank cells are tree depth only in this table's own subtree
+        // copy; from a spreadsheet they are real (empty) cells.
+        { treeDepth: isOwnSubtreeCopy(text) ? "auto" : "none" },
       )
       if (!payload) return false
 
@@ -381,7 +440,11 @@ export function useCellSelection<T extends Record<string, unknown>>({
       void (async () => {
         try {
           const text = await navigator.clipboard.readText()
-          if (pasteHandledRef.current) return
+          if (pasteHandledRef.current) {
+            // The paste event already handled this keystroke; consume the flag.
+            pasteHandledRef.current = false
+            return
+          }
           if (pendingPasteModeRef.current !== mode) return
           if (!isActiveCellSelectionOwner(ownerRef.current)) return
           if (!text) return
@@ -413,6 +476,9 @@ export function useCellSelection<T extends Record<string, unknown>>({
       const mode = pendingPasteModeRef.current ?? "overwrite"
 
       if (pasteHandledRef.current) {
+        // readText already handled this keystroke. Consume the flag so a later
+        // context-menu paste is not swallowed.
+        pasteHandledRef.current = false
         e.preventDefault()
         return
       }
@@ -444,45 +510,50 @@ export function useCellSelection<T extends Record<string, unknown>>({
   useEffect(() => {
     if (!enabled) return
 
+    // Commit callbacks run here, outside any state updater: React may invoke
+    // updaters twice (StrictMode), which would apply the fill twice.
     const handleMouseUp = () => {
-      setDragState((prev) => {
-        if (prev.isFillDragging && prev.fillAnchor && prev.fillEnd) {
-          const sourceBounds = getCellSelectionBounds(prev.start, prev.end)
-          const newBounds = getCellSelectionBounds(prev.fillAnchor, prev.fillEnd)
+      const prev = dragStateRef.current
+      let next: DragState = prev
 
-          if (newBounds) {
-            if (hasFillExtension(sourceBounds, newBounds) && sourceBounds) {
-              if (onBatchChange) {
-                const changes = collectFillChanges(rows, sourceBounds, newBounds)
-                if (changes.length > 0) {
-                  onBatchChange(changes)
-                }
-              } else if (onDataChange) {
-                onDataChange(applyFillData(data, rows, sourceBounds, newBounds))
+      if (prev.isFillDragging && prev.fillEnd) {
+        const sourceBounds = getCellSelectionBounds(prev.start, prev.end)
+
+        if (sourceBounds) {
+          const newBounds = resolveFillBounds(sourceBounds, prev.fillEnd)
+
+          if (hasFillExtension(sourceBounds, newBounds)) {
+            if (onBatchChange) {
+              const changes = collectFillChanges(rows, sourceBounds, newBounds)
+              if (changes.length > 0) {
+                onBatchChange(changes)
               }
-            }
-
-            return {
-              isSelecting: false,
-              isFillDragging: false,
-              start: { row: newBounds.startRow, col: newBounds.startCol },
-              end: { row: newBounds.endRow, col: newBounds.endCol },
-              fillAnchor: null,
-              fillEnd: null,
+            } else if (onDataChange) {
+              onDataChange(applyFillData(data, rows, sourceBounds, newBounds))
             }
           }
-        }
 
-        if (prev.isSelecting) {
-          return { ...prev, isSelecting: false }
+          next = {
+            isSelecting: false,
+            isFillDragging: false,
+            start: { row: newBounds.startRow, col: newBounds.startCol },
+            end: { row: newBounds.endRow, col: newBounds.endCol },
+            fillAnchor: null,
+            fillEnd: null,
+          }
+        } else {
+          next = { ...prev, isFillDragging: false, fillAnchor: null, fillEnd: null }
         }
+      } else if (prev.isSelecting) {
+        next = { ...prev, isSelecting: false }
+      } else if (prev.isFillDragging) {
+        next = { ...prev, isFillDragging: false, fillAnchor: null, fillEnd: null }
+      }
 
-        if (prev.isFillDragging) {
-          return { ...prev, isFillDragging: false, fillAnchor: null, fillEnd: null }
-        }
+      if (next === prev) return
 
-        return prev
-      })
+      dragStateRef.current = next
+      setDragState(next)
     }
 
     window.addEventListener("mouseup", handleMouseUp)
