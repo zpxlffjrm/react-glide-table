@@ -1,5 +1,6 @@
 import type { ColumnDef, Row } from "@tanstack/react-table"
 
+import { isColumnEditable } from "@/components/ui/table/features/cell-edit/cellEdit"
 import {
   getCellSelectionBounds,
   isCellInSelection,
@@ -56,6 +57,9 @@ function collectFillTargets<T extends Record<string, unknown>>(
       const targetCell = targetRow?.getVisibleCells()[colIndex]
       const sourceCell = rows[sourceRowIndex]?.getVisibleCells()[sourceColIndex]
       if (!targetRow || !targetCell || !sourceCell) continue
+      // Fill writes like an edit, so it must respect the same guard: never
+      // overwrite read-only (or protected) columns.
+      if (!isColumnEditable(targetCell.column.columnDef)) continue
 
       const accessorKey = getColumnAccessorKey(
         targetCell.column.columnDef as ColumnDef<unknown, unknown>,

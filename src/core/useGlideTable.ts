@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table/constants";
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
+import { isProtectedColumn } from "@/components/ui/table/features/cell-edit/cellEdit";
 import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue";
 import { createCellRendererRegistry } from "@/components/ui/table/features/cell-render/registry";
 import {
@@ -173,6 +174,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     onExpandedRowsChange,
     preventExpand = false,
     enableSubtreeCopy,
+    escapeCopyFormulas = false,
     onCopyActionsReady,
     onRowsPaste,
     enableInsertPaste,
@@ -463,6 +465,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enabled: enableCellSelection,
     columnCount: visibleLeafColumns.length,
     enableSubtreeCopy: resolvedEnableSubtreeCopy,
+    escapeCopyFormulas,
     enableInsertPaste: enableInsertPaste ?? true,
     onDataChange,
     onBatchChange,
@@ -613,6 +616,10 @@ export function useGlideTable<T extends Record<string, unknown>>(
       const corpusRow = searchCorpusRef.current[rowIndex];
       const column = visibleLeafColumns[colIndex];
       if (!corpusRow || !column) return undefined;
+
+      // Masked columns must not be searchable: matching on the raw value
+      // would let a user reveal it one character at a time.
+      if (isProtectedColumn(column.columnDef)) return undefined;
 
       // Prefer TanStack accessor resolution when the row is currently visible.
       const visibleIndex = visibleRowIndexById.get(corpusRow.id);

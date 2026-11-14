@@ -13,6 +13,7 @@ type ColumnDefLike = {
   meta?: {
     editable?: boolean
     editType?: CellEditType
+    kind?: unknown
   }
 }
 
@@ -24,7 +25,17 @@ export function getColumnAccessorKey(columnDef: ColumnDefLike): string | undefin
   return columnDef.id
 }
 
+/**
+ * `kind: "protected"` columns mask their value on screen, so they are never
+ * editable: the editor would otherwise show the raw secret as its draft.
+ */
+export function isProtectedColumn(columnDef: ColumnDefLike): boolean {
+  return columnDef.meta?.kind === "protected"
+}
+
 export function isColumnEditable(columnDef: ColumnDefLike): boolean {
+  if (isProtectedColumn(columnDef)) return false
+
   return Boolean(columnDef.meta?.editable)
 }
 

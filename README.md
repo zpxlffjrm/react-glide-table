@@ -133,6 +133,8 @@ Built-ins (DOM, inspired by [Glide All Cell Kinds](https://glideapps.github.io/g
 
 Priority: **column `render` > registry `kind` > default text**.
 
+`protected` masks the value everywhere the table exposes it: the cell shows `****`, inline search skips the column, copy writes `****`, and the column is never editable or fill-able. It is still only a display mask: the raw value is in your `data`, so don't send real secrets to the browser. `uri` links allow only http(s)/mailto/relative URLs, and `image` / `drilldown` images only http(s)/blob/`data:image/*`/relative sources (`sanitizeUriHref`, `sanitizeImageSrc`).
+
 ```tsx
 const buttonRenderer = {
   kind: "my-button",
@@ -284,7 +286,11 @@ import type { RowsPastePayload } from "react-glide-table/compound";
 </ProductTable>;
 ```
 
-Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `onCopyActionsReady`.  
+Set `escapeCopyFormulas` when the table shows data other users can write: copied cells that start with `=`, `+`, `-`, `@` get a leading `'` so Excel / Sheets paste them as text instead of running them as formulas (plain signed numbers like `-12.5` are left as-is).
+
+The fill handle only writes into `editable` columns, the same rule as double-click editing.
+
+Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `escapeCopyFormulas`, `onCopyActionsReady`.  
 Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboardTSVWithDepths`, `serializeSelectionToTSV`, …
 
 ## Column width

@@ -266,6 +266,13 @@ export type DataTableProps<T extends Record<string, unknown>> = {
    * Defaults to true when `toggleField` is set.
    */
   enableSubtreeCopy?: boolean;
+  /**
+   * Prefixes copied cells that start with `=`, `+`, `-`, `@` (or a tab / CR)
+   * with `'` so spreadsheets paste them as text instead of evaluating them as
+   * formulas (CSV / formula injection). Enable when the table shows data that
+   * other users can write. Defaults to false.
+   */
+  escapeCopyFormulas?: boolean;
   /** Receives copy helpers once the table mounts or updates. */
   onCopyActionsReady?: (actions: DataTableCopyActions) => void;
   /**

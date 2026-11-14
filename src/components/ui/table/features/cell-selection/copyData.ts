@@ -28,6 +28,25 @@ export type CopyRowEntry<T extends Record<string, unknown>> = {
 export type CopyRenderOptions = {
   registry?: CellRendererRegistry
   root?: ParentNode | null
+  /** Prefix formula-like cells with `'` (see `escapeSpreadsheetFormula`). */
+  escapeFormulas?: boolean
+}
+
+/**
+ * Spreadsheets evaluate a pasted cell that starts with one of these as a
+ * formula (`=HYPERLINK(...)`, `=cmd|...`). Leading tab / CR are included per
+ * the OWASP CSV-injection guidance.
+ */
+const SPREADSHEET_FORMULA_PREFIX = /^[=+\-@\t\r]/
+const PLAIN_SIGNED_NUMBER = /^[+-]\d+(?:\.\d+)?$/
+
+/** Prefix formula-like text with `'` so spreadsheets paste it as plain text. */
+export function escapeSpreadsheetFormula(text: string): string {
+  if (!SPREADSHEET_FORMULA_PREFIX.test(text)) return text
+  // Plain signed numbers ("-12.5", "+3") are not formulas; keep them numeric.
+  if (PLAIN_SIGNED_NUMBER.test(text)) return text
+
+  return `'${text}`
 }
 
 type ColumnCopyMeta = {
@@ -354,7 +373,12 @@ function formatCopyCellText<T extends Record<string, unknown>>(
   // `ResolvedTableCell` uses (built-ins like `protected`, plus custom
   // `cellRenderers`), so copy text matches what the cell actually shows
   // instead of the raw underlying value (e.g. a masked secret).
-  if (options?.registry && meta?.kind && isPrimitiveCopyValue(value)) {
+  // Protected cells always copy their masked text, whatever the value type.
+  if (
+    options?.registry &&
+    meta?.kind &&
+    (isPrimitiveCopyValue(value) || meta.kind === "protected")
+  ) {
     try {
       const renderer = resolveCellRenderer(options.registry, meta.kind, ctx)
       if (renderer) {
@@ -572,7 +596,7 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
           const sourceCell = matchingCells?.[colOffset]
           const column = sourceCell?.column ?? templateCell.column
 
-          return formatCopyCellText(
+          const text = formatCopyCellText(
             rowData,
             column.columnDef as ColumnDef<unknown, unknown>,
             resolveCopyColumnId(sourceCell ?? templateCell),
@@ -584,6 +608,8 @@ export function serializeCopyRowsToTSV<T extends Record<string, unknown>>(
               : undefined,
             options,
           )
+
+          return options?.escapeFormulas ? escapeSpreadsheetFormula(text) : text
         })
         .join("\t")
 
