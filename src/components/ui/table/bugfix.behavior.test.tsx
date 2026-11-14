@@ -131,12 +131,13 @@ describe("tree tables", () => {
     expect(columnTexts(container)).toEqual(["A", "A1", "B", "B1", "B1x"])
   })
 
-  it("M4: respects a controlled expandedRows value on mount", () => {
+  it("M4: can keep a controlled expandedRows value on mount", () => {
     const onExpandedRowsChange = vi.fn()
     const { container } = render(
       <Table
         data={[{ id: "A", name: "A", children: [{ id: "A1", name: "child" }] }]}
         toggleField="id"
+        autoExpandOnLoad={false}
         expandedRows={new Set<string>()}
         onExpandedRowsChange={onExpandedRowsChange}
         enableVirtualization={false}
@@ -182,6 +183,7 @@ describe("onDataChange keeps the full original data", () => {
         <Table
           data={data}
           toggleField="id"
+          autoExpandOnLoad={false}
           expandedRows={expanded}
           onExpandedRowsChange={setExpanded}
           onDataChange={onDataChange}
