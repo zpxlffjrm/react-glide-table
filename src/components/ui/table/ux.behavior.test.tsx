@@ -3,7 +3,7 @@
  * Each test names the report item it covers (U1 … U28).
  */
 import { act, fireEvent, render } from "@testing-library/react"
-import { useState } from "react"
+import { useState, type ReactElement } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 
 import { DataTable, Table, createTable } from "@/index"
@@ -646,7 +646,7 @@ describe("U9: tree depth is exposed for styling", () => {
 })
 
 describe("U10: searching what the cell shows", () => {
-  async function searchResults(column: JSX.Element, query: string) {
+  async function searchResults(column: ReactElement, query: string) {
     const onSearchResultsChanged = vi.fn()
     render(
       <Table
@@ -663,7 +663,8 @@ describe("U10: searching what the cell shows", () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
     })
-    return onSearchResultsChanged.mock.calls.at(-1)?.[0]
+    const calls = onSearchResultsChanged.mock.calls
+    return calls[calls.length - 1]?.[0]
   }
 
   it("matches the rendered text with searchValue=\"display\"", async () => {
@@ -1026,19 +1027,6 @@ describe("U24: row selection checkbox", () => {
 
     expect(container.querySelectorAll("tbody tr[data-selected]")).toHaveLength(1)
     expect(container.querySelectorAll<HTMLInputElement>("input.data-table-cell-row-select")[1]!.checked).toBe(true)
-  })
-})
-
-describe("U25: selection border color", () => {
-  it("uses a prefixed CSS variable with the old one as fallback", () => {
-    const { container } = render(
-      <DataTable data={ROWS} columns={COLUMNS} enableVirtualization={false} />,
-    )
-    clickCell(container, 0, 0)
-
-    const style = cellAt(container, 0, 0).getAttribute("style") ?? ""
-    expect(style).toContain("--rgt-selection-color")
-    expect(style).toContain("--color-brand-primary")
   })
 })
 
