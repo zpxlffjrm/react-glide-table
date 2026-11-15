@@ -42,6 +42,17 @@ export type ColumnCopyValue<
   V = unknown,
 > = "display" | "value" | "omit" | ((ctx: CellRenderContext<T, V>) => string);
 
+/**
+ * Per-column inline-search text.
+ * - `"value"` (default): raw accessor / field value
+ * - `"display"`: text of the rendered cell (`render` / `kind`)
+ * - function: custom search string
+ */
+export type ColumnSearchValue<
+  T extends Record<string, unknown> = Record<string, unknown>,
+  V = unknown,
+> = "value" | "display" | ((ctx: CellRenderContext<T, V>) => string);
+
 export type { DataTableLabels };
 
 export type {
@@ -89,6 +100,13 @@ declare module "@tanstack/react-table" {
      * - function: custom string for the clipboard
      */
     copyValue?: ColumnCopyValue;
+    /** Inline-search text for this column. Defaults to the raw value. */
+    searchValue?: ColumnSearchValue;
+    /**
+     * Set by compound `Table.Column sortable`: the column's current sort
+     * direction, or `false` when it is sortable but unsorted. Drives `aria-sort`.
+     */
+    sortDirection?: "asc" | "desc" | false;
     /**
      * Freeze (sticky) this column without reordering.
      * `true` / `"left"` stick to the scrollport left; `"right"` to the right.
@@ -170,6 +188,11 @@ export type RowsPastePayload = {
   anchorRowId: string;
   /** Visible column ids from startCol for clipboard width */
   columnIds: string[];
+  /**
+   * The subset of `columnIds` the table itself would write to (editable and
+   * not `kind: "protected"`), the same rule as editing and the fill handle.
+   */
+  editableColumnIds?: string[];
   /** Parsed TSV matrix (rows × cols) */
   values: string[][];
   /**
@@ -220,13 +243,22 @@ export type DataTableProps<T extends Record<string, unknown>> = {
    */
   enableCellSelection?: boolean;
   /**
-   * @deprecated Combining with paged/tree-transformed data can corrupt the source.
-   * Prefer onCellChange / onBatchChange.
+   * Receives the full original `data` with the change applied (also for tree,
+   * sorted and paginated tables). Used when neither `onCellChange` nor
+   * `onBatchChange` is given.
    */
   onDataChange?: (data: T[]) => void;
-  /** Single-cell change (edit commit). Takes precedence over onDataChange */
+  /**
+   * Single-cell change (edit commit, render `update`, boolean checkbox).
+   * Also receives fill changes one by one when `onBatchChange` is absent.
+   * Takes precedence over onDataChange.
+   */
   onCellChange?: (rowId: string, columnId: string, value: unknown) => void;
-  /** Multi-cell change (fill handle, etc.). Takes precedence over onDataChange */
+  /**
+   * Multi-cell change (fill handle, Delete key). Also receives single-cell
+   * changes as a one-item batch when `onCellChange` is absent.
+   * Takes precedence over onDataChange.
+   */
   onBatchChange?: (
     changes: Array<{ rowId: string; columnId: string; value: unknown }>,
   ) => void;
@@ -250,10 +282,21 @@ export type DataTableProps<T extends Record<string, unknown>> = {
 
   /** Expand key field. Enables tree conversion / expand UI when set. Default `id` */
   toggleField?: string;
+  /** Alias of `toggleField`: the row id field of a tree. Enables tree mode when set. */
+  idField?: string;
   /** Child → parent reference field. Default `parentId` */
   childField?: string;
+  /** Alias of `childField`: the field holding the parent row's id. */
+  parentIdField?: string;
   /** Nested children array field. Default `children` */
   flattenField?: string;
+  /** Alias of `flattenField`: the nested children array field. */
+  childrenField?: string;
+  /**
+   * Column id that shows the expand toggle. Defaults to the `toggleField`
+   * column, else the column after a `no` / `treeNo` column, else the first.
+   */
+  expandColumn?: string;
   /** Parent quantity field used for parentCount. Default `qty` */
   qtyField?: string;
   /** Expanded row key set (controlled) */
@@ -302,6 +345,10 @@ export type DataTableProps<T extends Record<string, unknown>> = {
   estimateRowHeight?: number;
   /** Virtualization overscan row count. Default 8 */
   virtualOverscan?: number;
+  /**
+   * W/A/S/D move the cell selection like the arrow keys. Defaults to true.
+   */
+  enableWasdNavigation?: boolean;
 
   /**
    * Enable drag-to-resize on column headers. Defaults to false.
@@ -370,6 +417,10 @@ export type DataTableProps<T extends Record<string, unknown>> = {
  */
 export type DataTableClassNames = {
   root?: string;
+  /** Compound `Table` only: the outer wrapper around the table and pagination */
+  tableRoot?: string;
+  /** Compound `Table` only: the pagination bar */
+  pagination?: string;
   pending?: string;
   loadingText?: string;
   toolbar?: string;
@@ -415,6 +466,8 @@ export type DataTableToolbarSlotProps = {
   summary?: ReactNode;
   selectedCount: number;
   selectionLabel?: (selectedCount: number) => ReactNode;
+  /** Renders the row count instead of the bare numbers (`labels.count`) */
+  countLabel?: (filteredCount: number | undefined, totalCount: number | undefined) => ReactNode;
   toolbar?: ReactNode;
   className?: string;
   classNames?: Pick<
@@ -556,6 +609,13 @@ export type TableColumnProps<
    * - function: custom string for the clipboard
    */
   copyValue?: ColumnCopyValue<T, K extends keyof T ? T[K] : unknown>;
+  /**
+   * Inline-search text for this column.
+   * - `"value"` (default): raw field value
+   * - `"display"`: text of the rendered cell
+   * - function: custom search string
+   */
+  searchValue?: ColumnSearchValue<T, K extends keyof T ? T[K] : unknown>;
 };
 
 /** Declares a multi-row header group wrapping leaf `Table.Column`s. */
@@ -569,11 +629,24 @@ export type TableColumnGroupProps = {
   headerClassName?: string;
 };
 
+export type TableSort = {
+  field: string;
+  direction: "asc" | "desc";
+};
+
 export type TableProps<T extends Record<string, unknown>> = Omit<
   DataTableProps<T>,
   "columns"
 > & {
   children: ReactNode;
+  /** Controlled sort (`null` = unsorted). Use with `onSortChange`. */
+  sort?: TableSort | null;
+  /** Initial sort when uncontrolled. */
+  defaultSort?: TableSort | null;
+  /** Called with the next sort when a sortable header is clicked. */
+  onSortChange?: (sort: TableSort | null) => void;
+  /** Locale for string sorting. Defaults to `"ko"`. */
+  sortLocale?: string;
 };
 
 export type {

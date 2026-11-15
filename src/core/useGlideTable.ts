@@ -30,15 +30,30 @@ import {
 } from "@/components/ui/table/constants";
 import type { DataTableRowContextValue } from "@/components/ui/table/DataTableContext";
 import { useCellEdit } from "@/components/ui/table/features/cell-edit/useCellEdit";
-import { isProtectedColumn } from "@/components/ui/table/features/cell-edit/cellEdit";
-import { getTreeRowKey } from "@/components/ui/table/features/data-patch/dataPatch";
+import {
+  getColumnAccessorKey,
+  isColumnEditable,
+  isProtectedColumn,
+} from "@/components/ui/table/features/cell-edit/cellEdit";
+import {
+  applyCellChangesToData,
+  getTreeRowKey,
+} from "@/components/ui/table/features/data-patch/dataPatch";
 import { commitCellValue } from "@/components/ui/table/features/cell-render/commitCellValue";
-import { createCellRendererRegistry } from "@/components/ui/table/features/cell-render/registry";
+import {
+  createCellRendererRegistry,
+  resolveCellRenderer,
+} from "@/components/ui/table/features/cell-render/registry";
+import type { CellRenderContext } from "@/components/ui/table/features/cell-render/types";
+import { reactNodeToText } from "@/components/ui/table/features/cell-selection/copyData";
 import {
   withCellUpdate,
   type CellContextWithUpdate,
 } from "@/components/ui/table/features/cell-render/withCellUpdate";
-import type { CellPosition } from "@/components/ui/table/features/cell-selection/cellSelection";
+import type {
+  CellPosition,
+  CellSelectionBounds,
+} from "@/components/ui/table/features/cell-selection/cellSelection";
 import { useCellSelection } from "@/components/ui/table/features/cell-selection/useCellSelection";
 import { createRowHoverStore } from "@/components/ui/table/features/row-hover/rowHover";
 import { registerEscapeDismiss } from "@/components/ui/table/features/selection-dismiss/escapeDismissRegistry";
@@ -75,6 +90,13 @@ import type {
 } from "@/components/ui/table/types";
 import type { DataTableLabels } from "@/core/labels";
 import { resolveDataTableLabels } from "@/core/labels";
+
+// Bundlers replace `process.env.NODE_ENV`; guarded for runtimes without `process`.
+declare const process: { env?: Record<string, string | undefined> } | undefined;
+
+function isProductionBuild(): boolean {
+  return typeof process !== "undefined" && process?.env?.NODE_ENV === "production";
+}
 
 const EMPTY_COLUMN_FREEZE_OFFSETS = new Map<string, ColumnFreezeOffset>();
 const EMPTY_SEARCH_MATCH_KEYS = new Set<string>();
@@ -124,6 +146,8 @@ export type UseGlideTableResult<T extends Record<string, unknown>> = {
   handleToggleSelect: (row: Row<T>) => void;
   clearHover: () => void;
   setColumnOrder: (next: ColumnOrderState) => void;
+  /** Keyboard focus landed on the table root: select the first cell if none. */
+  handleRootFocus: () => void;
   copySelection: DataTableCopyActions["copySelection"];
   inlineSearch: {
     showSearch: boolean;
@@ -163,14 +187,18 @@ export function useGlideTable<T extends Record<string, unknown>>(
     selectOnRowClick = true,
     enableCellSelection = true,
     onDataChange,
-    onCellChange,
-    onBatchChange,
+    onCellChange: onCellChangeProp,
+    onBatchChange: onBatchChangeProp,
     cellRenderers,
     preserveRowSelection = false,
-    toggleField,
-    childField,
-    flattenField,
+    toggleField: toggleFieldProp,
+    idField,
+    childField: childFieldProp,
+    parentIdField,
+    flattenField: flattenFieldProp,
+    childrenField,
     qtyField,
+    expandColumn,
     expandedRows: controlledExpandedRows,
     onExpandedRowsChange,
     preventExpand = false,
@@ -198,7 +226,32 @@ export function useGlideTable<T extends Record<string, unknown>>(
     onSearchClose,
     searchResults,
     onSearchResultsChanged,
+    enableWasdNavigation = true,
   } = options;
+
+  const toggleField = toggleFieldProp ?? idField;
+  const childField = childFieldProp ?? parentIdField;
+  const flattenField = flattenFieldProp ?? childrenField;
+
+  // One write path for every commit: a single-cell change falls back to a
+  // one-item batch, and a batch falls back to one call per cell, so whichever
+  // callback the app gives receives edits, fill, checkbox and Delete alike.
+  const onCellChange = useMemo<DataTableProps<T>["onCellChange"]>(() => {
+    if (onCellChangeProp) return onCellChangeProp;
+    if (!onBatchChangeProp) return undefined;
+    return (rowId, columnId, value) =>
+      onBatchChangeProp([{ rowId, columnId, value }]);
+  }, [onBatchChangeProp, onCellChangeProp]);
+  const onBatchChange = useMemo<DataTableProps<T>["onBatchChange"]>(() => {
+    if (onBatchChangeProp) return onBatchChangeProp;
+    if (!onCellChangeProp) return undefined;
+    return (changes) => {
+      for (const change of changes) {
+        onCellChangeProp(change.rowId, change.columnId, change.value);
+      }
+    };
+  }, [onBatchChangeProp, onCellChangeProp]);
+  const hasWriteCallback = Boolean(onCellChange || onBatchChange || onDataChange);
 
   const labels = useMemo(() => {
     const resolved = resolveDataTableLabels(labelsProp);
@@ -379,6 +432,30 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const columnCount = table.getAllLeafColumns().length || 1;
   const visibleLeafColumns = table.getVisibleLeafColumns();
 
+  const canFill =
+    enableCellSelection &&
+    hasWriteCallback &&
+    visibleLeafColumns.some((column) => isColumnEditable(column.columnDef));
+
+  // `kind: "boolean"` writes on click unless `editable` is false, while every
+  // other cell needs `editable` to write. Until that changes in a major
+  // release, say so once per column.
+  const warnedBooleanColumnsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!hasWriteCallback || isProductionBuild()) return;
+    for (const column of visibleLeafColumns) {
+      const meta = column.columnDef.meta;
+      if (meta?.kind !== "boolean" || meta.editable !== undefined || meta.cellRender) continue;
+      if (warnedBooleanColumnsRef.current.has(column.id)) continue;
+      warnedBooleanColumnsRef.current.add(column.id);
+      console.warn(
+        `[react-glide-table] Column "${column.id}" (kind "boolean") has no \`editable\` prop, so its checkbox writes on click. ` +
+          "Set editable={true} to keep that, or editable={false} for a read-only checkbox. " +
+          "A future major release will make boolean cells read-only unless editable is set, like other cells.",
+      );
+    }
+  }, [hasWriteCallback, visibleLeafColumns]);
+
   const columnFreezeOffsets = useMemo(() => {
     if (!enableColumnFreeze) return EMPTY_COLUMN_FREEZE_OFFSETS;
 
@@ -438,7 +515,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
         const cell = scrollElement.querySelector(
           `[data-row-index="${rowIndex}"][data-col-index="${colIndex}"]`,
         );
-        if (cell instanceof HTMLElement) {
+        if (cell instanceof HTMLElement && typeof cell.scrollIntoView === "function") {
           cell.scrollIntoView({ block: blockAlign, inline: "nearest" });
         }
       };
@@ -460,6 +537,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     [scrollCellIntoView],
   );
 
+  const editKeyRef = useRef<(position: CellPosition) => void>(() => {});
+  const clearKeyRef = useRef<(bounds: CellSelectionBounds) => void>(() => {});
+
   const {
     dragState,
     activeSelectionBounds,
@@ -468,6 +548,8 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleFillHandleMouseDown,
     clearSelection: clearCellSelection,
     copySelection,
+    selectCell,
+    focusSelection,
   } = useCellSelection({
     data: sourceData,
     rows,
@@ -483,6 +565,9 @@ export function useGlideTable<T extends Record<string, unknown>>(
     onCellNavigate: handleCellNavigate,
     cellRendererRegistry,
     rootRef,
+    enableWasdNavigation,
+    onEditKey: (position) => editKeyRef.current(position),
+    onClearKey: (bounds) => clearKeyRef.current(bounds),
   });
 
   const clearRowSelection = useCallback(() => {
@@ -509,11 +594,69 @@ export function useGlideTable<T extends Record<string, unknown>>(
   const {
     editingCell,
     draftValue,
+    draftInvalid,
+    setDraftInvalid,
     setDraftValue,
     startEdit,
     commitEdit,
     cancelEdit,
   } = useCellEdit({ data: sourceData, rows, onDataChange, onCellChange });
+
+  editKeyRef.current = (position) => {
+    startEdit(position.row, position.col);
+  };
+
+  clearKeyRef.current = (bounds) => {
+    const changes: Array<{ rowId: string; columnId: string; value: unknown }> = [];
+    for (let rowIndex = bounds.startRow; rowIndex <= bounds.endRow; rowIndex += 1) {
+      const row = rows[rowIndex];
+      if (!row) continue;
+      const cells = row.getVisibleCells();
+      for (let colIndex = bounds.startCol; colIndex <= bounds.endCol; colIndex += 1) {
+        const cell = cells[colIndex];
+        if (!cell || !isColumnEditable(cell.column.columnDef)) continue;
+        changes.push({ rowId: row.id, columnId: cell.column.id, value: null });
+      }
+    }
+    if (changes.length === 0) return;
+
+    if (onBatchChange) {
+      onBatchChange(changes);
+      return;
+    }
+    if (!onDataChange) return;
+
+    let next = sourceData;
+    for (const change of changes) {
+      const row = rows.find((item) => item.id === change.rowId);
+      const cell = row?.getVisibleCells().find((item) => item.column.id === change.columnId);
+      const accessorKey = cell ? getColumnAccessorKey(cell.column.columnDef) : undefined;
+      if (!row || !accessorKey) continue;
+      next = applyCellChangesToData(next, [
+        { original: row.original, index: row.index, accessorKey, value: null },
+      ]);
+    }
+    if (next !== sourceData) onDataChange(next);
+  };
+
+  /** Commit the editor, then move the selection (Enter → down, Tab → right). */
+  const commitEditAndMove = useCallback(
+    (raw: string, delta: { row: number; col: number }) => {
+      const current = editingCell;
+      if (!commitEdit(raw)) return false;
+      if (current) {
+        selectCell(current.rowIndex + delta.row, current.colIndex + delta.col);
+      }
+      rootRef.current?.focus({ preventScroll: true });
+      return true;
+    },
+    [commitEdit, editingCell, selectCell],
+  );
+
+  const cancelEditAndRefocus = useCallback(() => {
+    cancelEdit();
+    rootRef.current?.focus({ preventScroll: true });
+  }, [cancelEdit]);
 
   const commitRenderedCellValue = useCallback(
     (rowId: string, columnId: string, value: unknown) => {
@@ -617,6 +760,45 @@ export function useGlideTable<T extends Record<string, unknown>>(
     return map;
   }, [resolveSearchRowId, rows]);
 
+  const readSearchRawValue = useCallback(
+    (
+      corpusRow: { id: string; data: T },
+      rowIndex: number,
+      column: (typeof visibleLeafColumns)[number],
+    ): { value: unknown; row: Row<T> | undefined } => {
+      // Prefer TanStack accessor resolution when the row is currently visible.
+      const visibleIndex = visibleRowIndexById.get(corpusRow.id);
+      if (visibleIndex !== undefined) {
+        const visibleRow = rows[visibleIndex];
+        if (visibleRow) {
+          return { value: visibleRow.getValue(column.id), row: visibleRow };
+        }
+      }
+
+      const columnDef = column.columnDef;
+      if (
+        "accessorFn" in columnDef &&
+        typeof columnDef.accessorFn === "function"
+      ) {
+        return { value: columnDef.accessorFn(corpusRow.data, rowIndex), row: undefined };
+      }
+
+      if (
+        "accessorKey" in columnDef &&
+        columnDef.accessorKey != null &&
+        columnDef.accessorKey !== ""
+      ) {
+        return {
+          value: corpusRow.data[String(columnDef.accessorKey) as keyof T],
+          row: undefined,
+        };
+      }
+
+      return { value: corpusRow.data[column.id as keyof T], row: undefined };
+    },
+    [rows, visibleRowIndexById],
+  );
+
   const getSearchCellValue = useCallback(
     (rowIndex: number, colIndex: number) => {
       const corpusRow = searchCorpusRef.current[rowIndex];
@@ -627,34 +809,36 @@ export function useGlideTable<T extends Record<string, unknown>>(
       // would let a user reveal it one character at a time.
       if (isProtectedColumn(column.columnDef)) return undefined;
 
-      // Prefer TanStack accessor resolution when the row is currently visible.
-      const visibleIndex = visibleRowIndexById.get(corpusRow.id);
-      if (visibleIndex !== undefined) {
-        const visibleRow = rows[visibleIndex];
-        if (visibleRow) {
-          return visibleRow.getValue(column.id);
-        }
+      const { value, row } = readSearchRawValue(corpusRow, rowIndex, column);
+      const meta = column.columnDef.meta;
+      const searchValue = meta?.searchValue;
+      if (!searchValue || searchValue === "value") return value;
+
+      const ctx = {
+        value,
+        row: (row ?? { id: corpusRow.id, index: rowIndex, original: corpusRow.data }) as Row<
+          Record<string, unknown>
+        >,
+        index: row?.index ?? rowIndex,
+        columnId: column.id,
+        cellProps: meta?.cellProps,
+        update: () => {},
+      } as CellRenderContext;
+
+      try {
+        if (typeof searchValue === "function") return searchValue(ctx);
+
+        // "display": the text the cell renders (`render`, then `kind`).
+        if (meta?.cellRender) return reactNodeToText(meta.cellRender(ctx));
+        const renderer = resolveCellRenderer(cellRendererRegistry, meta?.kind, ctx);
+        if (renderer) return reactNodeToText(renderer.render(ctx));
+      } catch {
+        return value;
       }
 
-      const columnDef = column.columnDef;
-      if (
-        "accessorFn" in columnDef &&
-        typeof columnDef.accessorFn === "function"
-      ) {
-        return columnDef.accessorFn(corpusRow.data, rowIndex);
-      }
-
-      if (
-        "accessorKey" in columnDef &&
-        columnDef.accessorKey != null &&
-        columnDef.accessorKey !== ""
-      ) {
-        return corpusRow.data[String(columnDef.accessorKey) as keyof T];
-      }
-
-      return corpusRow.data[column.id as keyof T];
+      return value;
     },
-    [rows, visibleLeafColumns, visibleRowIndexById],
+    [cellRendererRegistry, readSearchRawValue, visibleLeafColumns],
   );
 
   const pendingSearchNavRef = useRef<{
@@ -834,6 +1018,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
         enableCellSelection,
         activeSelectionBounds,
         dragState,
+        canFill,
         onCellMouseDown: handleCellMouseDownWithCommit,
         onCellMouseEnter: handleCellMouseEnter,
         onFillHandleMouseDown: handleFillHandleMouseDown,
@@ -841,18 +1026,23 @@ export function useGlideTable<T extends Record<string, unknown>>(
       cellEdit: {
         editingCell,
         draftValue,
+        draftInvalid,
+        onDraftInvalidChange: setDraftInvalid,
         onDraftValueChange: setDraftValue,
         onStartEdit: startEdit,
         onCommitEdit: commitEdit,
-        onCancelEdit: cancelEdit,
+        onCommitEditAndMove: commitEditAndMove,
+        onCancelEdit: cancelEditAndRefocus,
       },
       cellRender: {
         registry: cellRendererRegistry,
         commitValue: commitRenderedCellValue,
+        protectedLabel: labels.protectedCell,
       },
       expand: {
         enableExpand,
         toggleField,
+        expandColumn,
         expandedRows,
         preventExpand,
         onToggleExpand: handleToggleExpand,
@@ -887,19 +1077,25 @@ export function useGlideTable<T extends Record<string, unknown>>(
     enableCellSelection,
     activeSelectionBounds,
     dragState,
+    canFill,
     handleCellMouseDownWithCommit,
     handleCellMouseEnter,
     handleFillHandleMouseDown,
     editingCell,
     draftValue,
+    draftInvalid,
+    setDraftInvalid,
     setDraftValue,
     startEdit,
     commitEdit,
-    cancelEdit,
+    commitEditAndMove,
+    cancelEditAndRefocus,
     cellRendererRegistry,
     commitRenderedCellValue,
+    labels.protectedCell,
     enableExpand,
     toggleField,
+    expandColumn,
     expandedRows,
     preventExpand,
     handleToggleExpand,
@@ -953,6 +1149,7 @@ export function useGlideTable<T extends Record<string, unknown>>(
     handleToggleSelect,
     clearHover,
     setColumnOrder,
+    handleRootFocus: focusSelection,
     copySelection: stableCopySelection,
     inlineSearch: {
       showSearch: inlineSearch.showSearch,

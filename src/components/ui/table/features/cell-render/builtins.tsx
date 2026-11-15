@@ -246,11 +246,38 @@ function LoadingCell() {
   return <span className="data-table-cell-loading" aria-busy="true" />
 }
 
-function ProtectedCell() {
+function ProtectedCell({ cellProps }: CellRenderContext) {
+  const label = typeof cellProps?.ariaLabel === "string" ? cellProps.ariaLabel : "protected"
   return (
-    <span className="data-table-cell-protected" aria-label="protected">
+    <span className="data-table-cell-protected" aria-label={label}>
       ****
     </span>
+  )
+}
+
+/** Checkbox bound to the row's selection. Needs `rowSelectionMode`. */
+function RowSelectCell({ row, cellProps }: CellRenderContext) {
+  const canSelect = typeof row.getCanSelect === "function" ? row.getCanSelect() : false
+  const checked = typeof row.getIsSelected === "function" ? row.getIsSelected() : false
+  const label = typeof cellProps?.ariaLabel === "string" ? cellProps.ariaLabel : "Select row"
+
+  return (
+    <input
+      type="checkbox"
+      className="data-table-cell-row-select"
+      checked={checked}
+      disabled={!canSelect}
+      aria-label={label}
+      onChange={() => {
+        if (canSelect) row.toggleSelected()
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+      }}
+      onMouseDown={(event) => {
+        event.stopPropagation()
+      }}
+    />
   )
 }
 
@@ -273,6 +300,7 @@ const BUILTIN_RENDER_MAP: Record<
   loading: LoadingCell,
   protected: ProtectedCell,
   "row-id": RowIdCell,
+  "row-select": RowSelectCell,
 }
 
 export const BUILTIN_CELL_RENDERERS: CellRenderer[] = (

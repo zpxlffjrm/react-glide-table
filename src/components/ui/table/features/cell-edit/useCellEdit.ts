@@ -29,6 +29,14 @@ export function useCellEdit<T extends Record<string, unknown>>({
   const [editingKey, setEditingKey] = useState<EditingKey | null>(null)
   const [draftValue, setDraftValue] = useState("")
   const draftValueRef = useRef(draftValue)
+  // The browser rejected what was typed (e.g. "1-2" in a number input, which
+  // reads back as ""). Committing would silently clear the cell instead.
+  const [draftInvalid, setDraftInvalidState] = useState(false)
+  const draftInvalidRef = useRef(false)
+  const setDraftInvalid = useCallback((invalid: boolean) => {
+    draftInvalidRef.current = invalid
+    setDraftInvalidState(invalid)
+  }, [])
 
   useEffect(() => {
     draftValueRef.current = draftValue
@@ -54,6 +62,8 @@ export function useCellEdit<T extends Record<string, unknown>>({
     editingCellRef.current = null
     setEditingKey(null)
     setDraftValue("")
+    draftInvalidRef.current = false
+    setDraftInvalidState(false)
   }, [])
 
   const commitEdit = useCallback(
@@ -80,6 +90,8 @@ export function useCellEdit<T extends Record<string, unknown>>({
 
         return true
       }
+
+      if (draftInvalidRef.current) return false
 
       const value = raw ?? draftValueRef.current
       const parsed = parseCellEditValue(value, getColumnEditType(cell.column.columnDef))
@@ -130,6 +142,8 @@ export function useCellEdit<T extends Record<string, unknown>>({
   return {
     editingCell,
     draftValue,
+    draftInvalid,
+    setDraftInvalid,
     setDraftValue,
     startEdit,
     commitEdit,

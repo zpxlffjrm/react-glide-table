@@ -12,6 +12,7 @@ export {
 export { useGlideTable, type UseGlideTableOptions, type UseGlideTableResult } from "@/core/useGlideTable"
 export type {
   ColumnCopyValue,
+  ColumnSearchValue,
   ColumnDef,
   ColumnOrderState,
   ColumnResizeMode,

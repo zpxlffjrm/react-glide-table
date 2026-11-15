@@ -384,9 +384,10 @@ export function useInlineSearch({
         // Focus on <body> doesn't say which table is meant. With several
         // searchable tables mounted, only the last one the user pointed at
         // answers (or none, until one has been touched).
+        // The same holds for a single table: until the user points at it,
+        // Ctrl+F stays the browser's find for the page.
         if (
           !focusInside &&
-          searchInstanceCount > 1 &&
           !(lastPointerTarget instanceof Node && root.contains(lastPointerTarget))
         ) {
           return
