@@ -8,6 +8,7 @@ import type {
   DragState,
 } from "@/components/ui/table/features/cell-selection/cellSelection";
 import type { ColumnFreezeOffset } from "@/components/ui/table/features/column-freeze/columnFreeze";
+import type { RowHoverStore } from "@/components/ui/table/features/row-hover/rowHover";
 import type { SearchResultItem } from "@/components/ui/table/features/inline-search/inlineSearch";
 import type { ColumnRowSpanMap } from "@/components/ui/table/features/row-span/rowSpan";
 import type {
@@ -24,7 +25,12 @@ export type DataTableRowContextValue = {
     primaryRowSpanKey?: string;
     primaryRowSpanColumnId?: string;
     columnRowSpanMap: ColumnRowSpanMap;
-    hoveredRowIndex: number | null;
+    /**
+     * hover 상태는 store로 별도 관리한다 (참조가 절대 바뀌지 않아 이 context
+     * 전체를 무효화하지 않음). 실제 hover 여부는 각 행이 store를 직접 구독해서
+     * 계산한다 — rowHover.ts의 설명 참고.
+     */
+    hoverStore: RowHoverStore;
     selectedRowIndices: Set<number>;
     onRowHover: (rowIndex: number, rowData: RowData) => void;
   };
@@ -38,6 +44,8 @@ export type DataTableRowContextValue = {
     enableCellSelection: boolean;
     activeSelectionBounds: CellSelectionBounds | null;
     dragState: DragState;
+    /** False when fill could not write anything (no editable column or no write callback). */
+    canFill?: boolean;
     onCellMouseDown: (
       rowIndex: number,
       colIndex: number,
@@ -49,18 +57,27 @@ export type DataTableRowContextValue = {
   cellEdit: {
     editingCell: EditingCell | null;
     draftValue: string;
+    /** The browser rejected the typed text (number input `badInput`). */
+    draftInvalid?: boolean;
+    onDraftInvalidChange?: (invalid: boolean) => void;
     onDraftValueChange: (value: string) => void;
     onStartEdit: (rowIndex: number, colIndex: number) => void;
     onCommitEdit: (raw?: string) => boolean;
+    /** Commit, then move the cell selection by `delta` (Enter / Tab). */
+    onCommitEditAndMove?: (raw: string, delta: { row: number; col: number }) => boolean;
     onCancelEdit: () => void;
   };
   cellRender: {
     registry: CellRendererRegistry;
     commitValue: (rowId: string, columnId: string, value: unknown) => boolean;
+    /** `labels.protectedCell` for `kind: "protected"` cells */
+    protectedLabel?: string;
   };
   expand: {
     enableExpand: boolean;
     toggleField?: string;
+    /** Column id that shows the expand toggle */
+    expandColumn?: string;
     expandedRows?: Set<string>;
     preventExpand: boolean;
     onToggleExpand?: (rowKey: string) => void;

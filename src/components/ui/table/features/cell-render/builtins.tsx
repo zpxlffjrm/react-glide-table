@@ -34,8 +34,9 @@ function asDrilldownItems(value: unknown): DrilldownItem[] {
       const record = item as Record<string, unknown>
       const text = asString(record.text ?? record.label ?? "")
       if (!text) return []
-      const img = record.img ?? record.image
-      return [{ text, ...(typeof img === "string" ? { img } : {}) }]
+      const rawImg = record.img ?? record.image
+      const img = typeof rawImg === "string" ? sanitizeImageSrc(rawImg) : null
+      return [{ text, ...(img ? { img } : {}) }]
     }
     return [{ text: asString(item) }]
   })
@@ -122,6 +123,29 @@ export function sanitizeUriHref(raw: string): string | null {
   }
 }
 
+/**
+ * Allow http(s)/blob, `data:image/*` and relative image sources; reject other
+ * schemes (`javascript:`, `data:text/html`, `file:`, custom protocols).
+ */
+export function sanitizeImageSrc(raw: string): string | null {
+  const src = raw.trim()
+  if (!src) return null
+
+  try {
+    const parsed = new URL(src)
+    const protocol = parsed.protocol.toLowerCase()
+    if (protocol === "http:" || protocol === "https:" || protocol === "blob:") {
+      return src
+    }
+    if (protocol === "data:" && /^data:image\//i.test(src)) return src
+    return null
+  } catch {
+    // Relative / protocol-relative path (no scheme), e.g. "/img/a.png", "a.png"
+    if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return null
+    return src
+  }
+}
+
 function UriCell({ value }: CellRenderContext) {
   const raw = asString(value)
   if (!raw) return null
@@ -146,7 +170,10 @@ function UriCell({ value }: CellRenderContext) {
 }
 
 function ImageCell({ value }: CellRenderContext) {
-  const urls = asStringList(value)
+  const urls = asStringList(value).flatMap((url) => {
+    const src = sanitizeImageSrc(url)
+    return src ? [src] : []
+  })
   if (urls.length === 0) return null
 
   return (
@@ -219,11 +246,38 @@ function LoadingCell() {
   return <span className="data-table-cell-loading" aria-busy="true" />
 }
 
-function ProtectedCell() {
+function ProtectedCell({ cellProps }: CellRenderContext) {
+  const label = typeof cellProps?.ariaLabel === "string" ? cellProps.ariaLabel : "protected"
   return (
-    <span className="data-table-cell-protected" aria-label="protected">
+    <span className="data-table-cell-protected" aria-label={label}>
       ****
     </span>
+  )
+}
+
+/** Checkbox bound to the row's selection. Needs `rowSelectionMode`. */
+function RowSelectCell({ row, cellProps }: CellRenderContext) {
+  const canSelect = typeof row.getCanSelect === "function" ? row.getCanSelect() : false
+  const checked = typeof row.getIsSelected === "function" ? row.getIsSelected() : false
+  const label = typeof cellProps?.ariaLabel === "string" ? cellProps.ariaLabel : "Select row"
+
+  return (
+    <input
+      type="checkbox"
+      className="data-table-cell-row-select"
+      checked={checked}
+      disabled={!canSelect}
+      aria-label={label}
+      onChange={() => {
+        if (canSelect) row.toggleSelected()
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+      }}
+      onMouseDown={(event) => {
+        event.stopPropagation()
+      }}
+    />
   )
 }
 
@@ -246,6 +300,7 @@ const BUILTIN_RENDER_MAP: Record<
   loading: LoadingCell,
   protected: ProtectedCell,
   "row-id": RowIdCell,
+  "row-select": RowSelectCell,
 }
 
 export const BUILTIN_CELL_RENDERERS: CellRenderer[] = (

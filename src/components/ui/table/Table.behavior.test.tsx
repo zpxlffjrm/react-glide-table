@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event"
 import type { ComponentProps } from "react"
 import { useEffect, useState } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 
 import { createTable, DataTable, Table } from "@/index"
@@ -1204,6 +1205,98 @@ describe("DataTable direct usage behavior", () => {
     expect(thirdCells[1]).not.toHaveAttribute("rowspan")
     expect(thirdCells[1]).toHaveTextContent("TR253023A")
     expect(thirdCells[2]).toHaveTextContent("11")
+  })
+
+  it("server-renders a rowSpan table without throwing (useSyncExternalStore needs a server snapshot)", () => {
+    type LotRow = { id: string; date: string; dateId: string; lot: string }
+
+    const lotRows: LotRow[] = [
+      { id: "1", date: "2026-07-01", dateId: "d1", lot: "1" },
+      { id: "2", date: "2026-07-01", dateId: "d1", lot: "2" },
+    ]
+
+    const columns: ColumnDef<LotRow, unknown>[] = [
+      { id: "date", accessorKey: "date", header: "Date", meta: { rowSpan: true, rowSpanKey: "dateId" } },
+      { id: "lot", accessorKey: "lot", header: "Lot" },
+    ]
+
+    expect(() =>
+      renderToStaticMarkup(
+        <DataTable
+          data={lotRows}
+          columns={columns}
+          getRowId={(row) => row.id}
+          enableRowSpan
+          enableVirtualization={false}
+        />,
+      ),
+    ).not.toThrow()
+  })
+
+  it("moves nested rowSpan hover highlight between sibling sub-groups under the same parent group", () => {
+    type LotRow = {
+      id: string
+      date: string
+      dateId: string
+      partNo: string
+      partId: string
+      lot: string
+    }
+
+    // All 5 rows share one primary "date" group. Within it, rows 0-1 are one
+    // nested "partNo" sub-group (owned by row 0) and rows 2-4 are a sibling
+    // nested sub-group (owned by row 2) — hovering between the two sub-groups
+    // must move the merged-cell highlight off row 0's cell and onto row 2's,
+    // even though neither row is the exact row losing/gaining the hover.
+    const lotRows: LotRow[] = [
+      { id: "1", date: "2026-07-01", dateId: "d1", partNo: "A", partId: "p-a", lot: "1" },
+      { id: "2", date: "2026-07-01", dateId: "d1", partNo: "A", partId: "p-a", lot: "2" },
+      { id: "3", date: "2026-07-01", dateId: "d1", partNo: "B", partId: "p-b", lot: "3" },
+      { id: "4", date: "2026-07-01", dateId: "d1", partNo: "B", partId: "p-b", lot: "4" },
+      { id: "5", date: "2026-07-01", dateId: "d1", partNo: "B", partId: "p-b", lot: "5" },
+    ]
+
+    const columns: ColumnDef<LotRow, unknown>[] = [
+      {
+        id: "date",
+        accessorKey: "date",
+        header: "Date",
+        meta: { rowSpan: true, rowSpanKey: "dateId" },
+      },
+      {
+        id: "partNo",
+        accessorKey: "partNo",
+        header: "Part No",
+        meta: { rowSpan: true, rowSpanKey: "partId", rowSpanParent: "date" },
+      },
+      {
+        id: "lot",
+        accessorKey: "lot",
+        header: "Lot",
+      },
+    ]
+
+    const { container } = render(
+      <DataTable
+        data={lotRows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        enableRowSpan
+        enableVirtualization={false}
+      />,
+    )
+
+    const rows = container.querySelectorAll("tbody tr")
+    const partNoCellOwnedByRow0 = rows[0]!.querySelectorAll("td")[1]!
+    const partNoCellOwnedByRow2 = rows[2]!.querySelectorAll("td")[1]!
+
+    fireEvent.mouseEnter(rows[1]!)
+    expect(partNoCellOwnedByRow0).toHaveAttribute("data-group-hovered", "")
+    expect(partNoCellOwnedByRow2).not.toHaveAttribute("data-group-hovered")
+
+    fireEvent.mouseEnter(rows[2]!)
+    expect(partNoCellOwnedByRow0).not.toHaveAttribute("data-group-hovered")
+    expect(partNoCellOwnedByRow2).toHaveAttribute("data-group-hovered", "")
   })
 
   it("merges rowSpan columns independently when rowSpanParent is omitted", () => {

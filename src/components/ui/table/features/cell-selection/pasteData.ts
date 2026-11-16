@@ -37,25 +37,95 @@ function looksLikeSubtreeIndentation(leadingEmptyCounts: number[]): boolean {
   return leadingEmptyCounts.some((depth) => depth > 0)
 }
 
+/**
+ * Splits TSV into rows of cells, honoring spreadsheet quoting: a cell that
+ * starts with `"` runs to the closing quote (tabs and line breaks inside are
+ * kept; `""` is a literal quote). Other cells are taken literally.
+ */
+function splitTSV(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let index = 0
+
+  while (index <= text.length) {
+    let cell = ""
+
+    if (text[index] === '"') {
+      index += 1
+      while (index < text.length) {
+        const char = text[index]!
+        if (char === '"') {
+          if (text[index + 1] === '"') {
+            cell += '"'
+            index += 2
+            continue
+          }
+          index += 1
+          break
+        }
+        cell += char
+        index += 1
+      }
+      // Anything after the closing quote up to the delimiter stays literal.
+      while (index < text.length && text[index] !== "\t" && text[index] !== "\n") {
+        cell += text[index]
+        index += 1
+      }
+    } else {
+      while (index < text.length && text[index] !== "\t" && text[index] !== "\n") {
+        cell += text[index]
+        index += 1
+      }
+    }
+
+    row.push(cell)
+
+    if (index >= text.length) {
+      rows.push(row)
+      break
+    }
+
+    if (text[index] === "\n") {
+      rows.push(row)
+      row = []
+    }
+    index += 1
+  }
+
+  return rows
+}
+
 /** Parse Excel/Sheets-style TSV from the clipboard. Trailing newlines are ignored. */
 export function parseClipboardTSV(text: string): string[][] {
   return parseClipboardTSVWithDepths(text).values
+}
+
+export type ParseClipboardOptions = {
+  /**
+   * `"auto"` (default) reads leading empty cells as subtree depth when the
+   * text looks like a subtree copy. `"none"` always keeps them as cells.
+   */
+  treeDepth?: "auto" | "none"
 }
 
 /**
  * Parse TSV and recover relative tree depth from leading tabs
  * (encoded by subtree copy as leading empty cells).
  */
-export function parseClipboardTSVWithDepths(text: string): ParsedClipboardTSV {
+export function parseClipboardTSVWithDepths(
+  text: string,
+  options?: ParseClipboardOptions,
+): ParsedClipboardTSV {
   if (!text) return { values: [], depths: [] }
 
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
   const withoutTrailing = normalized.replace(/\n+$/, "")
   if (!withoutTrailing) return { values: [], depths: [] }
 
-  const rows = withoutTrailing.split("\n").map((line) => line.split("\t"))
+  const rows = splitTSV(withoutTrailing)
   const leadingEmptyCounts = rows.map(countLeadingEmptyCells)
-  const treatAsDepth = looksLikeSubtreeIndentation(leadingEmptyCounts)
+  const treatAsDepth =
+    options?.treeDepth !== "none" && looksLikeSubtreeIndentation(leadingEmptyCounts)
 
   const values: string[][] = []
   const depths: number[] = []
@@ -103,8 +173,9 @@ export function buildRowsPastePayload<T extends Record<string, unknown>>(
   text: string,
   mode: PasteMode,
   endRow: number = startRow,
+  options?: ParseClipboardOptions,
 ): RowsPastePayload | null {
-  const { values, depths } = parseClipboardTSVWithDepths(text)
+  const { values, depths } = parseClipboardTSVWithDepths(text, options)
   if (values.length === 0) return null
 
   const width = Math.max(...values.map((row) => row.length), 0)

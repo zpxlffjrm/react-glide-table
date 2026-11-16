@@ -20,6 +20,8 @@ export type DataTableSearchProps = {
   previousLabel: string
   nextLabel: string
   closeLabel: string
+  /** Status line text. Defaults to "2 of 5 results". */
+  formatResult?: (status: SearchStatus) => string
   rowsTotal: number
   classNames?: Pick<
     DataTableClassNames,
@@ -71,6 +73,7 @@ export function DataTableSearch({
   previousLabel,
   nextLabel,
   closeLabel,
+  formatResult = formatSearchResultLabel,
   rowsTotal,
   classNames,
   onSearchValueChange,
@@ -81,7 +84,7 @@ export function DataTableSearch({
   if (!showSearch) return null
 
   const resultString = searchStatus
-    ? formatSearchResultLabel(searchStatus)
+    ? formatResult(searchStatus)
     : resultHint
   const progress =
     rowsTotal > 0
@@ -89,6 +92,10 @@ export function DataTableSearch({
       : 0
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // IME (e.g. Hangul) composition: Enter/arrows confirm the composition,
+    // they are not navigation.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+
     if (
       ((event.ctrlKey || event.metaKey) && event.code === "KeyF") ||
       event.key === "Escape"

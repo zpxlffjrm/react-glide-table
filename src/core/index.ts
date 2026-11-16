@@ -12,6 +12,7 @@ export {
 export { useGlideTable, type UseGlideTableOptions, type UseGlideTableResult } from "@/core/useGlideTable"
 export type {
   ColumnCopyValue,
+  ColumnSearchValue,
   ColumnDef,
   ColumnOrderState,
   ColumnResizeMode,
@@ -127,6 +128,7 @@ export {
   serializeSelectionToTSV,
   writeSelectionToClipboard,
   collectCopyRowEntries,
+  escapeSpreadsheetFormula,
   type CopySelectionMode,
   type CopyRowEntry,
 } from "@/components/ui/table/features/cell-selection/copyData"

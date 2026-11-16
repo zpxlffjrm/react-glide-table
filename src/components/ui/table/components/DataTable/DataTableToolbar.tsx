@@ -9,6 +9,7 @@ type DataTableToolbarProps = {
   summary?: ReactNode
   selectedCount: number
   selectionLabel?: (selectedCount: number) => ReactNode
+  countLabel?: (filteredCount: number | undefined, totalCount: number | undefined) => ReactNode
   toolbar?: ReactNode
   className?: string
   classNames?: Pick<
@@ -28,6 +29,7 @@ function DataTableToolbar({
   summary,
   selectedCount,
   selectionLabel,
+  countLabel,
   toolbar,
   className,
   classNames,
@@ -51,7 +53,9 @@ function DataTableToolbar({
       <div className={cn("toolbar-left", classNames?.toolbarLeft)}>
         {hasCount && (
           <span className={cn("toolbar-count", classNames?.toolbarCount)}>
-            {displayFiltered !== undefined && totalCount !== undefined ? (
+            {countLabel ? (
+              countLabel(displayFiltered, totalCount)
+            ) : displayFiltered !== undefined && totalCount !== undefined ? (
               <>
                 <span className="toolbar-count-primary">{displayFiltered}</span>
                 <span className="toolbar-count-placeholder"> / {totalCount}</span>

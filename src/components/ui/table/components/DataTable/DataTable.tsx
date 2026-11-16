@@ -1,11 +1,13 @@
 import { flexRender } from "@tanstack/react-table";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import { DataTableRow } from "@/components/ui/table/components/DataTable/DataTableRow";
 import { DataTableSearch } from "@/components/ui/table/components/DataTable/DataTableSearch";
 import { DataTableToolbar } from "@/components/ui/table/components/DataTable/DataTableToolbar";
 import {
   CELL_ALIGN_CLASS,
+  DATA_TABLE_COLUMN_MAX_SIZE,
+  DATA_TABLE_COLUMN_MIN_SIZE,
   DATA_TABLE_HEADER_ROW_HEIGHT,
 } from "@/components/ui/table/constants";
 import { DataTableContextProvider } from "@/components/ui/table/DataTableContext";
@@ -140,6 +142,7 @@ function DataTable<T extends Record<string, unknown>>({
     clearHover,
     setColumnOrder,
     inlineSearch,
+    handleRootFocus,
   } = useGlideTable(glideOptions);
 
   const ToolbarSlot = slots?.Toolbar ?? DataTableToolbar;
@@ -209,6 +212,37 @@ function DataTable<T extends Record<string, unknown>>({
     return resolveColumnLayoutWidths(containerWidth, columns);
   }, [enableColumnResize, containerWidth, table, columnLayoutMetaSignature]);
 
+  // Columns without a fixed width are laid out by the browser, so their real
+  // width is only known after render. Frozen insets after such a column must
+  // use that measured width, or frozen cells overlap / leave a gap.
+  const [measuredWidths, setMeasuredWidths] = useState<Map<string, number>>(
+    () => new Map(),
+  );
+  useLayoutEffect(() => {
+    if (!enableColumnFreeze || enableColumnResize) return;
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const next = new Map<string, number>();
+    element
+      .querySelectorAll<HTMLElement>("th[data-leaf-column-id]")
+      .forEach((th) => {
+        const id = th.getAttribute("data-leaf-column-id");
+        const width = th.getBoundingClientRect().width;
+        if (id && width > 0) next.set(id, width);
+      });
+
+    setMeasuredWidths((previous) => {
+      if (
+        previous.size === next.size &&
+        [...next].every(([id, width]) => previous.get(id) === width)
+      ) {
+        return previous;
+      }
+      return next;
+    });
+  });
+
   // `useGlideTable`'s own freeze offsets are built from `column.getSize()`,
   // which only matches `layoutWidths` for fixed-width columns — a
   // min/max-only column can resolve to e.g. 160px while `getSize()` stays at
@@ -223,7 +257,10 @@ function DataTable<T extends Record<string, unknown>>({
       .getVisibleLeafColumns()
       .map((column) => ({
         id: column.id,
-        size: layoutWidths.get(column.id) ?? column.getSize(),
+        size:
+          measuredWidths.get(column.id) ??
+          layoutWidths.get(column.id) ??
+          column.getSize(),
         side: resolveColumnFreezeSide(column.columnDef.meta?.frozen),
       }));
 
@@ -232,6 +269,7 @@ function DataTable<T extends Record<string, unknown>>({
     enableColumnFreeze,
     enableColumnResize,
     layoutWidths,
+    measuredWidths,
     rowContextValue.columnFreeze.offsets,
     table,
   ]);
@@ -265,6 +303,14 @@ function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       ref={rootRef}
+      tabIndex={enableCellSelection ? 0 : undefined}
+      onFocus={
+        enableCellSelection
+          ? (event) => {
+              if (event.target === event.currentTarget) handleRootFocus();
+            }
+          : undefined
+      }
       className={cn(
         "DataTableJSX",
         !enableCellSelection && "DataTableJSX--no-cell-selection",
@@ -283,6 +329,7 @@ function DataTable<T extends Record<string, unknown>>({
         summary={summary}
         selectedCount={selectedCount}
         selectionLabel={selectionLabel}
+        countLabel={labels.count}
         toolbar={toolbar}
         classNames={classNames}
       />
@@ -300,6 +347,7 @@ function DataTable<T extends Record<string, unknown>>({
           previousLabel={labels.searchPrevious}
           nextLabel={labels.searchNext}
           closeLabel={labels.searchClose}
+          formatResult={labels.searchResultCount}
           rowsTotal={inlineSearch.searchRowCount}
           classNames={classNames}
           onSearchValueChange={inlineSearch.setSearchValue}
@@ -363,6 +411,17 @@ function DataTable<T extends Record<string, unknown>>({
                       isColumnReorderable(leafColumn.columnDef.meta),
                     );
                   const isDragging = draggingColumnId === header.column.id;
+                  const sortDirection = isPlaceholder
+                    ? undefined
+                    : header.column.columnDef.meta?.sortDirection;
+                  const ariaSort =
+                    sortDirection === undefined
+                      ? undefined
+                      : sortDirection === "asc"
+                        ? "ascending"
+                        : sortDirection === "desc"
+                          ? "descending"
+                          : "none";
                   const dropEdge =
                     !isPlaceholder && dropTarget?.columnId === header.column.id
                       ? dropTarget.edge
@@ -394,7 +453,10 @@ function DataTable<T extends Record<string, unknown>>({
                       }
                       data-frozen={freezeOffset?.side}
                       data-freeze-edge={getColumnFreezeEdgeAttr(freezeOffset)}
-                      aria-grabbed={isDragging ? true : undefined}
+                      data-leaf-column-id={
+                        isLeafHeader ? header.column.id : undefined
+                      }
+                      aria-sort={ariaSort}
                       title={canDrag ? labels.reorderColumn : undefined}
                       onPointerDown={
                         enableColumnReorder
@@ -432,7 +494,37 @@ function DataTable<T extends Record<string, unknown>>({
                           role="separator"
                           aria-orientation="vertical"
                           aria-label={labels.resizeColumn}
+                          aria-valuenow={header.getSize()}
+                          tabIndex={0}
                           data-table-disable-cell-selection=""
+                          onKeyDown={(event) => {
+                            if (
+                              event.key !== "ArrowLeft" &&
+                              event.key !== "ArrowRight"
+                            ) {
+                              return;
+                            }
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const step = event.shiftKey ? 50 : 10;
+                            const columnDef = header.column.columnDef;
+                            const min =
+                              columnDef.minSize ?? DATA_TABLE_COLUMN_MIN_SIZE;
+                            const max =
+                              columnDef.maxSize ?? DATA_TABLE_COLUMN_MAX_SIZE;
+                            const nextSize = Math.min(
+                              max,
+                              Math.max(
+                                min,
+                                header.getSize() +
+                                  (event.key === "ArrowRight" ? step : -step),
+                              ),
+                            );
+                            table.setColumnSizing((previous) => ({
+                              ...previous,
+                              [header.column.id]: nextSize,
+                            }));
+                          }}
                           className={cn(
                             "data-table-resize-handle",
                             classNames?.resizeHandle,

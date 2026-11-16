@@ -104,7 +104,7 @@ Row-level UI → `slots.Row`. Cell content → `Column.render` or `Column.kind`.
 />
 ```
 
-`update` commits through `onCellChange` (preferred) or `onDataChange`. Prefer `update` over calling `setData` inside the render.
+`update` commits through the same write callbacks as editing (see [Writing changes](#writing-changes)). Prefer `update` over calling `setData` inside the render.
 
 The same `update` is available on TanStack `ColumnDef.cell` when using `DataTable` directly (or `useGlideTable().getCellContext` with `flexRender`). Bare `cell.getContext()` does **not** include `update` at runtime — only the wrapped context does (`CellContextWithUpdate`).
 
@@ -132,6 +132,8 @@ Built-ins (DOM, inspired by [Glide All Cell Kinds](https://glideapps.github.io/g
 `text`, `number`, `boolean`, `uri`, `image`, `bubble`, `markdown`, `drilldown`, `loading`, `protected`, `row-id`.
 
 Priority: **column `render` > registry `kind` > default text**.
+
+`protected` masks the value everywhere the table exposes it: the cell shows `****`, inline search skips the column, copy writes `****`, and the column is never editable or fill-able. It is still only a display mask: the raw value is in your `data`, so don't send real secrets to the browser. `uri` links allow only http(s)/mailto/relative URLs, and `image` / `drilldown` images only http(s)/blob/`data:image/*`/relative sources (`sanitizeUriHref`, `sanitizeImageSrc`).
 
 ```tsx
 const buttonRenderer = {
@@ -228,6 +230,50 @@ export function ProductTable({ data }: { data: Product[] }) {
 
 Wire `rowContextValue` into your own row/cell components for edit, selection, expand, and row-span behavior. Use `getCellContext(cell)` (not bare `cell.getContext()`) so `ColumnDef.cell` receives `update`.
 
+## Writing changes
+
+Every write the table makes goes to the first callback you provide, in this order:
+
+| Change                                   | `onCellChange` | `onBatchChange`        | `onDataChange`          |
+| ---------------------------------------- | -------------- | ---------------------- | ----------------------- |
+| Double-click / Enter edit, render `update`, boolean checkbox | called once    | one-item batch if no `onCellChange` | full patched `data` otherwise |
+| Fill handle, Delete key                  | once per cell if no `onBatchChange` | called once            | full patched `data` otherwise |
+| Paste                                    | –              | –                      | – (use `onRowsPaste`)   |
+
+So any one of the three is enough for editing, fill, checkbox and Delete. `onDataChange` always receives the full original `data` (also for tree, sorted and paginated tables). Writes only reach `editable` columns that are not `kind: "protected"`; the fill handle is shown only when at least one column is editable and a write callback is set.
+
+`kind: "boolean"` is the exception today: its checkbox writes unless `editable={false}`. The table warns once per column when `editable` is not set; a future major release will make it require `editable` like other cells.
+
+## Keyboard
+
+Click a cell, or Tab to the table (which selects the first cell), then:
+
+| Key                               | Behavior                                                    |
+| --------------------------------- | ----------------------------------------------------------- |
+| Arrows (W/A/S/D)                  | Move; with Shift, extend the selection                      |
+| Home / End                        | First / last cell in the row (Ctrl/Cmd: first / last cell)  |
+| Ctrl/Cmd+A                        | Select every cell                                           |
+| Enter / F2                        | Edit the active cell (`editable` columns)                   |
+| Enter / Shift+Enter in the editor | Commit and move down / up                                   |
+| Tab / Shift+Tab in the editor     | Commit and move right / left                                |
+| Escape in the editor              | Cancel                                                      |
+| Delete / Backspace                | Clear editable cells in the selection (writes `null`)       |
+
+Pressing anywhere outside the table hands the keyboard back to the page: arrows, Ctrl+C and the rest stop acting on the table until you click or Tab back into it. Ctrl+C also leaves the page alone when you have selected text outside the table. Set `enableWasdNavigation={false}` to keep W/A/S/D for typing or page shortcuts. A number editor with input the browser rejects stays open and gets `aria-invalid` instead of clearing the cell. Resize handles take focus and respond to ←/→ (Shift for larger steps).
+
+## Row selection
+
+`rowSelectionMode="single" | "multi"` turns on row selection. With cell selection on (the default), clicking a cell selects the cell and does **not** toggle the row; use a `kind="row-select"` column for checkboxes. With `enableCellSelection={false}`, clicking a row toggles it unless `selectOnRowClick={false}`.
+
+```tsx
+<ProductTable rowSelectionMode="multi">
+  <ProductTable.Header>
+    <ProductTable.Column field="select" virtual kind="row-select" />
+    <ProductTable.Column field="name">Name</ProductTable.Column>
+  </ProductTable.Header>
+</ProductTable>
+```
+
 ## Clipboard copy & paste
 
 Cell selection ships with clipboard shortcuts. The table parses TSV and emits structured payloads; **your app applies domain conversion and updates data**.
@@ -284,7 +330,13 @@ import type { RowsPastePayload } from "react-glide-table/compound";
 </ProductTable>;
 ```
 
-Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `onCopyActionsReady`.  
+Set `escapeCopyFormulas` when the table shows data other users can write: copied cells that start with `=`, `+`, `-`, `@` get a leading `'` so Excel / Sheets paste them as text instead of running them as formulas (plain signed numbers like `-12.5` are left as-is).
+
+The fill handle only writes into `editable` columns, the same rule as double-click editing.
+
+`payload.editableColumnIds` lists the target columns the table itself would write (editable, not protected), so you can skip read-only columns the same way editing and fill do.
+
+Related props: `onRowsPaste`, `enableInsertPaste`, `enableSubtreeCopy`, `escapeCopyFormulas`, `onCopyActionsReady`.  
 Helpers (`/core`): `buildRowsPastePayload`, `parseClipboardTSV`, `parseClipboardTSVWithDepths`, `serializeSelectionToTSV`, …
 
 ## Column width
@@ -376,7 +428,7 @@ Helpers (`/core`): `applyLeafColumnOrder`, `moveColumnIds`, `collectLeafColumnId
 
 ## Column freeze
 
-Opt in with `enableColumnFreeze`. Mark columns with `frozen` — sticky insets are stacked so frozen cells never overlap, and **column order is unchanged** (middle columns may also freeze).
+Opt in with `enableColumnFreeze`. Mark columns with `frozen` — sticky insets are stacked so frozen cells never overlap, and **column order is unchanged** (middle columns may also freeze). Columns without a `width` are measured after layout, so insets follow their real width.
 
 Keep vertical stickiness on the header via `classNames.head` (e.g. `sticky top-0`). Frozen header cells only stick horizontally (`left` / `right`); setting `top` on both `thead` and frozen `th` can detach the freeze band.
 
@@ -422,7 +474,7 @@ On tree tables (`toggleField`), search also scans **collapsed** descendants. Nav
 
 | Shortcut / control           | Behavior                       |
 | ---------------------------- | ------------------------------ |
-| Ctrl/Cmd+F                   | Open (or focus) the search box |
+| Ctrl/Cmd+F                   | Open (or focus) the search box once the table has been clicked or focused (until then the browser's find stays) |
 | Enter / ↓                    | Next match                     |
 | Shift+Enter / ↑              | Previous match                 |
 | Escape / Ctrl+F (in box) / ✕ | Close                          |
@@ -433,10 +485,34 @@ On tree tables (`toggleField`), search also scans **collapsed** descendants. Nav
 | `showSearch` / `onSearchClose`             | Controlled overlay visibility                       |
 | `searchValue` / `onSearchValueChange`      | Controlled query                                    |
 | `searchResults` / `onSearchResultsChanged` | Override / observe matches (`[colIndex, rowIndex]`) |
+| `Column.searchValue`                       | `"value"` (default) / `"display"` (rendered text) / `(ctx) => string` |
+| `labels.searchResultCount`                 | Status line text (`(status) => string`)             |
 | `data-search-match` / `data-search-active` | Match highlight hooks on cells                      |
 | `classNames.search*`                       | Style the overlay                                   |
 
 Helpers (`/core`): `useInlineSearch`, `collectSearchMatchesInRange`, `formatSearchResultLabel`, …
+
+## Sorting (compound `Table`)
+
+`Table.Column sortable` adds a header button that cycles ascending → descending → unsorted, with `aria-sort` on the header. Sorting is uncontrolled by default; pass `sort` + `onSortChange` to control it (for example to sort on the server), or `defaultSort` for an initial order. `sortLocale` sets the string collation (default `"ko"`).
+
+In a tree table (`toggleField` / `idField`), sorting reorders siblings and never moves a child out of its parent, and `Table.Pagination` pages by root rows (`pageSize` counts roots; each page shows its roots with their descendants). Nested `children` arrays keep their own order.
+
+## Tree tables
+
+| Prop                                                  | Role                                                                 |
+| ----------------------------------------------------- | -------------------------------------------------------------------- |
+| `idField` (alias of `toggleField`)                    | Row id field; turns tree mode on                                     |
+| `parentIdField` (alias of `childField`)               | Field holding the parent row's id (flat data)                        |
+| `childrenField` (alias of `flattenField`)             | Nested children array field                                          |
+| `expandColumn`                                        | Column id that shows the expand toggle                               |
+| `expandedRows` / `onExpandedRowsChange` / `autoExpandOnLoad` | Controlled expansion / expand all once on load (default `true`) |
+
+Tree rows carry `data-level` (0 = root) and the expand cell sets the `--table-row-level` CSS variable, so indentation can be styled per depth.
+
+## Styling notes
+
+The selection outline reads the CSS variables `--color-brand-primary` (border) and `--color-brand-surface` (hides grid lines inside a merged selection). Define them in your styles; without them the outline is not drawn. The compound `Table` also takes `classNames.tableRoot` (outer wrapper) and `classNames.pagination`. `labels` covers the UI copy, including `count` (toolbar), `protectedCell`, `paginationPrevious` / `paginationNext` and `searchResultCount`.
 
 ## Public API
 

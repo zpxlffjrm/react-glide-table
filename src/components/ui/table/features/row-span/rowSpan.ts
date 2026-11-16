@@ -86,7 +86,7 @@ export function computeRowSpans<T extends Record<string, unknown>>(
 
     if (
       index > 0 &&
-      currentValue === previousValue &&
+      Object.is(currentValue, previousValue) &&
       sharesParentGroup(parentStartRows, index)
     ) {
       result.push({ rowSpan: 0, isFirstInGroup: false })
@@ -95,7 +95,7 @@ export function computeRowSpans<T extends Record<string, unknown>>(
 
     let span = 1
     for (let nextIndex = index + 1; nextIndex < data.length; nextIndex++) {
-      if (getRowFieldValue(data[nextIndex], rowSpanKey) !== currentValue) break
+      if (!Object.is(getRowFieldValue(data[nextIndex], rowSpanKey), currentValue)) break
       if (!sharesParentGroup(parentStartRows, nextIndex)) break
       span++
     }
