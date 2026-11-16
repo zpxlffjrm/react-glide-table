@@ -84,7 +84,13 @@ function blurActiveElementOutside(container: EventTarget | null) {
 function resolveExpandCellIndex<T extends Record<string, unknown>>(
   cells: ReturnType<Row<T>["getVisibleCells"]>,
   toggleField?: string,
+  expandColumn?: string,
 ): number {
+  if (expandColumn) {
+    const explicitIndex = cells.findIndex((cell) => cell.column.id === expandColumn);
+    if (explicitIndex >= 0) return explicitIndex;
+  }
+
   if (!toggleField) return 0;
 
   const matchedIndex = cells.findIndex(
@@ -145,6 +151,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
     enableCellSelection,
     activeSelectionBounds,
     dragState,
+    canFill = true,
     onCellMouseDown,
     onCellMouseEnter,
     onFillHandleMouseDown,
@@ -153,9 +160,12 @@ export function DataTableRow<T extends Record<string, unknown>>({
   const {
     editingCell,
     draftValue,
+    draftInvalid = false,
+    onDraftInvalidChange,
     onDraftValueChange,
     onStartEdit,
     onCommitEdit,
+    onCommitEditAndMove,
     onCancelEdit,
   } = cellEdit;
 
@@ -168,6 +178,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
   const {
     enableExpand,
     toggleField,
+    expandColumn,
     expandedRows,
     preventExpand,
     onToggleExpand,
@@ -306,7 +317,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
       }
     : undefined;
   const expandCellIndex = enableExpand
-    ? resolveExpandCellIndex(visibleCells, toggleField)
+    ? resolveExpandCellIndex(visibleCells, toggleField, expandColumn)
     : -1;
   const canExpand = enableExpand && !preventExpand && canExpandRow(rowData);
   const expandKey =
@@ -319,6 +330,9 @@ export function DataTableRow<T extends Record<string, unknown>>({
     expandKey !== null && Boolean(expandedRows?.has(expandKey));
   const rowLevel = typeof rowData.level === "number" ? rowData.level : 0;
   const editInputRef = useRef<HTMLInputElement>(null);
+  // Set when a press on a cell started a cell selection: that click belongs
+  // to the cell selection, not to row selection.
+  const cellPressRef = useRef(false);
   const isRowEditing = editingCell?.rowIndex === rowIndex;
 
   useEffect(() => {
@@ -336,6 +350,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
       data-hovered={isRowHovered || isGroupHovered ? "" : undefined}
       data-expandable={enableExpand && canExpand ? "" : undefined}
       data-expanded={isExpanded ? "" : undefined}
+      data-level={enableExpand ? rowLevel : undefined}
       className={cn(
         "DataTableRowJSX",
         !enableRowSpan && ROW_HOVER_CLASS,
@@ -346,11 +361,20 @@ export function DataTableRow<T extends Record<string, unknown>>({
         getRowClassName?.(rowData, rowIndex),
       )}
       onMouseEnter={() => onRowHover(rowIndex, rowData)}
+      onMouseDownCapture={() => {
+        cellPressRef.current = false;
+      }}
       onClick={() => {
+        const startedCellSelection = cellPressRef.current;
+        cellPressRef.current = false;
         if (isRowEditing) return;
 
         onRowClick?.(rowData, rowIndex);
-        if (rowSelectionMode !== "none" && selectOnRowClick) {
+        if (
+          rowSelectionMode !== "none" &&
+          selectOnRowClick &&
+          !startedCellSelection
+        ) {
           onToggleSelect();
         }
       }}
@@ -420,6 +444,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
         );
 
         const isBottomRightCell =
+          canFill &&
           !isEditing &&
           activeSelectionBounds &&
           !dragState.isSelecting &&
@@ -519,6 +544,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
 
               event.preventDefault();
               blurActiveElementOutside(event.currentTarget);
+              cellPressRef.current = true;
               onCellMouseDown(
                 resolveCellRowIndex(event.clientY, event.currentTarget),
                 cellIndex,
@@ -580,6 +606,8 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 ref={editInputRef}
                 type={editType === "number" ? "number" : "text"}
                 defaultValue={draftValue}
+                aria-invalid={draftInvalid ? true : undefined}
+                data-invalid={draftInvalid ? "" : undefined}
                 className={cn(
                   "cell-edit-input",
                   CELL_ALIGN_CLASS[align],
@@ -588,6 +616,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 )}
                 onChange={(event) => {
                   editInputProps?.onChange?.(event);
+                  onDraftInvalidChange?.(Boolean(event.target.validity?.badInput));
                   onDraftValueChange(event.target.value);
                 }}
                 onMouseDown={(event) => {
@@ -607,9 +636,22 @@ export function DataTableRow<T extends Record<string, unknown>>({
                     return;
                   }
 
-                  if (event.key === "Enter") {
+                  if (event.key === "Enter" || event.key === "Tab") {
                     event.preventDefault();
-                    onCommitEdit(event.currentTarget.value);
+                    if (event.currentTarget.validity?.badInput) {
+                      onDraftInvalidChange?.(true);
+                      return;
+                    }
+                    const delta =
+                      event.key === "Enter"
+                        ? { row: event.shiftKey ? -1 : 1, col: 0 }
+                        : { row: 0, col: event.shiftKey ? -1 : 1 };
+                    if (onCommitEditAndMove) {
+                      onCommitEditAndMove(event.currentTarget.value, delta);
+                    } else {
+                      onCommitEdit(event.currentTarget.value);
+                    }
+                    return;
                   }
 
                   if (event.key === "Escape") {
@@ -620,6 +662,10 @@ export function DataTableRow<T extends Record<string, unknown>>({
                 onBlur={(event) => {
                   editInputProps?.onBlur?.(event);
                   if (event.defaultPrevented) return;
+                  if (event.currentTarget.validity?.badInput) {
+                    onDraftInvalidChange?.(true);
+                    return;
+                  }
                   onCommitEdit(event.currentTarget.value);
                 }}
               />
@@ -630,6 +676,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                     "expand-cell-content",
                     classNames?.expandCellContent,
                   )}
+                  style={{ "--table-row-level": rowLevel } as CSSProperties}
                 >
                   {rowLevel > 0 && (
                     <span
@@ -654,6 +701,7 @@ export function DataTableRow<T extends Record<string, unknown>>({
                   <button
                     type="button"
                     aria-label={isExpanded ? collapseRowLabel : expandRowLabel}
+                    aria-expanded={isExpanded}
                     className={cn(
                       "expand-toggle-button",
                       classNames?.expandToggle,

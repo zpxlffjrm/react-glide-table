@@ -44,6 +44,8 @@ export type DataTableRowContextValue = {
     enableCellSelection: boolean;
     activeSelectionBounds: CellSelectionBounds | null;
     dragState: DragState;
+    /** False when fill could not write anything (no editable column or no write callback). */
+    canFill?: boolean;
     onCellMouseDown: (
       rowIndex: number,
       colIndex: number,
@@ -55,18 +57,27 @@ export type DataTableRowContextValue = {
   cellEdit: {
     editingCell: EditingCell | null;
     draftValue: string;
+    /** The browser rejected the typed text (number input `badInput`). */
+    draftInvalid?: boolean;
+    onDraftInvalidChange?: (invalid: boolean) => void;
     onDraftValueChange: (value: string) => void;
     onStartEdit: (rowIndex: number, colIndex: number) => void;
     onCommitEdit: (raw?: string) => boolean;
+    /** Commit, then move the cell selection by `delta` (Enter / Tab). */
+    onCommitEditAndMove?: (raw: string, delta: { row: number; col: number }) => boolean;
     onCancelEdit: () => void;
   };
   cellRender: {
     registry: CellRendererRegistry;
     commitValue: (rowId: string, columnId: string, value: unknown) => boolean;
+    /** `labels.protectedCell` for `kind: "protected"` cells */
+    protectedLabel?: string;
   };
   expand: {
     enableExpand: boolean;
     toggleField?: string;
+    /** Column id that shows the expand toggle */
+    expandColumn?: string;
     expandedRows?: Set<string>;
     preventExpand: boolean;
     onToggleExpand?: (rowKey: string) => void;

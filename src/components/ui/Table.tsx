@@ -6,6 +6,8 @@ export {
 } from "@/components/ui/table/components/Table/Table"
 export type {
   ColumnCopyValue,
+  ColumnSearchValue,
+  TableSort,
   DataTableLabels,
   DataTableClassNames,
   DataTableEditInputProps,

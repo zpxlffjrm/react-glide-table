@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import type { ReactElement } from "react"
 
 import { DataTable } from "@/components/ui/table/components/DataTable/DataTable"
 import {
   buildColumnDefsFromTree,
   countLeafColumns,
+  TableSortContext,
+  type HeaderRendererCache,
 } from "@/components/ui/table/components/Table/buildColumnDef"
 import {
   extractColumnTree,
@@ -18,6 +20,7 @@ import {
 import { TableColumn } from "@/components/ui/table/components/Table/TableColumn"
 import { TableColumnGroup } from "@/components/ui/table/components/Table/TableColumnGroup"
 import {
+  buildTreeRootBlocks,
   paginateTableData,
   sortTableData,
   type TableSortState,
@@ -32,6 +35,7 @@ import type {
   TableColumnProps,
   TableProps,
 } from "@/components/ui/table/types"
+import { DEFAULT_TREE_PARENT_ID_FIELD } from "@/core/treeDefaults"
 import { cn } from "@/lib/cn"
 
 
@@ -49,10 +53,15 @@ function TableRoot<T extends Record<string, unknown>>({
   data,
   children,
   className,
+  classNames,
   totalCount,
   filteredCount,
   onDataChange,
   getRowId,
+  sort: controlledSort,
+  defaultSort = null,
+  onSortChange,
+  sortLocale,
   ...dataTableProps
 }: TableProps<T>) {
   const { header, pagination: paginationElement } = useMemo(
@@ -60,28 +69,34 @@ function TableRoot<T extends Record<string, unknown>>({
     [children],
   )
 
-  const [sort, setSort] = useState<TableSortState | null>(null)
+  const [internalSort, setInternalSort] = useState<TableSortState | null>(defaultSort)
+  const sort = controlledSort !== undefined ? controlledSort : internalSort
 
-  const handleSort = useCallback((field: string) => {
-    setSort((previous) => {
-      if (previous?.field !== field) {
-        return { field, direction: "asc" }
+  const handleSort = useCallback(
+    (field: string) => {
+      let next: TableSortState | null
+      if (sort?.field !== field) {
+        next = { field, direction: "asc" }
+      } else if (sort.direction === "asc") {
+        next = { field, direction: "desc" }
+      } else {
+        next = null
       }
 
-      if (previous.direction === "asc") {
-        return { field, direction: "desc" }
-      }
-
-      return null
-    })
-  }, [])
+      if (controlledSort === undefined) setInternalSort(next)
+      onSortChange?.(next)
+    },
+    [controlledSort, onSortChange, sort],
+  )
 
   const columnTree = useMemo(() => extractColumnTree<T>(header), [header])
 
+  const headerCacheRef = useRef<HeaderRendererCache>(new Map())
   const columns = useMemo(
-    () => buildColumnDefsFromTree(columnTree, sort, handleSort),
+    () => buildColumnDefsFromTree(columnTree, sort, handleSort, headerCacheRef.current),
     [columnTree, sort, handleSort],
   )
+  const sortContextValue = useMemo(() => ({ sort, onSort: handleSort }), [sort, handleSort])
 
   const paginationProps = paginationElement?.props as TablePaginationProps | undefined
   const pageSize = paginationProps?.pageSize ?? 10
@@ -90,13 +105,43 @@ function TableRoot<T extends Record<string, unknown>>({
 
   const isManualPagination = Boolean(paginationProps?.manual)
 
+  const treeIdField = dataTableProps.toggleField ?? dataTableProps.idField
+  const isTree = Boolean(treeIdField)
+  const treeParentIdField =
+    dataTableProps.childField ?? dataTableProps.parentIdField ?? DEFAULT_TREE_PARENT_ID_FIELD
+
+  // Tree tables sort siblings and page by root rows, so a child never shows
+  // up apart from its parent (or ahead of it, which would make it a root).
+  const treeBlocks = useMemo(() => {
+    if (!isTree || !treeIdField) return null
+    if (!sort && (!paginationProps || isManualPagination)) return null
+
+    return buildTreeRootBlocks(
+      data,
+      { idField: treeIdField, parentIdField: treeParentIdField },
+      sort,
+      sortLocale,
+    )
+  }, [data, isManualPagination, isTree, paginationProps, sort, sortLocale, treeIdField, treeParentIdField])
+
+  const pageTotalCount =
+    paginationProps?.totalCount ?? totalCount ?? (treeBlocks ? treeBlocks.length : data.length)
+
   const tableData = useMemo(() => {
-    const sortedData = sortTableData(data, sort)
+    if (treeBlocks) {
+      const blocks =
+        !paginationProps || isManualPagination
+          ? treeBlocks
+          : paginateTableData(treeBlocks, page, pageSize)
+      return blocks.flat()
+    }
+
+    const sortedData = sortTableData(data, sort, sortLocale)
 
     if (!paginationProps || isManualPagination) return sortedData
 
     return paginateTableData(sortedData, page, pageSize)
-  }, [data, sort, paginationProps, isManualPagination, page, pageSize])
+  }, [treeBlocks, data, sort, sortLocale, paginationProps, isManualPagination, page, pageSize])
 
   // The DataTable below only sees the sorted / paged rows. Map them back to
   // their index in the consumer's `data` so ids and writes stay correct.
@@ -109,10 +154,10 @@ function TableRoot<T extends Record<string, unknown>>({
   const resolvedGetRowId = useMemo<TableProps<T>["getRowId"]>(() => {
     if (getRowId) return getRowId
     // Tree tables get stable ids from the tree conversion itself.
-    if (dataTableProps.toggleField) return undefined
+    if (isTree) return undefined
 
     return (row: T, index: number) => String(originalIndexByRow.get(row) ?? index)
-  }, [dataTableProps.toggleField, getRowId, originalIndexByRow])
+  }, [isTree, getRowId, originalIndexByRow])
 
   const handleDataChange = useMemo<TableProps<T>["onDataChange"]>(() => {
     if (!onDataChange) return undefined
@@ -136,9 +181,11 @@ function TableRoot<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className="TableJSX">
+    <div className={cn("TableJSX", classNames?.tableRoot)}>
+      <TableSortContext value={sortContextValue}>
       <DataTable
         {...dataTableProps}
+        classNames={classNames}
         getRowId={resolvedGetRowId}
         onDataChange={handleDataChange}
         data={tableData}
@@ -147,15 +194,16 @@ function TableRoot<T extends Record<string, unknown>>({
         filteredCount={filteredCount ?? data.length}
         className={cn(className, paginationProps && "DataTableJSX--with-pagination")}
       />
+      </TableSortContext>
       {paginationProps && (
         <TablePagination
           page={page}
           pageSize={pageSize}
-          totalCount={resolvedTotalCount}
+          totalCount={pageTotalCount}
           onChange={paginationProps.onChange}
-          className={paginationProps.className}
-          previousLabel={paginationProps.previousLabel}
-          nextLabel={paginationProps.nextLabel}
+          className={cn(classNames?.pagination, paginationProps.className)}
+          previousLabel={paginationProps.previousLabel ?? dataTableProps.labels?.paginationPrevious}
+          nextLabel={paginationProps.nextLabel ?? dataTableProps.labels?.paginationNext}
         />
       )}
     </div>

@@ -1,5 +1,10 @@
 import type { ReactNode } from "react"
 
+import {
+  formatSearchResultLabel,
+  type SearchStatus,
+} from "@/components/ui/table/features/inline-search/inlineSearch"
+
 export type DataTableLabels = {
   empty: string
   loading: string
@@ -16,6 +21,18 @@ export type DataTableLabels = {
   searchPrevious: string
   searchNext: string
   searchClose: string
+  /** Search status line ("2 of 5 results") */
+  searchResultCount: (status: SearchStatus) => string
+  /** Accessible label of a `kind: "protected"` cell */
+  protectedCell: string
+  /** Compound `Table.Pagination` buttons (the Pagination props win when set) */
+  paginationPrevious: string
+  paginationNext: string
+  /**
+   * Toolbar row count. When omitted the toolbar shows the bare numbers
+   * (`filtered / total`).
+   */
+  count?: (filteredCount: number | undefined, totalCount: number | undefined) => ReactNode
 }
 
 /** Default copy. Override via the `labels` option. */
@@ -33,6 +50,10 @@ export const DEFAULT_DATA_TABLE_LABELS: DataTableLabels = {
   searchPrevious: "Previous result",
   searchNext: "Next result",
   searchClose: "Close search",
+  searchResultCount: formatSearchResultLabel,
+  protectedCell: "protected",
+  paginationPrevious: "Previous page",
+  paginationNext: "Next page",
 }
 
 export function resolveDataTableLabels(

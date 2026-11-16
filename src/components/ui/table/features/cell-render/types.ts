@@ -17,6 +17,8 @@ export type BuiltinCellKind =
   | "loading"
   | "protected"
   | "row-id"
+  /** Checkbox bound to the row's selection (`rowSelectionMode`) */
+  | "row-select"
 
 export type CellKind = BuiltinCellKind | (string & {})
 

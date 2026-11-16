@@ -6,6 +6,8 @@ export {
 } from "@/components/ui/Table"
 export type {
   ColumnCopyValue,
+  ColumnSearchValue,
+  TableSort,
   ColumnDef,
   ColumnFreezeMeta,
   ColumnFreezeSide,
